@@ -1,0 +1,13 @@
+[project]
+name = "stock-trend-forecasting"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "nphuoctho", email = "phuoctho.dev@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+package = false
