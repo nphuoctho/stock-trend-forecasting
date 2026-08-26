@@ -12,10 +12,60 @@
 
 ## Môi trường
 
-- Python 3.12, managed by `uv`. Tạo/cập nhật môi trường bằng `uv sync`.
-- Chạy script bằng `uv run`, ví dụ: `uv run python src/data/spike_prices.py`.
+- Python 3.12, quản lý bằng `uv`. Tạo/cập nhật môi trường bằng `uv sync`.
+- Chạy lệnh bằng `uv run`.
 
 ## Cấu trúc
 
-- `src/data/` - kéo giá (`spike_prices.py`) + tin Vietstock (`spike_news_vietstock.py`).
-- `data/` - dữ liệu thô/xử lý (gitignore; tái tạo bằng script).
+```
+src/stf/                 package chính
+  config.py              cấu hình tập trung: mã, cửa sổ thời gian, đường dẫn
+  cli.py                 CLI: prices | news | verify | sentiment-smoke | sentiment-train
+  data/
+    prices.py            loader giá OHLCV điều chỉnh (vnstock/VCI)
+    news.py              scraper tin Vietstock: timestamp + tiêu đề + nội dung
+  sentiment/
+    labels.py            định nghĩa 3 lớp NEGATIVE/NEUTRAL/POSITIVE
+    dataset.py           nạp nhãn, split tách thời gian (chống rò rỉ)
+    metrics.py           macro-F1, per-class, Cohen/Fleiss kappa
+    model.py             fine-tune PhoBERT + sinh xác suất 3 lớp
+tests/                   test pipeline (offline)
+legacy/                  script spike giai đoạn đầu (tham chiếu)
+data/                    dữ liệu thô/xử lý (gitignore; tái tạo bằng script)
+models/                  checkpoint mô hình (gitignore)
+```
+
+## Chạy pipeline dữ liệu
+
+```bash
+# Kéo giá 10 mã VN30 (01/2020 -> 31/03/2026)
+uv run python -m stf.cli prices              # toàn bộ
+uv run python -m stf.cli prices --limit 1    # thử nhanh 1 mã
+
+# Crawl tin (timestamp phút + tiêu đề + nội dung bài)
+uv run python -m stf.cli news                     # toàn bộ (chạy nền dài)
+uv run python -m stf.cli news --limit-urls 20     # thử nhanh 20 bài
+
+# Báo cáo coverage dữ liệu đã có (offline, không tải mạng)
+uv run python -m stf.cli verify
+```
+
+## Phase 2 - PhoBERT sentiment
+
+```bash
+# Smoke-test pipeline bằng dữ liệu giả (verify code chạy thông, KHÔNG phải kết quả thật)
+uv run python -m stf.cli sentiment-smoke --n 60
+
+# Fine-tune trên file nhãn thật (.csv/.parquet có cột text, label)
+uv run python -m stf.cli sentiment-train --data data/labeled/seed.csv --epochs 3
+```
+
+> Máy phát triển hiện tại không có GPU/CUDA. Fine-tune thật nên chạy trên GPU
+> (Google Colab/Kaggle). Xem `docs/phase2-phobert-guide.md` (trong thư mục docs của
+> project research) để biết quy trình training trên GPU và ràng buộc chống rò rỉ.
+
+## Kiểm thử
+
+```bash
+uv run pytest tests/ -q
+```

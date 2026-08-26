@@ -12,3 +12,4 @@ wheels/
 # Local datasets and experiment artifacts
 /data/
 /scratch/
+/models/
