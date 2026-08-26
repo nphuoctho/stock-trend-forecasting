@@ -44,8 +44,10 @@ def normalize_labels(df: pd.DataFrame) -> pd.DataFrame:
     if "label_id" in df.columns:
         return df
     raw = df["label"]
-    if raw.dtype == object:
-        df["label_id"] = raw.str.upper().map(LABEL2ID)
+    # Nhận diện label dạng chữ (object hoặc string dtype của pandas mới) vs số.
+    is_text = raw.dtype == object or pd.api.types.is_string_dtype(raw)
+    if is_text:
+        df["label_id"] = raw.astype("string").str.upper().str.strip().map(LABEL2ID)
     else:
         df["label_id"] = raw.astype(int)
     if df["label_id"].isna().any():
