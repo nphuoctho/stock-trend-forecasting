@@ -28,7 +28,8 @@ def cmd_prices(args: argparse.Namespace) -> int:
 def cmd_news(args: argparse.Namespace) -> int:
     from stf.data import news
 
-    articles = news.crawl(refresh=args.refresh, limit_urls=args.limit_urls)
+    articles = news.crawl(refresh=args.refresh, limit_urls=args.limit_urls,
+                          max_new=args.batch)
     news.summary(articles)
     return 0 if len(articles) else 1
 
@@ -117,6 +118,8 @@ def main(argv: list[str] | None = None) -> int:
 
     p_news = sub.add_parser("news", help="crawl tin (timestamp + tiêu đề + nội dung)")
     p_news.add_argument("--limit-urls", type=int, default=None, help="chỉ lấy N bài đầu")
+    p_news.add_argument("--batch", type=int, default=None,
+                        help="chỉ crawl thêm N bài CHƯA có body rồi dừng (cho cron)")
     p_news.add_argument("--refresh", action="store_true", help="cào lại listing")
     p_news.set_defaults(func=cmd_news)
 

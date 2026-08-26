@@ -152,27 +152,59 @@ def _to_iso(ts: str | None) -> str | None:
         return None
 
 
-def fetch_articles(urls: list[str], *, limit_urls: int | None = None) -> pd.DataFrame:
-    """Lấy timestamp phút + tiêu đề + nội dung cho mỗi url. Cache HTML, ghi tăng dần."""
+def _has_body(val) -> bool:
+    """True nếu body có nội dung thật (không None, không NaN, không rỗng).
+
+    Cần thiết vì pandas lưu ô thiếu thành NaN (float) — mà `not float('nan')` là False,
+    dễ khiến bài chưa có body bị tưởng đã có. Kiểm tra qua pd.isna cho an toàn.
+    """
+    if val is None:
+        return False
+    try:
+        if pd.isna(val):
+            return False
+    except (TypeError, ValueError):
+        pass
+    return bool(str(val).strip())
+
+
+def fetch_articles(
+    urls: list[str], *, limit_urls: int | None = None, max_new: int | None = None
+) -> pd.DataFrame:
+    """Lấy timestamp phút + tiêu đề + nội dung cho mỗi url. Cache HTML, ghi tăng dần.
+
+    Upsert theo url: GIỮ mọi bài cũ (kể cả bài mới chỉ có title, chưa có body) và chỉ
+    BỔ SUNG body cho bài còn thiếu. max_new giới hạn số bài được bổ sung body mỗi lần
+    (cho cron crawl dần toàn corpus qua nhiều lần chạy).
+    """
     config.NEWS_HTML_DIR.mkdir(parents=True, exist_ok=True)
-    done: dict[str, dict] = {}
+
+    # Nạp toàn bộ bài cũ vào store theo url (không bỏ bài nào).
+    store: dict[str, dict] = {}
     if config.ARTICLES_PQ.exists():
         prev = pd.read_parquet(config.ARTICLES_PQ)
-        # Chỉ coi là "đã xong" khi bài đã có cột body (dữ liệu cũ chỉ có title thì cào lại body).
-        has_body = "body" in prev.columns
         for r in prev.to_dict("records"):
-            if has_body and r.get("body"):
-                done[r["url"]] = r
-        _log(f"[articles] đã có {len(done)} bài (có body) từ lần trước, bỏ qua")
+            store[r["url"]] = r
+        with_body = sum(1 for r in store.values() if _has_body(r.get("body")))
+        _log(f"[articles] nạp {len(store)} bài cũ ({with_body} đã có body)")
 
     if limit_urls is not None:
         urls = urls[:limit_urls]
 
-    recs = list(done.values())
+    def _needs_body(url: str) -> bool:
+        rec = store.get(url)
+        return rec is None or not _has_body(rec.get("body"))
+
+    def _flush() -> None:
+        pd.DataFrame(list(store.values())).to_parquet(config.ARTICLES_PQ)
+
     n_new = 0
     for i, url in enumerate(urls, 1):
-        if url in done:
+        if not _needs_body(url):
             continue
+        if max_new is not None and n_new >= max_new:
+            _log(f"[articles] đạt batch {max_new} bài, dừng (còn lại để lần sau)")
+            break
         aid_m = ART_ID.search(url)
         aid = aid_m.group(1) if aid_m else str(abs(hash(url)))
         cache = config.NEWS_HTML_DIR / f"{aid}.html"
@@ -186,27 +218,27 @@ def fetch_articles(urls: list[str], *, limit_urls: int | None = None) -> pd.Data
             cache.write_text(html, encoding="utf-8")
             time.sleep(SLEEP)
         parsed = parse_article(html)
-        recs.append({"url": url, "article_id": aid,
-                     "published_at": _to_iso(parsed["published_at_str"]),
-                     **parsed})
+        store[url] = {"url": url, "article_id": aid,
+                      "published_at": _to_iso(parsed["published_at_str"]),
+                      **parsed}
         n_new += 1
         if n_new % 100 == 0:
-            pd.DataFrame(recs).to_parquet(config.ARTICLES_PQ)
-            with_ts = sum(1 for r in recs if r.get("published_at"))
-            with_body = sum(1 for r in recs if r.get("body"))
-            _log(f"[articles] {i}/{len(urls)} | mới {n_new} | ts {with_ts} | body {with_body}")
-    df = pd.DataFrame(recs)
-    config.NEWS_DIR.mkdir(parents=True, exist_ok=True)
-    df.to_parquet(config.ARTICLES_PQ)
-    return df
+            _flush()
+            with_body = sum(1 for r in store.values() if _has_body(r.get("body")))
+            _log(f"[articles] {i}/{len(urls)} | batch {n_new} | body {with_body}/{len(store)}")
+
+    _flush()
+    return pd.DataFrame(list(store.values()))
 
 
-def crawl(*, refresh: bool = False, limit_urls: int | None = None) -> pd.DataFrame:
+def crawl(
+    *, refresh: bool = False, limit_urls: int | None = None, max_new: int | None = None
+) -> pd.DataFrame:
     """Chạy pipeline tin đầu-cuối: listing -> articles (ts + title + body)."""
     listings = collect_listings(refresh=refresh)
     urls = listings["url"].drop_duplicates().tolist()
     _log(f"[news] {len(urls)} url duy nhất để lấy nội dung")
-    return fetch_articles(urls, limit_urls=limit_urls)
+    return fetch_articles(urls, limit_urls=limit_urls, max_new=max_new)
 
 
 def summary(articles: pd.DataFrame) -> None:

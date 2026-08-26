@@ -47,3 +47,15 @@ def test_to_iso_parsing():
     assert news._to_iso("08/09/2022 16:35") == "2022-09-08T16:35:00"
     assert news._to_iso(None) is None
     assert news._to_iso("không hợp lệ") is None
+
+
+def test_has_body_handles_nan():
+    """_has_body phân biệt đúng body thật với None/NaN/rỗng (chống bug NaN truthy)."""
+    import numpy as np
+
+    assert news._has_body("nội dung thật") is True
+    assert news._has_body(None) is False
+    assert news._has_body(float("nan")) is False
+    assert news._has_body(np.nan) is False
+    assert news._has_body("") is False
+    assert news._has_body("   ") is False
