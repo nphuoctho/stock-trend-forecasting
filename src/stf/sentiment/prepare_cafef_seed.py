@@ -1,13 +1,13 @@
-"""Chuẩn hóa seed CafeF công khai (209sontung) về định dạng nhãn của pipeline.
+"""Normalize the public CafeF seed (209sontung) into the pipeline's label format.
 
-Nguồn: https://github.com/209sontung/Vietnamese-stock-article-classification
-  Dataset/raw_data.xlsx - 1005 tiêu đề tin CafeF, gán nhãn bởi chuyên gia, 3 lớp.
-  Mapping label gốc -> lớp: 1=NEGATIVE (187), 2=NEUTRAL (249), 3=POSITIVE (569).
+Source: https://github.com/209sontung/Vietnamese-stock-article-classification
+  Dataset/raw_data.xlsx - 1005 expert-labeled CafeF headlines, 3 classes.
+  Original label -> class mapping: 1=NEGATIVE (187), 2=NEUTRAL (249), 3=POSITIVE (569).
 
-Đầu ra: data/labeled/cafef_seed/cafef_seed.parquet với cột text, label (tên lớp).
-Đây là dữ liệu để DẠY PhoBERT (train), khác với tin Vietstock crawl (để inference).
+Output: data/labeled/cafef_seed/cafef_seed.parquet with text, label (class name) columns.
+This is training data to TEACH PhoBERT, distinct from the crawled Vietstock news (for inference).
 
-Chạy: uv run --with openpyxl python -m stf.sentiment.prepare_cafef_seed
+Run: uv run --with openpyxl python -m stf.sentiment.prepare_cafef_seed
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ import pandas as pd
 from stf import config
 from stf.sentiment.labels import LABELS
 
-# Mapping số nhãn gốc trong raw_data.xlsx -> tên lớp chuẩn của pipeline.
+# Maps the original numeric labels in raw_data.xlsx -> the pipeline's class names.
 _RAW2LABEL = {1: "NEGATIVE", 2: "NEUTRAL", 3: "POSITIVE"}
 
 SEED_DIR = config.DATA / "labeled" / "cafef_seed"

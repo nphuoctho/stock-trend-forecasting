@@ -1,20 +1,20 @@
-"""Scraper tin Vietstock per-ticker: listing -> timestamp phút -> tiêu đề + nội dung.
+"""Per-ticker Vietstock news scraper: listing -> minute timestamp -> title + body.
 
-Kế thừa recipe đã xác minh ở spike (finance.vietstock.vn/View/PagingNewsContent),
-mở rộng:
-  - Trích NỘI DUNG BÀI (div itemprop="articleBody" id="vst_detail"), không chỉ tiêu đề.
-  - Cửa sổ tới config.DATE_END (mặc định 31/03/2026).
-  - Timestamp tới phút (itemprop="datePublished") cho cutoff 15:00 ở Phase 3.
+Builds on the recipe verified in the spike (finance.vietstock.vn/View/PagingNewsContent),
+extended to:
+  - Extract the ARTICLE BODY (div itemprop="articleBody" id="vst_detail"), not just the title.
+  - Cover the window up to config.DATE_END (default 2026-03-31).
+  - Keep minute-level timestamps (itemprop="datePublished") for the 15:00 cutoff in Phase 3.
 
-Thiết kế cho chạy nền dài + chạy lại rẻ:
-  - Cache HTML trang bài -> chạy lại không tải lại.
-  - Ghi parquet tăng dần -> dừng giữa chừng vẫn còn dữ liệu dùng được.
-  - listings.parquet: mọi (mã, url, ngày) -> nguồn ánh xạ tin->mã.
-  - articles.parquet: mỗi url 1 dòng (timestamp phút + tiêu đề + nội dung), đã dedup.
+Built for long background runs and cheap reruns:
+  - Cache article HTML so reruns don't re-download.
+  - Write parquet incrementally so stopping midway still leaves usable data.
+  - listings.parquet: every (ticker, url, date) -> the news->ticker mapping source.
+  - articles.parquet: one row per url (minute timestamp + title + body), deduped.
 
-Chạy:
-    uv run python -m stf.cli news                 # crawl toàn bộ
-    uv run python -m stf.cli news --limit-urls 20 # verify nhỏ, chỉ 20 bài
+Run:
+    uv run python -m stf.cli news                 # crawl everything
+    uv run python -m stf.cli news --limit-urls 20 # small check, 20 articles only
 """
 
 from __future__ import annotations
@@ -31,23 +31,23 @@ from stf import config
 
 BASE = "https://finance.vietstock.vn/View/PagingNewsContent"
 HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://finance.vietstock.vn/"}
-SLEEP = 0.4  # nhịp lịch sự, khớp spike đã chạy an toàn
+SLEEP = 0.4  # polite pacing, matches the spike that ran safely
 PAGE_SIZE = 20
-MAX_PAGES = 400  # chặn vòng lặp vô hạn nếu paginator lặp lại trang cuối
+MAX_PAGES = 400  # guard against an infinite loop if the paginator repeats the last page
 
-# --- Regex trích dữ liệu --------------------------------------------------
+# --- Data-extraction regexes ----------------------------------------------
 HREF = re.compile(r"href=(//vietstock\.vn/\d{4}/\d{2}/[^\s\"']+\.htm)", re.I)
 DATE = re.compile(r"\b(\d{2}/\d{2}/\d{4})\b")
 PUB = re.compile(r"\b(\d{2}/\d{2}/\d{4} \d{2}:\d{2})\b")  # itemprop=datePublished
 OG_TITLE = re.compile(r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)', re.I)
 TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
 ART_ID = re.compile(r"-(\d+)\.htm", re.I)
-# Khối nội dung bài: <div itemprop="articleBody" id="vst_detail"> ... </div>
+# Article body block: <div itemprop="articleBody" id="vst_detail"> ... </div>
 BODY_BLOCK = re.compile(
     r'<div[^>]*itemprop=["\']articleBody["\'][^>]*id=["\']vst_detail["\'][^>]*>(.*?)</div>',
     re.I | re.S,
 )
-# Fallback cho bài longform/chuyên đề không có khối vst_detail: dùng og:description.
+# Fallback for longform/feature articles with no vst_detail block: use og:description.
 OG_DESC = re.compile(
     r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)', re.I)
 TAG = re.compile(r"<[^>]+>")
@@ -58,23 +58,23 @@ def _log(msg: str) -> None:
 
 
 def get(url: str, params: dict | None = None, tries: int = 4) -> requests.Response | None:
-    """GET với backoff lũy thừa. Trả None sau khi hết lượt (bỏ bài lỗi, không chết job)."""
+    """GET with exponential backoff. Returns None after retries run out (skip the bad article, don't kill the job)."""
     for i in range(tries):
         try:
             r = requests.get(url, params=params, headers=HEADERS, timeout=30)
             if r.status_code == 200:
                 r.encoding = "utf-8"
                 return r
-            time.sleep(SLEEP * (2 ** i))  # 429/5xx: lùi lâu hơn
+            time.sleep(SLEEP * (2 ** i))  # 429/5xx: back off longer
         except requests.RequestException:
             time.sleep(SLEEP * (2 ** i))
     return None
 
 
-# --- Pha 1: listing (ánh xạ tin -> mã) ------------------------------------
+# --- Phase 1: listing (news -> ticker mapping) ----------------------------
 
 def list_ticker_year(code: str, year: int, *, to_date: str) -> list[tuple[str, str]]:
-    """Duyệt hết trang tin của 1 mã trong 1 năm. Trả [(url, ngày dd/mm/yyyy)]."""
+    """Walk every news page for one ticker in one year. Returns [(url, dd/mm/yyyy date)]."""
     rows: list[tuple[str, str]] = []
     seen: set[str] = set()
     for page in range(1, MAX_PAGES + 1):
@@ -88,7 +88,7 @@ def list_ticker_year(code: str, year: int, *, to_date: str) -> list[tuple[str, s
         hrefs = HREF.findall(r.text)
         dates = DATE.findall(r.text)
         new = [(h, d) for h, d in zip(hrefs, dates + [""] * len(hrefs)) if h not in seen]
-        if not new:  # trang rỗng / chỉ lặp bài đã thấy => hết năm
+        if not new:  # empty page / only articles already seen => year exhausted
             break
         for h, d in new:
             seen.add(h)
@@ -98,7 +98,7 @@ def list_ticker_year(code: str, year: int, *, to_date: str) -> list[tuple[str, s
 
 
 def collect_listings(refresh: bool = False) -> pd.DataFrame:
-    """Gom danh sách tin toàn bộ mã x năm trong cửa sổ config. Nguồn ánh xạ tin->mã."""
+    """Gather news listings for every ticker x year in the config window. The news->ticker mapping source."""
     if config.LISTINGS_PQ.exists() and not refresh:
         df = pd.read_parquet(config.LISTINGS_PQ)
         _log(f"[listings] dùng lại: {len(df)} dòng, {df['url'].nunique()} url, "
@@ -111,7 +111,7 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
     for code in config.TICKERS:
         tot = 0
         for year in range(start_year, end_year + 1):
-            # Năm cuối chỉ lấy tới DATE_END (vd 2026-03-31), năm khác tới 31/12.
+            # Final year stops at DATE_END (e.g. 2026-03-31); other years go to Dec 31.
             to_date = config.DATE_END if year == end_year else f"{year}-12-31"
             rows = list_ticker_year(code, year, to_date=to_date)
             for href, d in rows:
@@ -120,28 +120,28 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
             tot += len(rows)
             _log(f"[listings] {code} {year}: {len(rows)} bài (luỹ kế mã {tot})")
         config.NEWS_DIR.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(recs).to_parquet(config.LISTINGS_PQ)  # lưu tăng dần sau mỗi mã
+        pd.DataFrame(recs).to_parquet(config.LISTINGS_PQ)  # save incrementally after each ticker
     df = pd.DataFrame(recs)
     _log(f"[listings] XONG: {len(df)} dòng, {df['url'].nunique()} url duy nhất")
     return df
 
 
-# --- Pha 2: nội dung bài (timestamp + tiêu đề + body) ---------------------
+# --- Phase 2: article content (timestamp + title + body) ------------------
 
 def extract_body(html: str) -> str | None:
-    """Trích nội dung bài từ khối vst_detail, strip HTML, gom whitespace.
+    """Extract the article body from the vst_detail block, strip HTML, collapse whitespace.
 
-    Bài thường: dùng khối articleBody/vst_detail (nội dung đầy đủ). Bài longform/chuyên
-    đề không có khối này thì fallback sang og:description (mô tả ngắn) để vẫn có văn bản
-    dùng cho sentiment, thay vì để trống và bị crawl lại vô hạn.
+    Normal articles use the articleBody/vst_detail block (full content). Longform/feature
+    articles without it fall back to og:description (a short blurb) so sentiment still has
+    some text, instead of leaving it empty and re-crawling forever.
     """
     m = BODY_BLOCK.search(html)
     if m:
-        text = TAG.sub(" ", m.group(1))  # bỏ mọi thẻ HTML
+        text = TAG.sub(" ", m.group(1))  # drop all HTML tags
         text = re.sub(r"\s+", " ", text).strip()
         if text:
             return text
-    # Fallback: og:description cho bài longform/chuyên đề.
+    # Fallback: og:description for longform/feature articles.
     d = OG_DESC.search(html)
     if d:
         return re.sub(r"\s+", " ", d.group(1)).strip() or None
@@ -149,7 +149,7 @@ def extract_body(html: str) -> str | None:
 
 
 def parse_article(html: str) -> dict:
-    """Trả dict(timestamp_str, title, body) từ HTML 1 bài."""
+    """Return dict(timestamp_str, title, body) from one article's HTML."""
     m = PUB.search(html)
     ts = m.group(1).strip() if m else None
     t = OG_TITLE.search(html) or TITLE.search(html)
@@ -167,10 +167,11 @@ def _to_iso(ts: str | None) -> str | None:
 
 
 def _has_body(val) -> bool:
-    """True nếu body có nội dung thật (không None, không NaN, không rỗng).
+    """True if body holds real content (not None, not NaN, not empty).
 
-    Cần thiết vì pandas lưu ô thiếu thành NaN (float) — mà `not float('nan')` là False,
-    dễ khiến bài chưa có body bị tưởng đã có. Kiểm tra qua pd.isna cho an toàn.
+    Needed because pandas stores missing cells as NaN (float), and `not float('nan')`
+    is False — so an article without a body can look like it has one. Check via pd.isna
+    to be safe.
     """
     if val is None:
         return False
@@ -185,15 +186,15 @@ def _has_body(val) -> bool:
 def fetch_articles(
     urls: list[str], *, limit_urls: int | None = None, max_new: int | None = None
 ) -> pd.DataFrame:
-    """Lấy timestamp phút + tiêu đề + nội dung cho mỗi url. Cache HTML, ghi tăng dần.
+    """Fetch minute timestamp + title + body for each url. Caches HTML, writes incrementally.
 
-    Upsert theo url: GIỮ mọi bài cũ (kể cả bài mới chỉ có title, chưa có body) và chỉ
-    BỔ SUNG body cho bài còn thiếu. max_new giới hạn số bài được bổ sung body mỗi lần
-    (cho cron crawl dần toàn corpus qua nhiều lần chạy).
+    Upsert by url: KEEP every old article (including ones with only a title, no body yet)
+    and only ADD a body to those still missing one. max_new caps how many bodies get added
+    per run (lets cron crawl the whole corpus gradually across runs).
     """
     config.NEWS_HTML_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Nạp toàn bộ bài cũ vào store theo url (không bỏ bài nào).
+    # Load every old article into the store keyed by url (drop nothing).
     store: dict[str, dict] = {}
     if config.ARTICLES_PQ.exists():
         prev = pd.read_parquet(config.ARTICLES_PQ)
@@ -210,8 +211,8 @@ def fetch_articles(
         return rec is None or not _has_body(rec.get("body"))
 
     def _flush() -> None:
-        # Ghi atomic: ghi ra file tạm rồi os.replace, tránh corrupt nếu đọc/ghi đồng thời
-        # hoặc process chết giữa chừng (os.replace là thao tác nguyên tử trên cùng ổ đĩa).
+        # Atomic write: write a temp file then os.replace, to avoid corruption on concurrent
+        # read/write or a mid-write crash (os.replace is atomic on the same filesystem).
         tmp = config.ARTICLES_PQ.with_suffix(".parquet.tmp")
         pd.DataFrame(list(store.values())).to_parquet(tmp)
         os.replace(tmp, config.ARTICLES_PQ)
@@ -252,7 +253,7 @@ def fetch_articles(
 def crawl(
     *, refresh: bool = False, limit_urls: int | None = None, max_new: int | None = None
 ) -> pd.DataFrame:
-    """Chạy pipeline tin đầu-cuối: listing -> articles (ts + title + body)."""
+    """Run the news pipeline end to end: listing -> articles (ts + title + body)."""
     listings = collect_listings(refresh=refresh)
     urls = listings["url"].drop_duplicates().tolist()
     _log(f"[news] {len(urls)} url duy nhất để lấy nội dung")
@@ -260,7 +261,7 @@ def crawl(
 
 
 def summary(articles: pd.DataFrame) -> None:
-    """In tổng kết coverage tin."""
+    """Print a news coverage summary."""
     with_ts = articles["published_at"].notna().sum() if "published_at" in articles else 0
     with_body = articles["body"].notna().sum() if "body" in articles else 0
     _log("\n==== TỔNG KẾT TIN ====")

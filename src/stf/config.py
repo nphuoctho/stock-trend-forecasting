@@ -1,33 +1,33 @@
-"""Cấu hình tập trung cho toàn pipeline.
+"""Central config for the whole pipeline.
 
-Mọi hằng số dùng chung (danh sách mã, cửa sổ thời gian, đường dẫn dữ liệu) đặt ở
-đây để một chỗ sửa là mọi module theo. Tránh mỗi script tự khai báo lệch nhau
-như ở giai đoạn spike.
+Every shared constant (ticker list, date window, data paths) lives here so one
+edit propagates to every module. Keeps scripts from drifting apart the way they
+did during the spike.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-# --- Phạm vi đề tài -------------------------------------------------------
+# --- Study scope ----------------------------------------------------------
 
-# 10 mã VN30 thanh khoản cao, mật độ tin phù hợp (chốt ở plan.md).
+# 10 high-liquidity VN30 tickers with enough news coverage (fixed in plan.md).
 TICKERS: tuple[str, ...] = (
     "FPT", "GAS", "HPG", "MBB", "MWG",
     "TCB", "VCB", "VHM", "VIC", "VNM",
 )
 
-# Cửa sổ dữ liệu: 01/2020 -> 31/03/2026 (mở rộng từ 2020-2025 theo yêu cầu).
+# Data window: Jan 2020 -> Mar 31 2026 (extended from 2020-2025 on request).
 DATE_START = "2020-01-01"
 DATE_END = "2026-03-31"
 
-# Cutoff phiên HOSE dùng ở Phase 3 (tin sau giờ này dồn sang phiên kế tiếp).
+# HOSE session cutoff used in Phase 3 (news after this rolls to the next session).
 SESSION_CUTOFF = "15:00"
 TIMEZONE = "Asia/Ho_Chi_Minh"
 
-# --- Đường dẫn ------------------------------------------------------------
+# --- Paths ----------------------------------------------------------------
 
-# Gốc repo = thư mục chứa pyproject.toml (src/stf/config.py -> parents[2]).
+# Repo root = the dir holding pyproject.toml (src/stf/config.py -> parents[2]).
 ROOT = Path(__file__).resolve().parents[2]
 
 DATA = ROOT / "data"
@@ -42,12 +42,12 @@ NEWS_HTML_DIR = NEWS_DIR / "html"
 LISTINGS_PQ = NEWS_DIR / "listings.parquet"
 ARTICLES_PQ = NEWS_DIR / "articles.parquet"
 
-# Nơi lưu checkpoint/artifact mô hình sentiment.
+# Where sentiment model checkpoints/artifacts are stored.
 MODELS = ROOT / "models"
 SENTIMENT_DIR = MODELS / "sentiment"
 
 
 def ensure_dirs() -> None:
-    """Tạo mọi thư mục dữ liệu nếu chưa có (idempotent)."""
+    """Create all data directories if missing (idempotent)."""
     for d in (RAW, INTERIM, PROCESSED, PRICES_DIR, NEWS_DIR, NEWS_HTML_DIR, MODELS):
         d.mkdir(parents=True, exist_ok=True)

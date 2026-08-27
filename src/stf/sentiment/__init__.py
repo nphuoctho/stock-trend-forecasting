@@ -1,11 +1,11 @@
-"""stf.sentiment - fine-tune PhoBERT và sinh xác suất cảm xúc 3 lớp.
+"""stf.sentiment - fine-tune PhoBERT and produce 3-class sentiment probabilities.
 
-Ràng buộc validity (theo docs/research-gap-analysis-and-development-flow.md):
-  - 3 lớp NEGATIVE / NEUTRAL / POSITIVE.
-  - macro-F1 là metric chính (corpus lệch lớp).
-  - Split fine-tune tách THỜI GIAN khỏi phần đánh giá dự báo (chống rò rỉ).
-  - PhoBERT-base: tối đa 256 token.
-  - Tái lập: seed cố định, lưu config + checkpoint + manifest.
+Validity constraints (per docs/research-gap-analysis-and-development-flow.md):
+  - 3 classes NEGATIVE / NEUTRAL / POSITIVE.
+  - macro-F1 is the primary metric (class-imbalanced corpus).
+  - The fine-tune split separates TIME from the forecast evaluation (no leakage).
+  - PhoBERT-base: 256 tokens max.
+  - Reproducibility: fixed seed, save config + checkpoint + manifest.
 """
 
 from stf.sentiment.labels import ID2LABEL, LABEL2ID, LABELS

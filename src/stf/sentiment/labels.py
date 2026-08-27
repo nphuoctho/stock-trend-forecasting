@@ -1,8 +1,8 @@
-"""Định nghĩa nhãn cảm xúc 3 lớp dùng thống nhất toàn pipeline."""
+"""The 3-class sentiment label definitions, shared across the whole pipeline."""
 
 from __future__ import annotations
 
-# Thứ tự cố định: index = id nhãn. Không đổi thứ tự này sau khi đã train.
+# Fixed order: index = label id. Do not reorder after training.
 LABELS: tuple[str, ...] = ("NEGATIVE", "NEUTRAL", "POSITIVE")
 
 LABEL2ID: dict[str, int] = {name: i for i, name in enumerate(LABELS)}

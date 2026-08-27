@@ -1,9 +1,9 @@
-"""Fine-tune PhoBERT cho phân loại cảm xúc 3 lớp và sinh xác suất.
+"""Fine-tune PhoBERT for 3-class sentiment classification and produce probabilities.
 
-Dùng HuggingFace Trainer. Tự phát hiện device (CPU/GPU). Trên máy không có CUDA,
-fine-tune sẽ RẤT chậm: dùng chế độ smoke-test (ít mẫu, 1 epoch) để kiểm code, và
-chạy training thật trên GPU (Colab/Kaggle). Mọi tham số + kết quả được lưu manifest
-để tái lập.
+Uses the HuggingFace Trainer. Auto-detects the device (CPU/GPU). On a machine with no
+CUDA, fine-tuning is VERY slow: use smoke-test mode (few samples, 1 epoch) to check the
+code, and run real training on a GPU (Colab/Kaggle). Every param + result is saved to the
+manifest for reproducibility.
 """
 
 from __future__ import annotations
@@ -20,12 +20,12 @@ from stf.sentiment.dataset import Split
 from stf.sentiment.labels import ID2LABEL, LABEL2ID, NUM_LABELS
 
 MODEL_NAME = "vinai/phobert-base"
-MAX_LEN = 256  # trần token của PhoBERT-base
+MAX_LEN = 256  # PhoBERT-base token ceiling
 
 
 @dataclass
 class TrainConfig:
-    """Siêu tham số fine-tune. Lưu vào manifest để tái lập."""
+    """Fine-tune hyperparameters. Saved to the manifest for reproducibility."""
     model_name: str = MODEL_NAME
     max_len: int = MAX_LEN
     epochs: float = 3.0
@@ -37,7 +37,7 @@ class TrainConfig:
 
 
 def set_seed(seed: int) -> None:
-    """Cố định seed cho tái lập (python, numpy, torch)."""
+    """Fix the seed for reproducibility (python, numpy, torch)."""
     import torch
 
     random.seed(seed)
@@ -54,7 +54,7 @@ def get_device() -> str:
 
 
 class _TextDataset:
-    """torch Dataset gói (text, label) đã tokenize theo yêu cầu của Trainer."""
+    """A torch Dataset wrapping tokenized (text, label) pairs as the Trainer expects."""
 
     def __init__(self, texts, labels, tokenizer, max_len: int):
         self.enc = tokenizer(
@@ -77,7 +77,7 @@ def _compute_metrics(eval_pred):
     logits, labels = eval_pred
     preds = np.argmax(logits, axis=-1)
     m = classification_metrics(labels, preds)
-    # Trainer chọn best model theo macro_f1.
+    # Trainer picks the best model by macro_f1.
     return {"macro_f1": m["macro_f1"], "accuracy": m["accuracy"],
             "balanced_accuracy": m["balanced_accuracy"]}
 
@@ -88,8 +88,8 @@ def fine_tune(
     *,
     out_dir: Path | None = None,
 ) -> dict:
-    """Fine-tune PhoBERT trên split.train, chọn best theo macro-F1 trên val,
-    đánh giá trên test. Trả dict kết quả và lưu checkpoint + manifest.
+    """Fine-tune PhoBERT on split.train, pick the best by macro-F1 on val,
+    evaluate on test. Return a result dict and save checkpoint + manifest.
     """
     import torch
     from transformers import (
@@ -133,7 +133,7 @@ def fine_tune(
         greater_is_better=True,
         seed=cfg.seed,
         logging_steps=20,
-        report_to=[],  # không tự log lên W&B; bật sau nếu cần
+        report_to=[],  # don't auto-log to W&B; enable later if needed
         use_cpu=(device == "cpu"),
     )
 
@@ -147,14 +147,14 @@ def fine_tune(
     )
     trainer.train()
 
-    # Đánh giá đầy đủ trên test.
+    # Full evaluation on test.
     from stf.sentiment.metrics import classification_metrics
 
     pred = trainer.predict(ds_test)
     y_pred = np.argmax(pred.predictions, axis=-1)
     test_metrics = classification_metrics(pred.label_ids, y_pred)
 
-    # Lưu model + tokenizer + manifest.
+    # Save model + tokenizer + manifest.
     trainer.save_model(str(out_dir / "best"))
     tokenizer.save_pretrained(str(out_dir / "best"))
     manifest = {
@@ -170,9 +170,9 @@ def fine_tune(
 
 
 def predict_proba(texts, model_dir: Path | None = None, *, batch_size: int = 32) -> np.ndarray:
-    """Sinh xác suất 3 lớp cho danh sách text (dùng model đã fine-tune).
+    """Produce 3-class probabilities for a list of texts (using the fine-tuned model).
 
-    Trả mảng shape (len(texts), 3) — thứ tự lớp theo labels.LABELS.
+    Returns an array of shape (len(texts), 3) — class order follows labels.LABELS.
     """
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer

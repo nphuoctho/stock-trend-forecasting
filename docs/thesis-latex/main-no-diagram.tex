@@ -1,35 +1,35 @@
 % ============================================================================
-% main-no-diagram.tex - Bản KHÔNG chèn sơ đồ kiến trúc (bản rút gọn)
-% Dùng chung toàn bộ nội dung với main.tex, chỉ tắt hình kiến trúc ở chương 3.
-% Biên dịch: xelatex main-no-diagram -> biber main-no-diagram -> xelatex x2
+% main-no-diagram.tex - variant WITHOUT the architecture diagram
+% Same content as main.tex; only the chapter 3 architecture figure is disabled.
+% Build: xelatex main-no-diagram -> biber main-no-diagram -> xelatex x2
 % ============================================================================
 \documentclass[13pt, a4paper, oneside]{report}
 
 \input{preamble}
 \addbibresource{references.bib}
 
-% Toggle sơ đồ kiến trúc: bản này KHÔNG có sơ đồ.
+% Architecture-diagram toggle: this build has none.
 \newif\ifShowDiagram
 \ShowDiagramfalse
 
 \begin{document}
 
 % ------------------------------------------------------------------ FRONT
-\pagenumbering{gobble}   % không đánh số trang phần đầu
+\pagenumbering{gobble}   % no page numbers on front matter
 
 \input{frontmatter/00-bia-chinh}
 \input{frontmatter/01-bia-phu}
 \input{frontmatter/02-hoi-dong}
 \input{frontmatter/03-loi-cam-on}
 
-% Mục lục + các danh mục (không đánh số trang theo quy định)
+% Table of contents and lists (unnumbered per regulations)
 \tableofcontents
 \listoffigures
 \listoftables
 \input{frontmatter/04-danh-muc-viet-tat}
 
 % ------------------------------------------------------------------ BODY
-% Bắt đầu đánh số trang từ Tóm tắt, số Ả-rập, giữa bên dưới.
+% Page numbering starts at the abstract: arabic, bottom-center.
 \clearpage
 \pagenumbering{arabic}
 \setcounter{page}{1}

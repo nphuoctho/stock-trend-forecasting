@@ -1,16 +1,16 @@
-"""Tạo mẫu in-domain từ tin Vietstock đã crawl để gán nhãn cảm xúc thủ công.
+"""Build an in-domain sample from crawled Vietstock news for manual sentiment labeling.
 
-Mục đích: bổ sung một tập nhỏ nhãn IN-DOMAIN (đúng "giọng" tin Vietstock của 10 mã)
-cạnh seed CafeF công khai. Dùng để (a) tinh chỉnh PhoBERT sát dữ liệu thật, và
-(b) báo cáo độ đồng thuận Cohen's/Fleiss' kappa.
+Purpose: add a small IN-DOMAIN label set (in the actual "voice" of Vietstock news for the
+10 tickers) alongside the public CafeF seed. Used to (a) fine-tune PhoBERT closer to the real
+data, and (b) report Cohen's/Fleiss' kappa agreement.
 
-Chiến lược lấy mẫu:
-  - Chỉ lấy bài ĐÃ CÓ body (nội dung đầy đủ giúp gán nhãn chính xác hơn).
-  - Phân tầng theo mã và theo năm để mẫu đại diện toàn corpus, không lệch.
-  - Xuất CSV có cột `label` TRỐNG để người gán điền NEGATIVE/NEUTRAL/POSITIVE.
-  - Kèm file guideline gán nhãn để đảm bảo nhất quán giữa những người gán.
+Sampling strategy:
+  - Only take articles that HAVE a body (full content makes labeling more accurate).
+  - Stratify by ticker and by year so the sample represents the whole corpus without bias.
+  - Export a CSV with an EMPTY `label` column for annotators to fill NEGATIVE/NEUTRAL/POSITIVE.
+  - Ship a labeling guideline file to keep annotators consistent.
 
-Chạy:
+Run:
     uv run python -m stf.sentiment.make_indomain_sample --n 300
     uv run python -m stf.sentiment.make_indomain_sample --n 300 --raters 2
 """
@@ -65,33 +65,33 @@ def make_sample(n: int, seed: int, raters: int) -> pd.DataFrame:
     articles = pd.read_parquet(config.ARTICLES_PQ)
     listings = pd.read_parquet(config.LISTINGS_PQ)
 
-    # Chỉ lấy bài đã có body (nội dung đầy đủ để gán nhãn chính xác).
+    # Only take articles that already have a body (full content for accurate labeling).
     has_body = articles["body"].notna() & (articles["body"].astype("string").str.len() > 0)
     pool = articles[has_body].copy()
     if pool.empty:
         raise RuntimeError("Chưa có bài nào có body. Đợi cron crawl body chạy thêm.")
 
-    # Ghép mã (một bài có thể gắn nhiều mã; lấy mã đầu tiên cho đơn giản).
+    # Attach ticker (an article may map to several; take the first for simplicity).
     url2ticker = listings.drop_duplicates("url").set_index("url")["ticker"].to_dict()
     pool["ticker"] = pool["url"].map(url2ticker)
     pool = pool.dropna(subset=["ticker"])
     pool["year"] = pd.to_datetime(pool["published_at"], errors="coerce").dt.year
     pool = pool.dropna(subset=["year"])
 
-    # Phân tầng theo (mã, năm): rút tỷ lệ đều để mẫu đại diện toàn corpus.
+    # Stratify by (ticker, year): sample proportionally so it represents the whole corpus.
     frac = min(1.0, n / len(pool))
     picked_idx: list = []
     for _, g in pool.groupby(["ticker", "year"]):
         k = max(1, round(len(g) * frac))
         picked_idx.extend(g.sample(min(k, len(g)), random_state=seed).index.tolist())
     sample = pool.loc[picked_idx]
-    # Cắt về đúng n (nếu dư do làm tròn), xáo trộn.
+    # Trim back to exactly n (rounding may overshoot), then shuffle.
     sample = sample.sample(frac=1, random_state=seed).head(n).reset_index(drop=True)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     GUIDELINE.write_text(_GUIDELINE_TEXT, encoding="utf-8")
 
-    # File để gán nhãn: giữ thông tin cần thiết + cột label TRỐNG.
+    # Labeling file: keep the needed info + an EMPTY label column.
     body_preview = sample["body"].astype("string").str.slice(0, 400)
     out = pd.DataFrame({
         "sample_id": range(len(sample)),
@@ -100,7 +100,7 @@ def make_sample(n: int, seed: int, raters: int) -> pd.DataFrame:
         "title": sample["title"],
         "body_preview": body_preview,
         "url": sample["url"],
-        "label": "",  # người gán điền NEGATIVE/NEUTRAL/POSITIVE
+        "label": "",  # annotator fills NEGATIVE/NEUTRAL/POSITIVE
     })
 
     files = []

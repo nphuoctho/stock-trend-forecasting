@@ -1,7 +1,7 @@
-"""Chỉ số đánh giá cảm xúc và độ đồng thuận gán nhãn.
+"""Sentiment evaluation metrics and annotation agreement.
 
-macro-F1 là chỉ số CHÍNH (corpus lệch lớp). Kèm accuracy, balanced accuracy,
-per-class precision/recall/F1. Cohen's/Fleiss' κ cho báo cáo độ đồng thuận annotation.
+macro-F1 is the PRIMARY metric (class-imbalanced corpus). Plus accuracy, balanced
+accuracy, per-class precision/recall/F1. Cohen's/Fleiss' κ for reporting annotation agreement.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import numpy as np
 
 
 def classification_metrics(y_true, y_pred) -> dict:
-    """Trả dict các chỉ số phân loại. macro-F1 là khóa 'macro_f1'."""
+    """Return a dict of classification metrics. macro-F1 is under the 'macro_f1' key."""
     from sklearn.metrics import (
         accuracy_score,
         balanced_accuracy_score,
@@ -35,22 +35,22 @@ def classification_metrics(y_true, y_pred) -> dict:
 
 
 def cohen_kappa(rater_a, rater_b) -> float:
-    """Cohen's κ cho HAI người gán nhãn (báo cáo acceptance #6)."""
+    """Cohen's κ for TWO annotators (acceptance report #6)."""
     from sklearn.metrics import cohen_kappa_score
 
     return float(cohen_kappa_score(rater_a, rater_b))
 
 
 def fleiss_kappa(table: np.ndarray) -> float:
-    """Fleiss' κ cho TỪ BA người gán nhãn trở lên.
+    """Fleiss' κ for THREE OR MORE annotators.
 
-    table: ma trận (n_items, n_categories), mỗi ô = số người gán item vào lớp đó.
-    Tự cài (sklearn không có) theo công thức Fleiss 1971.
+    table: an (n_items, n_categories) matrix; each cell = how many raters put the item in that class.
+    Implemented here (sklearn has none) from the Fleiss 1971 formula.
     """
     table = np.asarray(table, dtype=float)
     n_items, _ = table.shape
-    n_raters = table.sum(axis=1)[0]  # giả định mọi item cùng số người gán
-    p_j = table.sum(axis=0) / (n_items * n_raters)  # tỷ lệ mỗi lớp
+    n_raters = table.sum(axis=1)[0]  # assumes every item has the same rater count
+    p_j = table.sum(axis=0) / (n_items * n_raters)  # proportion per class
     P_i = (np.square(table).sum(axis=1) - n_raters) / (n_raters * (n_raters - 1))
     P_bar = P_i.mean()
     P_e = np.square(p_j).sum()

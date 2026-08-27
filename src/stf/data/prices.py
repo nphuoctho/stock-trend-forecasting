@@ -1,11 +1,11 @@
-"""Loader giá OHLCV điều chỉnh cho 10 mã VN30 qua vnstock (nguồn VCI).
+"""Adjusted OHLCV price loader for the 10 VN30 tickers via vnstock (VCI source).
 
-Thay cho spike_prices.py: dùng config tập trung, chuẩn hóa schema đầu ra và
-báo cáo coverage rõ ràng. Mỗi mã lưu 1 parquet trong data/raw/prices/.
+Uses central config, normalizes the output schema, and reports coverage clearly.
+Each ticker is saved to one parquet in data/raw/prices/.
 
-Chạy:
-    uv run python -m stf.cli prices            # toàn bộ cửa sổ config
-    uv run python -m stf.cli prices --limit 1  # thử nhanh 1 mã
+Run:
+    uv run python -m stf.cli prices            # full window from config
+    uv run python -m stf.cli prices --limit 1  # quick 1-symbol test
 """
 
 from __future__ import annotations
@@ -16,21 +16,21 @@ import pandas as pd
 
 from stf import config
 
-# Schema chuẩn hóa đầu ra: cột thời gian tên "time", còn lại OHLCV.
+# Normalized output schema: the time column is named "time", the rest are OHLCV.
 _EXPECTED_COLS = ("time", "open", "high", "low", "close", "volume")
 
 
 def fetch_one(symbol: str, start: str, end: str) -> pd.DataFrame | None:
-    """Trả OHLCV ngày (điều chỉnh) cho 1 mã, hoặc None nếu lỗi/rỗng.
+    """Return daily adjusted OHLCV for one ticker, or None on error/empty.
 
-    Import vnstock trong hàm để tránh chi phí khởi tạo khi chỉ đọc parquet cũ.
+    Import vnstock inside the function to avoid its startup cost when only reading old parquet.
     """
     from vnstock import Vnstock
 
     try:
         quote = Vnstock().stock(symbol=symbol, source="VCI").quote
         df = quote.history(start=start, end=end, interval="1D")
-    except Exception as exc:  # noqa: BLE001 - ghi nhận mã hỏng, không chết cả job
+    except Exception as exc:  # noqa: BLE001 - record the broken ticker, don't kill the whole job
         print(f"  ! {symbol}: {type(exc).__name__}: {exc}", file=sys.stderr)
         return None
     if df is None or df.empty:
@@ -39,9 +39,9 @@ def fetch_one(symbol: str, start: str, end: str) -> pd.DataFrame | None:
 
 
 def _normalize(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
-    """Chuẩn hóa cột về schema _EXPECTED_COLS và thêm cột ticker."""
+    """Normalize columns to the _EXPECTED_COLS schema and add a ticker column."""
     df = df.copy()
-    # vnstock trả cột "time"; phòng trường hợp tên khác thì đổi về "time".
+    # vnstock returns a "time" column; rename the first column to "time" just in case.
     if "time" not in df.columns:
         df = df.rename(columns={df.columns[0]: "time"})
     df["time"] = pd.to_datetime(df["time"])
@@ -57,9 +57,9 @@ def collect(
     *,
     limit: int | None = None,
 ) -> dict[str, int]:
-    """Kéo giá cho danh sách mã, lưu parquet, trả {ticker: số dòng}.
+    """Pull prices for the ticker list, save parquet, return {ticker: row count}.
 
-    limit: chỉ lấy `limit` mã đầu (dùng để verify nhanh, không kéo toàn bộ).
+    limit: take only the first `limit` tickers (for a quick check, not a full pull).
     """
     config.ensure_dirs()
     tickers = tickers or config.TICKERS
@@ -82,7 +82,7 @@ def collect(
 
 
 def summary(result: dict[str, int]) -> None:
-    """In tổng kết coverage giá."""
+    """Print a price coverage summary."""
     ok = sum(1 for n in result.values() if n > 0)
     total = sum(result.values())
     print(f"\n[prices] {ok}/{len(result)} mã OK, tổng {total} dòng giá")

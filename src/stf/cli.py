@@ -1,10 +1,10 @@
-"""CLI thống nhất cho pipeline dữ liệu và mô hình.
+"""Unified CLI for the data and model pipeline.
 
     uv run python -m stf.cli prices [--limit N]
     uv run python -m stf.cli news [--limit-urls N] [--refresh]
     uv run python -m stf.cli verify
 
-`verify` đọc lại dữ liệu đã có và in báo cáo coverage (không tải mạng).
+`verify` re-reads existing data and prints a coverage report (no network).
 """
 
 from __future__ import annotations
@@ -35,11 +35,11 @@ def cmd_news(args: argparse.Namespace) -> int:
 
 
 def cmd_verify(_args: argparse.Namespace) -> int:
-    """Đọc dữ liệu đã lưu và in báo cáo coverage. Không truy cập mạng."""
+    """Read saved data and print a coverage report. No network access."""
     print("=== VERIFY DỮ LIỆU (offline) ===\n")
     ok = True
 
-    # --- Giá ---
+    # --- Prices ---
     price_files = sorted(config.PRICES_DIR.glob("*.parquet"))
     if not price_files:
         print("[giá] CHƯA CÓ dữ liệu giá")
@@ -51,7 +51,7 @@ def cmd_verify(_args: argparse.Namespace) -> int:
             total += len(df)
         print(f"[giá] {len(price_files)} mã, tổng {total} phiên")
 
-    # --- Tin ---
+    # --- News ---
     if not config.ARTICLES_PQ.exists():
         print("[tin] CHƯA CÓ articles.parquet")
         ok = False
@@ -75,9 +75,9 @@ def cmd_verify(_args: argparse.Namespace) -> int:
 
 
 def cmd_sentiment_smoke(args: argparse.Namespace) -> int:
-    """Smoke-test pipeline PhoBERT bằng dữ liệu GIẢ (verify code chạy thông).
+    """Smoke-test the PhoBERT pipeline on FAKE data, just to prove the code runs.
 
-    KHÔNG phải kết quả thật. Dùng ít mẫu + 1 epoch để kiểm train/eval end-to-end.
+    Not real results. Few samples + 1 epoch to check train/eval end-to-end.
     """
     from stf.sentiment import dataset, model
 
@@ -94,7 +94,7 @@ def cmd_sentiment_smoke(args: argparse.Namespace) -> int:
 
 
 def cmd_sentiment_train(args: argparse.Namespace) -> int:
-    """Fine-tune PhoBERT trên FILE NHÃN thật (.csv/.parquet có cột text, label)."""
+    """Fine-tune PhoBERT on a real LABEL FILE (.csv/.parquet with text, label columns)."""
     from stf.sentiment import dataset, model
 
     df = dataset.load_labeled(args.data)

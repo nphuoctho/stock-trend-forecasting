@@ -1,4 +1,4 @@
-"""Test pipeline dữ liệu — chạy offline, không truy cập mạng.
+"""Data pipeline tests — run offline, no network access.
 
     uv run pytest tests/test_data_pipeline.py -q
 """
@@ -9,7 +9,7 @@ from stf.data import news
 
 
 def test_extract_body_from_vst_detail():
-    """Trích đúng nội dung từ khối articleBody/vst_detail và strip HTML."""
+    """Extract content correctly from the articleBody/vst_detail block and strip HTML."""
     html = (
         '<html><body>'
         '<div itemprop="articleBody" id="vst_detail">'
@@ -20,17 +20,17 @@ def test_extract_body_from_vst_detail():
     body = news.extract_body(html)
     assert body is not None
     assert "Hòa Phát" in body
-    assert "<p" not in body  # đã strip tag
+    assert "<p" not in body  # tags stripped
     assert "628,000 tấn thép" in body
 
 
 def test_extract_body_missing_returns_none():
-    """Bài không có khối vst_detail và không og:description trả None, không crash."""
+    """An article with no vst_detail block and no og:description returns None, doesn't crash."""
     assert news.extract_body("<html><body>không có body</body></html>") is None
 
 
 def test_extract_body_fallback_og_description():
-    """Bài longform không có vst_detail thì fallback sang og:description."""
+    """A longform article without vst_detail falls back to og:description."""
     html = (
         '<html><head>'
         '<meta property="og:description" content="Chuyên đề cuộc đua lợi nhuận VN30 quý 3.">'
@@ -42,7 +42,7 @@ def test_extract_body_fallback_og_description():
 
 
 def test_parse_article_fields():
-    """parse_article trả đủ 3 khóa: timestamp, title, body."""
+    """parse_article returns all 3 keys: timestamp, title, body."""
     html = (
         '<meta property="og:title" content="Sản lượng thép Hòa Phát">'
         '<span itemprop="datePublished">08/09/2022 16:35</span>'
@@ -55,14 +55,14 @@ def test_parse_article_fields():
 
 
 def test_to_iso_parsing():
-    """Timestamp dd/mm/yyyy hh:mm -> ISO; sai định dạng -> None."""
+    """Timestamp dd/mm/yyyy hh:mm -> ISO; bad format -> None."""
     assert news._to_iso("08/09/2022 16:35") == "2022-09-08T16:35:00"
     assert news._to_iso(None) is None
     assert news._to_iso("không hợp lệ") is None
 
 
 def test_has_body_handles_nan():
-    """_has_body phân biệt đúng body thật với None/NaN/rỗng (chống bug NaN truthy)."""
+    """_has_body tells real bodies apart from None/NaN/empty (guards the NaN-truthy bug)."""
     import numpy as np
 
     assert news._has_body("nội dung thật") is True

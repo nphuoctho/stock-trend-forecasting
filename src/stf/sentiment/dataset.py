@@ -1,14 +1,15 @@
-"""Nạp dữ liệu nhãn cảm xúc và chuẩn bị cho fine-tune PhoBERT.
+"""Load sentiment-labeled data and prepare it for PhoBERT fine-tuning.
 
-Nguồn nhãn (theo plan.md Phase 2):
-  1. Seed công khai: corpus tiêu đề CafeF (3 lớp) để tái lập nhanh baseline.
-  2. Bổ sung in-domain: mẫu tự gán nhãn theo hướng dẫn cố định (báo cáo Cohen/Fleiss κ).
+Label sources (per plan.md Phase 2):
+  1. Public seed: the CafeF headline corpus (3 classes) for a quick baseline.
+  2. In-domain add-on: self-labeled samples following a fixed guideline (report Cohen/Fleiss κ).
 
-Định dạng CSV/parquet nhãn kỳ vọng: cột `text` (str) và `label` (NEGATIVE/NEUTRAL/POSITIVE
-hoặc 0/1/2). Nếu có cột `date` (ISO), split được thực hiện TÁCH THỜI GIAN để tránh rò rỉ.
+Expected label CSV/parquet format: a `text` column (str) and a `label` column
+(NEGATIVE/NEUTRAL/POSITIVE or 0/1/2). If a `date` column (ISO) exists, the split is done
+BY TIME to avoid leakage.
 
-PhoBERT lý tưởng dùng đầu vào đã word-segment (VnCoreNLP). Ở đây tokenize text thô cho
-đơn giản/tái lập; nếu cần nâng chất lượng, thêm bước segment trước khi gọi tokenizer.
+PhoBERT ideally takes word-segmented input (VnCoreNLP). Here we tokenize raw text for
+simplicity/reproducibility; to improve quality, add a segmentation step before the tokenizer.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ from stf.sentiment.labels import LABEL2ID
 
 @dataclass
 class Split:
-    """Một lần chia dữ liệu train/val/test đã cố định."""
+    """One fixed train/val/test split."""
     train: pd.DataFrame
     val: pd.DataFrame
     test: pd.DataFrame
@@ -39,12 +40,12 @@ class Split:
 
 
 def normalize_labels(df: pd.DataFrame) -> pd.DataFrame:
-    """Chuẩn hóa cột `label` về `label_id` (int 0/1/2). Chấp nhận tên lớp hoặc số."""
+    """Normalize the `label` column to `label_id` (int 0/1/2). Accepts class names or numbers."""
     df = df.copy()
     if "label_id" in df.columns:
         return df
     raw = df["label"]
-    # Nhận diện label dạng chữ (object hoặc string dtype của pandas mới) vs số.
+    # Tell text labels (object or pandas' newer string dtype) apart from numeric ones.
     is_text = raw.dtype == object or pd.api.types.is_string_dtype(raw)
     if is_text:
         df["label_id"] = raw.astype("string").str.upper().str.strip().map(LABEL2ID)
@@ -58,7 +59,7 @@ def normalize_labels(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_labeled(path: str | Path) -> pd.DataFrame:
-    """Nạp file nhãn (.csv/.parquet), trả DataFrame có cột text, label_id[, date]."""
+    """Load a label file (.csv/.parquet), return a DataFrame with text, label_id[, date]."""
     path = Path(path)
     df = pd.read_parquet(path) if path.suffix == ".parquet" else pd.read_csv(path)
     if "text" not in df.columns or "label" not in df.columns:
@@ -75,11 +76,11 @@ def make_split(
     test_frac: float = 0.1,
     time_aware: bool = True,
 ) -> Split:
-    """Chia train/val/test.
+    """Split into train/val/test.
 
-    time_aware=True và có cột `date`: chia theo THỜI GIAN (train = cũ nhất,
-    test = mới nhất) để mô phỏng đúng ràng buộc chống rò rỉ khi đánh giá dự báo.
-    Ngược lại: chia ngẫu nhiên phân tầng theo lớp (seed cố định).
+    time_aware=True with a `date` column: split BY TIME (train = oldest,
+    test = newest) to match the no-leakage constraint of forecast evaluation.
+    Otherwise: random split stratified by class (fixed seed).
     """
     df = df.reset_index(drop=True)
     if time_aware and "date" in df.columns:
@@ -94,7 +95,7 @@ def make_split(
                      val.reset_index(drop=True),
                      test.reset_index(drop=True))
 
-    # Ngẫu nhiên phân tầng theo lớp.
+    # Random split stratified by class.
     rng = np.random.default_rng(seed)
     parts: dict[str, list[pd.DataFrame]] = {"train": [], "val": [], "test": []}
     for _, grp in df.groupby("label_id"):
@@ -114,9 +115,9 @@ def make_split(
 
 
 def synthetic_dataset(n: int = 120, seed: int = 42) -> pd.DataFrame:
-    """Sinh dataset giả cân bằng 3 lớp để smoke-test pipeline khi CHƯA có nhãn thật.
+    """Build a balanced 3-class fake dataset to smoke-test the pipeline before real labels exist.
 
-    KHÔNG dùng để báo cáo kết quả — chỉ để kiểm tra code train/eval chạy thông.
+    Not for reporting results — only to check the train/eval code runs.
     """
     rng = np.random.default_rng(seed)
     pos = ["cổ phiếu tăng mạnh", "lợi nhuận vượt kỳ vọng", "doanh thu kỷ lục",
