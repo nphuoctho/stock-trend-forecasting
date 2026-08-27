@@ -1,0 +1,26 @@
+% Tóm tắt đồ án (bắt đầu đánh số trang từ đây)
+\chapter*{TÓM TẮT ĐỒ ÁN}
+\addcontentsline{toc}{chapter}{Tóm tắt đồ án}
+
+Đồ án xây dựng một hệ thống dự báo xu hướng biến động giá cổ phiếu trên thị trường
+chứng khoán Việt Nam (sàn HOSE, nhóm VN30) dựa trên việc kết hợp phân tích cảm xúc
+tin tức tài chính tiếng Việt với dữ liệu chuỗi thời gian về giá.
+
+Về hướng tiếp cận, hệ thống gồm hai nhánh. Nhánh cảm xúc sử dụng mô hình Transformer
+tiếng Việt PhoBERT được tinh chỉnh (fine-tune) để phân loại tin tức thành ba lớp
+tiêu cực, trung tính và tích cực, từ đó sinh ra đặc trưng cảm xúc theo mã và theo ngày.
+Nhánh giá sử dụng các đặc trưng kỹ thuật trích từ dữ liệu OHLCV điều chỉnh. Hai nhánh
+được hợp nhất và đưa vào mô hình chuỗi thời gian để dự báo xu hướng phiên kế tiếp theo
+ba lớp tăng, đi ngang và giảm.
+
+Về cách giải quyết, đồ án tuân thủ một giao thức đánh giá chống rò rỉ dữ liệu gồm mốc
+cắt thông tin theo phiên, chia dữ liệu theo thời gian, kiểm định walk-forward và so
+sánh có kiểm soát giữa mô hình có và không dùng cảm xúc (ablation).
+
+Về kết quả, đồ án cung cấp một pipeline hoàn chỉnh từ thu thập dữ liệu đến dự báo, cùng
+bảng so sánh các mô hình theo chỉ số macro-F1 kèm khoảng tin cậy, qua đó đo lường phần
+đóng góp của tín hiệu cảm xúc tin tức đối với bài toán dự báo xu hướng giá.
+
+\vspace{0.5cm}
+\noindent\textbf{Từ khóa:} dự báo xu hướng giá cổ phiếu, phân tích cảm xúc, PhoBERT,
+Transformer, chuỗi thời gian, HOSE, VN30.

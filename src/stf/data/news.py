@@ -19,6 +19,7 @@ Chạy:
 
 from __future__ import annotations
 
+import os
 import re
 import time
 from datetime import datetime
@@ -46,6 +47,9 @@ BODY_BLOCK = re.compile(
     r'<div[^>]*itemprop=["\']articleBody["\'][^>]*id=["\']vst_detail["\'][^>]*>(.*?)</div>',
     re.I | re.S,
 )
+# Fallback cho bài longform/chuyên đề không có khối vst_detail: dùng og:description.
+OG_DESC = re.compile(
+    r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)', re.I)
 TAG = re.compile(r"<[^>]+>")
 
 
@@ -125,13 +129,23 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
 # --- Pha 2: nội dung bài (timestamp + tiêu đề + body) ---------------------
 
 def extract_body(html: str) -> str | None:
-    """Trích nội dung bài từ khối vst_detail, strip HTML, gom whitespace."""
+    """Trích nội dung bài từ khối vst_detail, strip HTML, gom whitespace.
+
+    Bài thường: dùng khối articleBody/vst_detail (nội dung đầy đủ). Bài longform/chuyên
+    đề không có khối này thì fallback sang og:description (mô tả ngắn) để vẫn có văn bản
+    dùng cho sentiment, thay vì để trống và bị crawl lại vô hạn.
+    """
     m = BODY_BLOCK.search(html)
-    if not m:
-        return None
-    text = TAG.sub(" ", m.group(1))  # bỏ mọi thẻ HTML
-    text = re.sub(r"\s+", " ", text).strip()
-    return text or None
+    if m:
+        text = TAG.sub(" ", m.group(1))  # bỏ mọi thẻ HTML
+        text = re.sub(r"\s+", " ", text).strip()
+        if text:
+            return text
+    # Fallback: og:description cho bài longform/chuyên đề.
+    d = OG_DESC.search(html)
+    if d:
+        return re.sub(r"\s+", " ", d.group(1)).strip() or None
+    return None
 
 
 def parse_article(html: str) -> dict:
@@ -196,7 +210,11 @@ def fetch_articles(
         return rec is None or not _has_body(rec.get("body"))
 
     def _flush() -> None:
-        pd.DataFrame(list(store.values())).to_parquet(config.ARTICLES_PQ)
+        # Ghi atomic: ghi ra file tạm rồi os.replace, tránh corrupt nếu đọc/ghi đồng thời
+        # hoặc process chết giữa chừng (os.replace là thao tác nguyên tử trên cùng ổ đĩa).
+        tmp = config.ARTICLES_PQ.with_suffix(".parquet.tmp")
+        pd.DataFrame(list(store.values())).to_parquet(tmp)
+        os.replace(tmp, config.ARTICLES_PQ)
 
     n_new = 0
     for i, url in enumerate(urls, 1):

@@ -25,8 +25,20 @@ def test_extract_body_from_vst_detail():
 
 
 def test_extract_body_missing_returns_none():
-    """Bài không có khối vst_detail (vd Longform) trả None, không crash."""
+    """Bài không có khối vst_detail và không og:description trả None, không crash."""
     assert news.extract_body("<html><body>không có body</body></html>") is None
+
+
+def test_extract_body_fallback_og_description():
+    """Bài longform không có vst_detail thì fallback sang og:description."""
+    html = (
+        '<html><head>'
+        '<meta property="og:description" content="Chuyên đề cuộc đua lợi nhuận VN30 quý 3.">'
+        '</head><body>longform layout không có vst_detail</body></html>'
+    )
+    body = news.extract_body(html)
+    assert body is not None
+    assert "cuộc đua lợi nhuận VN30" in body
 
 
 def test_parse_article_fields():

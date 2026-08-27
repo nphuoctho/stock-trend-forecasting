@@ -1,0 +1,161 @@
+\chapter{HƯỚNG PHÁT TRIỂN}
+\label{ch:huong-phat-trien}
+
+Các hướng phát triển dưới đây được xếp sau graduation floor. Nghĩa là baseline, ablation,
+walk-forward, kiểm tra cutoff và train-only preprocessing phải được hoàn thiện trước khi
+thêm mô hình hoặc nguồn dữ liệu mới. Thứ tự này giúp phân biệt cải tiến thực sự với việc
+tăng độ phức tạp trong khi chưa biết pipeline hiện tại có hợp lệ hay không.
+
+\section{Củng cố dữ liệu và giao thức point-in-time}
+
+Ưu tiên đầu tiên là nâng chất lượng dữ liệu. Có thể mở rộng nguồn tin ngoài Vietstock,
+nhưng mỗi nguồn mới phải được kiểm tra độ phủ theo mã, timestamp, nội dung, trùng lặp,
+điều khoản truy cập và khả năng tái lập. Một bài viết được đăng lại ở nhiều nguồn cần
+được nhận diện để không làm tăng giả tạo trọng số của cùng một sự kiện. Các bản ghi bị
+thiếu thời gian hoặc không xác định được mã nên được loại khỏi tập chính và ghi vào
+báo cáo coverage.
+
+Mốc cutoff 15 giờ cũng có thể được kiểm tra độ nhạy. Một thực nghiệm riêng có thể so
+sánh cutoff bảo thủ với một cutoff khác nếu có lý do nghiệp vụ rõ ràng, nhưng mỗi cutoff
+phải tạo ra feature table và holdout riêng. Không được chọn cutoff dựa trên kết quả
+test tốt nhất mà không ghi số lần thử. Tương tự, có thể so sánh ngưỡng phân vị với
+ngưỡng cố định, nhưng cách fit ngưỡng phải tuân thủ train-only trong mọi trường hợp.
+
+Một hướng khác là làm giàu annotation. Tập nhãn có thể bổ sung nhãn cường độ, chủ thể,
+loại sự kiện và mức độ chắc chắn, nhưng chỉ khi có guideline và đánh giá độ đồng thuận.
+Nhãn sự kiện fine-grained có tiềm năng bổ sung cho sentiment vì một bài có thể truyền
+đạt loại sự kiện quan trọng mà phân cực ba lớp không thể hiện \cite{Chen2019_191005078v1}.
+Đây là mở rộng dữ liệu, không được đưa vào so sánh chính nếu làm thay đổi câu hỏi
+nghiên cứu ban đầu.
+
+\section{Cơ chế hợp nhất nâng cao}
+
+Mức sàn dùng concat vì dễ kiểm tra. Khi dữ liệu đủ lớn, có thể thử gated fusion, trong
+đó một cổng học cách điều chỉnh mức đóng góp của nhánh sentiment theo trạng thái giá
+và số tin. Một dạng khác là cross-attention hai chiều, cho phép các bước giá truy vấn
+chuỗi sentiment và ngược lại. Các mô hình Transformer đa phương thức gợi ý rằng cách
+hợp nhất động có thể giữ được tương tác giàu hơn concat \cite{Omranpour2024_241210540v1,
+Elahi2024_241101368v1}.
+
+Tuy nhiên, fusion động có nhiều tham số hơn và dễ học nhiễu khi chỉ có 10 mã. Mỗi biến
+thể cần được so sánh với cùng holdout, cùng ngân sách thử và cùng ablation. Cần báo cáo
+thêm số tham số, thời gian huấn luyện, độ nhạy seed và khoảng tin cậy. Nếu một fusion
+phức tạp chỉ tốt ở một fold, không nên gọi đó là cải tiến ổn định.
+
+TFT cũng có thể được phát triển thành bộ dự báo đa nhiệm, trong đó một head dự báo lớp
+xu hướng và một head dự báo volatility hoặc xác suất không có tin. Hướng này chỉ có
+ý nghĩa nếu loss được cân bằng, nhãn phụ có cơ sở và không làm rò rỉ dữ liệu mục tiêu.
+Variable importance và attention vẫn phải được diễn giải như tín hiệu nội tại của mô
+hình, không phải quan hệ nhân quả.
+
+\section{Mở rộng phạm vi thị trường và concept drift}
+
+Sau khi pipeline hoạt động ổn định trên 10 mã, có thể mở rộng sang toàn bộ VN30, HNX,
+UPCOM hoặc các nhóm ngành khác. Việc mở rộng nên thực hiện theo từng bước, trước hết
+kiểm tra coverage và tính nhất quán dữ liệu, sau đó đánh giá khả năng tổng quát theo
+mã. Không gộp mọi mã vào một điểm số duy nhất nếu một số mã có mật độ tin cao hơn nhiều
+so với phần còn lại.
+
+Các hướng quốc tế như HIST và REST khai thác quan hệ giữa các cổ phiếu, còn DoubleAdapt
+nhắm đến concept drift trong dữ liệu streaming \cite{Xu2021_211013716v2,
+Xu2021_210207372v2,Zhao2023_230609862v3}. Có thể thử một đồ thị ngành hoặc đồ thị
+được suy ra từ tương quan, nhưng cần làm rõ nguồn quan hệ, thời điểm xây dựng và nguy
+cơ dùng thông tin tương lai. Đồ thị phải được xây trong train của từng fold nếu nó
+được học từ dữ liệu. Các hướng MTMD, DishFT-GNN và S$^{3}$G có thể làm tài liệu tham
+khảo cho bộ nhớ đa quy mô, distillation và state-space graph, nhưng không phải mục
+tiêu bắt buộc của đề tài \cite{Wang2022_221208656v2,Liu2025_250210776v1,
+Lu2026_260324236v1}.
+
+Một hướng thực tế hơn là kiểm tra concept drift bằng cách huấn luyện trên các cửa sổ
+khác nhau, theo dõi delta giữa train và test, và cập nhật checkpoint theo lịch khóa.
+Nếu hệ thống cập nhật online, cần có cơ chế ghi phiên bản dữ liệu, thời điểm cập nhật
+và rollback. Không nên cập nhật mô hình sau mỗi phiên mà không có đánh giá riêng vì
+việc đó có thể làm khó phân biệt thích nghi thật với overfitting.
+
+\section{Đánh giá giá trị kinh tế}
+
+Dự báo đúng lớp chưa đủ để kết luận tín hiệu có giá trị giao dịch. Hướng phát triển
+quan trọng là xây dựng một backtest có quy tắc rõ về thời điểm vào lệnh, giá khớp,
+phí giao dịch, trượt giá, tỷ trọng, thanh khoản và giới hạn vị thế. Các chỉ số có thể
+gồm cumulative return, annualized return, Sharpe ratio, maximum drawdown, turnover và
+ổn định theo giai đoạn.
+
+Backtest phải dùng dự đoán ngoài mẫu theo đúng walk-forward, không dùng dự đoán của
+holdout để điều chỉnh chiến lược rồi báo cáo lại trên chính holdout. Nếu so sánh nhiều
+chiến lược, số lần thử cần được ghi và kết luận phải thận trọng trước multiple testing.
+Các nghiên cứu dùng trading simulation cho thấy đánh giá kinh tế có thể bổ sung cho
+metric phân loại, nhưng kết quả vẫn phụ thuộc vào giả định mô phỏng và thị trường
+\cite{Chen2021_210708721v1,Feng2018_181009936v2}.
+
+Backtest không nằm trong graduation floor vì nó mở rộng câu hỏi từ dự báo sang quyết
+định giao dịch. Khi được triển khai, cần tách chương trình sinh dự đoán khỏi chương
+trình mô phỏng, để mọi thay đổi trong chiến lược không làm thay đổi dữ liệu dự báo.
+
+\section{Giải thích và kiểm tra độ bền}
+
+Có thể mở rộng giải thích bằng feature ablation, occlusion, permutation importance,
+Integrated Gradients cho nhánh văn bản hoặc phân tích các token quan trọng. Mỗi phương
+pháp có giả định riêng và có thể cho kết quả không giống nhau. Vì vậy, nên xem chúng
+như bằng chứng bổ sung, đối chiếu với kiểm tra loại biến và báo cáo trường hợp cụ thể.
+
+Phân tích độ bền nên bao gồm thay đổi seed, độ dài cửa sổ, cutoff, ngưỡng nhãn và tập
+mã. Có thể phân tầng theo ngày có sự kiện, số tin, volatility và hướng thị trường.
+Các nhóm có quá ít quan sát cần được đánh dấu là không đủ để kết luận. Nếu chênh lệch
+sentiment chỉ xuất hiện khi có nhiều tin, cần kiểm tra xem đó là tín hiệu nội dung hay
+chỉ là hiệu ứng của cờ \texttt{has\_news} và quy mô mẫu.
+
+Một hướng khác là calibration của xác suất. Bên cạnh lớp argmax, có thể đo Brier score,
+Expected Calibration Error hoặc hiệu chỉnh xác suất trên validation. Điều này hữu ích
+nếu hệ thống sau này được dùng để xếp hạng mức tin cậy, nhưng không thay thế macro-F1
+trong protocol chính.
+
+\section{Mở rộng mô hình ngôn ngữ}
+
+Khi corpus đủ lớn, có thể so sánh PhoBERT-base với các backbone tiếng Việt khác hoặc
+tiếp tục pretrain trên văn bản tài chính không nhãn. Mọi bước tiếp tục tiền huấn luyện
+phải lưu phiên bản corpus và kiểm tra không đưa văn bản có nhãn hoặc thông tin tương lai
+vào quá trình đánh giá. PhoBERT là lựa chọn mở và phù hợp tiếng Việt, nhưng không nên
+coi checkpoint lớn hơn là mặc nhiên tốt hơn \cite{Nguyen2020_200300744v3}.
+
+Có thể thử biểu diễn kết hợp tiêu đề và phần mở đầu, trong đó một encoder xử lý tiêu
+đề và một encoder xử lý nội dung. Hướng này cần đánh giá riêng ảnh hưởng của độ dài,
+truncation và bản tin trùng lặp. LLM tài chính như FinGPT hoặc hệ thống hợp nhất qua
+LLM có thể làm baseline tham khảo, nhưng phải ghi rõ phiên bản, chi phí và khả năng
+tái lập; chúng không nên thay thế PhoBERT trong pipeline sàn \cite{Liang2024_241210823v2,
+Siala2026_260200086v3}.
+
+\section{Đóng gói và tái lập hệ thống}
+
+Một phiên bản phát triển hoàn chỉnh nên có các thành phần độc lập: module thu thập,
+module chuẩn hóa và deduplication, module ánh xạ theo phiên, module suy luận sentiment,
+module tạo feature table, module huấn luyện, module đánh giá và module trực quan hóa.
+Các module chia sẻ schema dữ liệu và manifest thay vì đọc các file tạm không có phiên
+bản.
+
+Hệ thống demo có thể hiển thị dòng tin đã thu thập, xác suất ba lớp, số tin theo mã,
+đặc trưng kỹ thuật, dự đoán phiên kế tiếp và cảnh báo dữ liệu thiếu. Giao diện chỉ nên
+trình bày dự đoán cùng thời điểm tạo, checkpoint và độ tin cậy; không gọi đó là khuyến
+nghị mua bán. Mọi bản ghi demo phải cho biết dữ liệu đến thời điểm nào để người dùng
+không nhầm giữa kết quả hồi cứu và dự báo thực.
+
+Để tăng khả năng tái lập, cần công bố file cấu hình, seed, hash dữ liệu, phiên bản
+checkpoint, nhật ký split, số lần thử và cách dựng môi trường. Nếu dữ liệu gốc không
+thể phân phối do điều khoản nguồn, có thể công bố schema, hash, recipe và một manifest
+đã ẩn nội dung nhạy cảm, đồng thời mô tả giới hạn truy cập.
+
+\section{Lộ trình ưu tiên}
+
+Lộ trình phát triển được đề xuất như sau:
+
+\begin{enumerate}[nosep]
+  \item hoàn thiện cổng chất lượng dữ liệu, cutoff, nhãn và audit leakage;
+  \item khóa baseline, LSTM hai nhánh, ablation và bootstrap CI trên holdout;
+  \item kiểm tra độ bền theo seed, cửa sổ, mã và coverage tin;
+  \item thử TFT classification nếu còn dữ liệu, thời gian và tài nguyên;
+  \item bổ sung fusion động hoặc event-level signal khi đã có protocol ổn định;
+  \item mở rộng mã, nguồn và concept drift sau khi đánh giá khả năng tái lập;
+  \item cuối cùng mới triển khai backtest và các chỉ số giá trị kinh tế.
+\end{enumerate}
+
+Thứ tự này bảo vệ mục tiêu cốt lõi của đồ án. Các hướng mở rộng chỉ có ý nghĩa khi
+chúng được đánh giá trên một nền dữ liệu sạch, có đối chứng và có thể truy nguyên.
