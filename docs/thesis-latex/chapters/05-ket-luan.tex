@@ -1,0 +1,107 @@
+\chapter{KẾT LUẬN}
+\label{ch:ket-luan}
+
+\section{Tóm tắt nội dung thực hiện}
+
+Đồ án đã xác định và mô tả một pipeline dự báo xu hướng biến động giá cổ phiếu trên
+sàn HOSE, trong đó tin tức tài chính tiếng Việt được xử lý bằng PhoBERT và dữ liệu giá
+được biểu diễn bằng lợi suất cùng các đặc trưng kỹ thuật. Hai nhánh được căn chỉnh
+theo mã cổ phiếu, ngày giao dịch và mốc cutoff, sau đó được đưa vào thang mô hình từ
+baseline đơn giản đến LSTM hai nhánh có fusion. Temporal Fusion Transformer được giữ
+ở vị trí mở rộng để không làm thay đổi graduation floor.
+
+Quy trình được thiết kế gồm thu thập dữ liệu, kiểm tra provenance và trùng lặp, gán
+nhãn sentiment, sinh xác suất ba lớp, tổng hợp đặc trưng theo mã và ngày, tạo nhãn
+UP, FLAT và DOWN, huấn luyện mô hình, đánh giá walk-forward và phân tích ablation.
+Trong đó, quy tắc train-only preprocessing, cutoff 15 giờ và holdout cuối được khóa
+là các điều kiện để kết quả dự báo có thể được diễn giải như kết quả ngoài mẫu.
+
+\section{Đối chiếu với mục tiêu và câu hỏi nghiên cứu}
+
+Mục tiêu thứ nhất của đề tài là tạo một bộ dữ liệu có thể truy nguyên. Mức độ hoàn
+thành mục tiêu này không chỉ được đo bằng số lượng bản ghi, mà còn bằng tỷ lệ có mã,
+timestamp, nội dung, lịch giá và thông tin nguồn. Các bản ghi không thể xác minh cần
+được loại hoặc báo cáo riêng.
+
+Mục tiêu thứ hai là đánh giá PhoBERT ở tầng sentiment. Kết luận về tầng này phải dựa
+trên accuracy, macro-F1, F1 theo lớp và độ đồng thuận nhãn của tập in-domain. Chất
+lượng phân loại sentiment không được đồng nhất với giá trị dự báo, vì một mô hình phân
+loại tốt vẫn có thể tạo tín hiệu ít liên quan đến biến động phiên kế tiếp. Việc dùng
+backbone tiếng Việt mở là sự lựa chọn phù hợp với dữ liệu, tương tự cách FinBERT được
+thích nghi cho ngữ liệu tài chính tiếng Anh, nhưng không phải bằng chứng rằng hai mô
+hình có hiệu năng tương đương \cite{Nguyen2020_200300744v3,Yang2020_200608097v2}.
+
+Mục tiêu thứ ba và thứ tư là kết hợp hai nguồn dữ liệu và huấn luyện mô hình dự báo.
+Mô hình hai nhánh LSTM là cấu hình sàn có thể kiểm tra trực tiếp. Cấu hình này kế thừa
+ý tưởng kết hợp sentiment với LSTM trong các nghiên cứu quốc tế, nhưng thay đổi ngôn
+ngữ, thị trường, mục tiêu ba lớp và giao thức thời gian \cite{Halder2022_221107392v1,
+Gu2024_240716150v1}. Vì các khác biệt đó, mọi kết luận phải được rút ra từ bảng điểm
+trên chính dữ liệu HOSE.
+
+Mục tiêu thứ năm là đo phần đóng góp riêng của sentiment. Phép đo phù hợp là chênh
+lệch giữa mô hình có sentiment và mô hình chỉ giá trên cùng cửa sổ, cùng seed hoặc
+tập seed, cùng preprocessing và cùng holdout. Nếu chênh lệch nhỏ, không ổn định hoặc
+không khác biệt rõ, kết quả đó vẫn trả lời được câu hỏi nghiên cứu. Nó cho thấy trong
+phạm vi protocol hiện tại chưa có bằng chứng đủ mạnh về giá trị gia tăng, chứ không
+phải phủ định khả năng sentiment hữu ích ở thời điểm hoặc thị trường khác.
+
+\section{Đóng góp và ý nghĩa}
+
+Đóng góp an toàn nhất của đồ án là một quy trình thực nghiệm đa phương thức tiếng Việt
+được mô tả tường minh. Quy trình này nối một backbone NLP mở với nhánh chuỗi giá, đồng
+thời đặt phép ablation và kiểm soát point-in-time ở vị trí trung tâm. Đây là điểm cần
+thiết vì các hướng fusion sử dụng embedding ngữ cảnh, sự kiện hoặc LLM có năng lực
+biểu đạt cao hơn nhưng cũng tăng yêu cầu về dữ liệu, chi phí và khả năng tái lập
+\cite{Chen2021_210708721v1,Elahi2024_241101368v1,Liang2024_241210823v2}.
+
+Về phương diện phương pháp, đồ án nhấn mạnh sự phân biệt giữa ba loại kết luận. Loại
+thứ nhất là kết luận về chất lượng sentiment trên tập được gán nhãn. Loại thứ hai là
+kết luận về khả năng dự báo ngoài mẫu của từng mô hình. Loại thứ ba là kết luận về
+phần đóng góp biên của sentiment thông qua ablation. Ba loại kết luận này không được
+thay thế cho nhau.
+
+Về phương diện thực tiễn, pipeline có thể làm nền cho một công cụ thăm dò dữ liệu,
+giúp người nghiên cứu xem phân bố tin, xác suất sentiment, trạng thái kỹ thuật và dự
+đoán lớp theo từng ngày. Tuy nhiên, bản thân pipeline chưa phải hệ thống giao dịch và
+không cung cấp khuyến nghị đầu tư. Việc đánh giá lợi nhuận sau phí, trượt giá và thanh
+khoản phải được thực hiện trong một nghiên cứu riêng.
+
+\section{Giới hạn của đồ án}
+
+Thứ nhất, phạm vi chỉ gồm 10 mã VN30 trên HOSE trong giai đoạn 2020 đến quý I năm 2026.
+Các kết quả có thể chịu ảnh hưởng bởi ngành, thanh khoản và mật độ tin của những mã
+này. Chưa đủ cơ sở để suy rộng sang cổ phiếu vốn hóa nhỏ, HNX, UPCOM hoặc các thị
+trường quốc tế.
+
+Thứ hai, dữ liệu tin phụ thuộc vào nguồn, chính sách truy cập và chất lượng timestamp.
+Bài viết bị thiếu thời gian hoặc được cập nhật nhiều lần có thể làm thay đổi quy tắc
+ánh xạ. Dù cutoff bảo thủ làm giảm rủi ro dùng tin tương lai, nó cũng có thể làm trễ
+một phần tín hiệu thực sự được thị trường nhìn thấy trước phiên kế tiếp.
+
+Thứ ba, nhãn sentiment là một khái niệm phụ thuộc vào hướng dẫn và người gán. Một tin
+chứa nhiều sự kiện có thể vừa tích cực vừa tiêu cực, trong khi nhãn ba lớp buộc phải
+nén thông tin đó. Độ đồng thuận, phân bố lớp và các mẫu bất đồng cần được công bố để
+người đọc đánh giá giới hạn này.
+
+Thứ tư, dự báo phiên kế tiếp chỉ quan sát một horizon ngắn. Tin tức về kế hoạch dài
+hạn, chất lượng quản trị hoặc thay đổi ngành có thể không thể hiện ngay trong lợi suất
+của phiên sau. Ngoài ra, metric phân loại không phản ánh trực tiếp khả năng sinh lợi.
+Các nghiên cứu quốc tế dùng mô phỏng giao dịch hoặc mô hình quan hệ liên mã cho thấy
+đánh giá tài chính có thể cần nhiều góc nhìn hơn accuracy, nhưng những mở rộng đó nằm
+ngoài graduation floor \cite{Chen2021_210708721v1,Xu2021_211013716v2}.
+
+\section{Kết luận cuối cùng}
+
+Đề tài cung cấp một cách tiếp cận có kiểm soát để kiểm tra việc bổ sung cảm xúc tin
+tức tiếng Việt vào dự báo xu hướng giá cổ phiếu. PhoBERT phù hợp làm backbone ngôn ngữ
+cho dữ liệu tiếng Việt, LSTM hai nhánh phù hợp làm mức sàn cho phép so sánh price-only
+và có sentiment, còn TFT là hướng mở rộng khi graduation floor đã được xác minh. Giá
+trị chính của đồ án không nằm ở việc giả định sentiment chắc chắn cải thiện điểm số,
+mà ở việc xây dựng phép đo có thể phân biệt tín hiệu thực với lợi thế do rò rỉ hoặc do
+thay đổi protocol.
+
+Kết luận định lượng cuối cùng cần được điền từ bảng kết quả và manifest thực nghiệm ở
+Chương~\ref{ch:ket-qua}. Dù chênh lệch cuối cùng dương, bằng không hay âm, kết luận phải
+giữ đúng phạm vi 10 mã, giai đoạn đã chọn và các điều kiện đánh giá. Cách trình bày
+thận trọng này giúp đồ án có giá trị như một nghiên cứu có thể kiểm tra lại, thay vì
+đưa ra một lời hứa hiệu năng không có cơ sở ngoài dữ liệu.

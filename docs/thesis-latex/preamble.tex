@@ -1,0 +1,87 @@
+% ============================================================================
+% preamble.tex - formatting per Appendix 2 (university regulations)
+% Times New Roman 13pt, 1.5 line spacing, margins top 3 / bottom 3.5 / left 3.5 / right 2 cm.
+% Build with XeLaTeX (system fonts + Vietnamese Unicode).
+% ============================================================================
+
+\usepackage{fontspec}          % system fonts (XeLaTeX/LuaLaTeX)
+\usepackage{polyglossia}       % multilingual, Vietnamese support
+\setmainlanguage{vietnamese}
+\setotherlanguage{english}
+
+% --- Font: Times New Roman (falls back to Liberation Serif when TNR is absent) ---
+% Detection is automatic below; hard-set \setmainfont{Times New Roman} to force it.
+\IfFontExistsTF{Times New Roman}{
+  \setmainfont{Times New Roman}
+}{
+  \setmainfont{Liberation Serif}  % metric-compatible substitute for Times New Roman
+}
+
+% --- 13pt body: base class caps at 12pt, so scale with anyfontsize ---
+\usepackage{anyfontsize}
+\usepackage{setspace}
+
+% --- Margins: top 3cm, bottom 3.5cm, left 3.5cm, right 2cm ---
+\usepackage[
+  top=3cm, bottom=3.5cm, left=3.5cm, right=2cm,
+  a4paper
+]{geometry}
+
+% --- 1.5 line spacing ---
+\onehalfspacing
+
+% --- Number headings to 4 levels (Chapter / x.y / x.y.z / x.y.z.t) ---
+\usepackage{titlesec}
+\setcounter{secnumdepth}{4}
+\setcounter{tocdepth}{3}
+
+% Chapter: bold ~14pt; subsections: bold 13pt (per regulations).
+\titleformat{\chapter}[block]
+  {\normalfont\fontsize{14}{18}\bfseries}
+  {Chương \thechapter.}{0.6em}{}
+\titlespacing*{\chapter}{0pt}{0pt}{12pt}
+
+\titleformat{\section}
+  {\normalfont\fontsize{13}{18}\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}
+  {\normalfont\fontsize{13}{18}\bfseries}{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}
+  {\normalfont\fontsize{13}{18}\bfseries}{\thesubsubsection.}{0.5em}{}
+
+% --- Tables, figures, captions numbered per chapter (Figure 1.1, Table 2.1) ---
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage[labelsep=colon]{caption}
+\captionsetup{font=small, labelfont=bf}
+\usepackage{chngcntr}
+\counterwithin{figure}{chapter}
+\counterwithin{table}{chapter}
+
+% --- Page numbers: bottom-center (regulation) ---
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+
+% --- IEEE citations (numeric [1], [2]) ---
+\usepackage[backend=biber, style=ieee, sorting=nyt]{biblatex}
+
+% --- Utilities ---
+\usepackage{hyperref}
+\hypersetup{colorlinks=false, hidelinks, pdfborder={0 0 0}}
+\usepackage{xurl}
+\usepackage{enumitem}
+\usepackage{amsmath, amssymb}
+
+% --- Custom commands for the title pages ---
+\newcommand{\thesistitle}{Xây dựng hệ thống dự báo xu hướng biến động giá cổ phiếu dựa trên phân tích cảm xúc tin tức tài chính bằng mô hình Transformer và chuỗi thời gian}
+\newcommand{\thesistitleEN}{Building a stock price movement forecasting system based on financial news sentiment analysis using Transformer and time-series models}
+\newcommand{\authorname}{Nguyễn Phước Thọ}
+\newcommand{\studentid}{25410139}
+\newcommand{\advisor}{TS. Đặng Văn Thìn}
+\newcommand{\major}{Trí tuệ nhân tạo}
+\newcommand{\thesisyear}{2026}
