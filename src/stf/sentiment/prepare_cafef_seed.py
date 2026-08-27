@@ -29,7 +29,7 @@ OUT_CSV = SEED_DIR / "cafef_seed.csv"
 def prepare() -> pd.DataFrame:
     if not RAW_XLSX.exists():
         raise FileNotFoundError(
-            f"Chưa có {RAW_XLSX}. Tải trước:\n"
+            f"{RAW_XLSX} not found. Download it first:\n"
             "  curl -sL -o data/labeled/cafef_seed/raw_data.xlsx "
             "https://raw.githubusercontent.com/209sontung/"
             "Vietnamese-stock-article-classification/main/Dataset/raw_data.xlsx"
@@ -38,7 +38,7 @@ def prepare() -> pd.DataFrame:
     df = df.rename(columns={"title": "text"})
     df["label"] = df["label"].map(_RAW2LABEL)
     if df["label"].isna().any():
-        raise ValueError("Có nhãn gốc ngoài {1,2,3}; kiểm tra lại raw_data.xlsx")
+        raise ValueError("Found source labels outside {1,2,3}; check raw_data.xlsx")
     df = df.dropna(subset=["text"]).drop_duplicates(subset=["text"]).reset_index(drop=True)
     df = df[["text", "label"]]
 
@@ -46,8 +46,8 @@ def prepare() -> pd.DataFrame:
     df.to_parquet(OUT_PARQUET, index=False)
     df.to_csv(OUT_CSV, index=False)
 
-    print(f"[cafef-seed] {len(df)} tiêu đề đã chuẩn hóa -> {OUT_PARQUET.name}, {OUT_CSV.name}")
-    print("[cafef-seed] phân bố lớp:")
+    print(f"[cafef-seed] {len(df)} titles normalized -> {OUT_PARQUET.name}, {OUT_CSV.name}")
+    print("[cafef-seed] class distribution:")
     for name in LABELS:
         print(f"    {name}: {(df['label'] == name).sum()}")
     return df

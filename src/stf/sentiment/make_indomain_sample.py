@@ -60,7 +60,7 @@ của mã liên quan, theo góc nhìn nhà đầu tư ngắn hạn.
 
 def make_sample(n: int, seed: int, raters: int) -> pd.DataFrame:
     if not config.ARTICLES_PQ.exists():
-        raise FileNotFoundError(f"Chưa có {config.ARTICLES_PQ}. Chạy crawl tin trước.")
+        raise FileNotFoundError(f"{config.ARTICLES_PQ} not found. Run the news crawl first.")
 
     articles = pd.read_parquet(config.ARTICLES_PQ)
     listings = pd.read_parquet(config.LISTINGS_PQ)
@@ -69,7 +69,7 @@ def make_sample(n: int, seed: int, raters: int) -> pd.DataFrame:
     has_body = articles["body"].notna() & (articles["body"].astype("string").str.len() > 0)
     pool = articles[has_body].copy()
     if pool.empty:
-        raise RuntimeError("Chưa có bài nào có body. Đợi cron crawl body chạy thêm.")
+        raise RuntimeError("No articles with a body yet. Wait for the body-crawl cron to run more.")
 
     # Attach ticker (an article may map to several; take the first for simplicity).
     url2ticker = listings.drop_duplicates("url").set_index("url")["ticker"].to_dict()
@@ -114,20 +114,20 @@ def make_sample(n: int, seed: int, raters: int) -> pd.DataFrame:
             out.to_csv(f, index=False)
             files.append(f)
 
-    print(f"[in-domain] tạo mẫu {len(out)} bài (phân tầng theo mã x năm, chỉ bài có body)")
-    print(f"[in-domain] phân bố theo mã:\n{sample['ticker'].value_counts().to_string()}")
+    print(f"[in-domain] built sample of {len(out)} articles (stratified by ticker x year, body only)")
+    print(f"[in-domain] distribution by ticker:\n{sample['ticker'].value_counts().to_string()}")
     print(f"[in-domain] guideline: {GUIDELINE}")
     for f in files:
-        print(f"[in-domain] file gán nhãn (cột label trống): {f}")
+        print(f"[in-domain] labeling file (empty label column): {f}")
     return out
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Tạo mẫu in-domain để gán nhãn cảm xúc")
-    ap.add_argument("--n", type=int, default=300, help="số bài trong mẫu")
+    ap = argparse.ArgumentParser(description="Build an in-domain sample for sentiment labeling")
+    ap.add_argument("--n", type=int, default=300, help="number of articles in the sample")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--raters", type=int, default=1,
-                    help="số người gán nhãn (>=2 sinh nhiều file để tính kappa)")
+                    help="number of annotators (>=2 makes multiple files for kappa)")
     args = ap.parse_args()
     make_sample(args.n, args.seed, args.raters)
     return 0

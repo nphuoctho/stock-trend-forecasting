@@ -77,7 +77,7 @@ def collect(
         df.to_parquet(out, index=False)
         result[sym] = len(df)
         lo, hi = str(df["time"].min())[:10], str(df["time"].max())[:10]
-        print(f"[prices] {sym}: {len(df)} phiên ({lo} -> {hi})")
+        print(f"[prices] {sym}: {len(df)} sessions ({lo} -> {hi})")
     return result
 
 
@@ -85,4 +85,4 @@ def summary(result: dict[str, int]) -> None:
     """Print a price coverage summary."""
     ok = sum(1 for n in result.values() if n > 0)
     total = sum(result.values())
-    print(f"\n[prices] {ok}/{len(result)} mã OK, tổng {total} dòng giá")
+    print(f"\n[prices] {ok}/{len(result)} tickers OK, {total} price rows total")

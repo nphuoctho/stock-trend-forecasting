@@ -23,7 +23,7 @@ try:
     out = subprocess.check_output(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"])
     print("GPU:", out.decode().strip())
 except Exception:
-    print("CẢNH BÁO: Không phát hiện GPU. Fine-tune trên CPU sẽ rất chậm.")
+    print("WARNING: no GPU detected. Fine-tuning on CPU will be very slow.")
     print("Colab: Runtime > Change runtime type > T4 GPU. Kaggle: Settings > Accelerator > GPU.")
 
 # %% [markdown]
@@ -55,8 +55,8 @@ PKGS = [
     "openpyxl>=3.1",          # read raw_data.xlsx
 ]
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", *PKGS], check=True)
-print("Đã cài xong. Nếu Colab/Kaggle báo cần KHỞI ĐỘNG LẠI runtime, hãy restart")
-print("rồi chạy tiếp TỪ MỤC 3 (không chạy lại mục 2).")
+print("Install done. If Colab/Kaggle asks to RESTART the runtime, restart it")
+print("then continue FROM SECTION 3 (do not rerun section 2).")
 
 # %% [markdown]
 # ## 3. Confirm versions after install
@@ -68,7 +68,7 @@ print("transformers :", transformers.__version__)
 print("sklearn      :", sklearn.__version__)
 print("pandas       :", pandas.__version__)
 print("numpy        :", numpy.__version__)
-assert torch.cuda.is_available(), "Cần GPU. Bật accelerator rồi chạy lại."
+assert torch.cuda.is_available(), "GPU required. Enable the accelerator and rerun."
 
 # %% [markdown]
 # ## 4. Get the `stf` code and label data
@@ -91,7 +91,7 @@ subprocess.run([
     "wget", "-q", "-O", "cafef_seed_raw.xlsx",
     "https://raw.githubusercontent.com/209sontung/Vietnamese-stock-article-classification/main/Dataset/raw_data.xlsx"
 ], check=True)
-print("Đã tải seed CafeF (raw_data.xlsx).")
+print("Downloaded CafeF seed (raw_data.xlsx).")
 
 # %% [markdown]
 # ## 5. Prepare label data
@@ -116,15 +116,15 @@ if os.path.exists("indomain_labeled.csv"):
     ind = pd.read_csv("indomain_labeled.csv")
     ind = ind.dropna(subset=["text", "label"])[["text", "label"]]
     df = pd.concat([seed, ind], ignore_index=True).drop_duplicates("text")
-    print(f"Gộp seed ({len(seed)}) + in-domain ({len(ind)}) = {len(df)}")
+    print(f"Merged seed ({len(seed)}) + in-domain ({len(ind)}) = {len(df)}")
 else:
     df = seed
-    print(f"Chỉ dùng seed CafeF: {len(df)} mẫu")
+    print(f"Using CafeF seed only: {len(df)} samples")
 
 df["label_id"] = df["label"].astype(str).str.upper().str.strip().map(LABEL2ID)
-assert df["label_id"].notna().all(), "Có nhãn lạ ngoài NEGATIVE/NEUTRAL/POSITIVE"
+assert df["label_id"].notna().all(), "Found unknown labels outside NEGATIVE/NEUTRAL/POSITIVE"
 df["label_id"] = df["label_id"].astype(int)
-print("Phân bố lớp:", df["label_id"].value_counts().sort_index().to_dict())
+print("Class distribution:", df["label_id"].value_counts().sort_index().to_dict())
 
 # %% [markdown]
 # ## 6. Split train / val / test (stratified by class, fixed seed)
@@ -166,7 +166,7 @@ class SentimentDataset(torch.utils.data.Dataset):
 ds_train = SentimentDataset(train_df["text"], train_df["label_id"])
 ds_val   = SentimentDataset(val_df["text"], val_df["label_id"])
 ds_test  = SentimentDataset(test_df["text"], test_df["label_id"])
-print("Đã tokenize:", len(ds_train), "train /", len(ds_val), "val /", len(ds_test), "test")
+print("Tokenized:", len(ds_train), "train /", len(ds_val), "val /", len(ds_test), "test")
 
 # %% [markdown]
 # ## 8. Load the model and configure training
@@ -192,12 +192,12 @@ RESUME_RUN_DIR = ""
 
 if RESUME_RUN_DIR:
     RUN_DIR = RESUME_RUN_DIR
-    assert os.path.isdir(RUN_DIR), f"Không thấy thư mục RUN để resume: {RUN_DIR}"
-    print("Sẽ RESUME vào RUN_DIR cũ:", RUN_DIR)
+    assert os.path.isdir(RUN_DIR), f"RUN directory to resume not found: {RUN_DIR}"
+    print("Will RESUME into existing RUN_DIR:", RUN_DIR)
 else:
     RUN_DIR = os.path.join(BASE_OUT, f"phobert-sentiment-{RUN_ID}")
     os.makedirs(RUN_DIR, exist_ok=True)
-    print("Tạo RUN_DIR mới:", RUN_DIR)
+    print("Created new RUN_DIR:", RUN_DIR)
 
 # %%
 import numpy as np
@@ -282,9 +282,9 @@ resume_ckpt = None
 if os.path.isdir(ckpt_dir):
     resume_ckpt = get_last_checkpoint(ckpt_dir)   # None if no checkpoint yet
 if resume_ckpt:
-    print("RESUME từ checkpoint:", resume_ckpt)
+    print("Resuming from checkpoint:", resume_ckpt)
 else:
-    print("Train mới (không tìm thấy checkpoint để resume).")
+    print("Fresh training (no checkpoint found to resume).")
 
 train_result = trainer.train(resume_from_checkpoint=resume_ckpt)
 
@@ -312,10 +312,10 @@ try:
     fig.savefig(os.path.join(RUN_DIR, "learning_curve.png"), dpi=150)
     plt.show()
 except Exception as e:
-    print("Bỏ qua vẽ learning curve:", e)
+    print("Skipping learning-curve plot:", e)
 
-print("Đã lưu log huấn luyện:", os.path.join(RUN_DIR, "train_log_history.csv"))
-print("Log an toàn từng bước:", os.path.join(RUN_DIR, "train_log.jsonl"))
+print("Saved training log:", os.path.join(RUN_DIR, "train_log_history.csv"))
+print("Per-step safe log:", os.path.join(RUN_DIR, "train_log.jsonl"))
 print(log_hist.tail(6))
 
 # %% [markdown]
@@ -352,7 +352,7 @@ fig, ax = plt.subplots(figsize=(4.5, 4))
 im = ax.imshow(cm, cmap="Blues")
 ax.set_xticks(range(3)); ax.set_xticklabels(LABELS, rotation=45, ha="right")
 ax.set_yticks(range(3)); ax.set_yticklabels(LABELS)
-ax.set_xlabel("Dự đoán"); ax.set_ylabel("Thực tế")
+ax.set_xlabel("Predicted"); ax.set_ylabel("Actual")
 ax.set_title(f"Confusion matrix (macro-F1={macro_f1:.3f})")
 for i in range(3):
     for j in range(3):
@@ -361,7 +361,7 @@ for i in range(3):
 fig.tight_layout()
 fig.savefig(os.path.join(RUN_DIR, "confusion_matrix.png"), dpi=150)
 plt.show()
-print("Đã lưu report + confusion matrix vào", RUN_DIR)
+print("Saved report + confusion matrix to", RUN_DIR)
 
 # SAVE the misclassified predictions for qualitative error analysis in the report.
 # Includes per-class probabilities and the confidence of each wrong prediction
@@ -382,7 +382,7 @@ mis = err_df[~err_df["correct"]].sort_values("pred_conf", ascending=False)
 mis.to_csv(os.path.join(RUN_DIR, "misclassified.csv"), index=False)
 # Also save ALL test predictions, to re-analyze later without rerunning the model.
 err_df.to_csv(os.path.join(RUN_DIR, "test_predictions.csv"), index=False)
-print(f"Số ca sai: {len(mis)}/{len(err_df)}. Đã lưu misclassified.csv + test_predictions.csv")
+print(f"Wrong cases: {len(mis)}/{len(err_df)}. Saved misclassified.csv + test_predictions.csv")
 print(mis.head(10)[["text", "true", "pred", "pred_conf"]].to_string(index=False))
 
 # %% [markdown]
@@ -427,7 +427,7 @@ manifest = {
 }
 with open(os.path.join(RUN_DIR, "manifest.json"), "w") as f:
     json.dump(manifest, f, ensure_ascii=False, indent=2)
-print("Đã lưu mô hình + manifest.json vào", RUN_DIR)
+print("Saved model + manifest.json to", RUN_DIR)
 print(json.dumps(manifest["test_metrics"], ensure_ascii=False, indent=2))
 
 # %% [markdown]
@@ -438,7 +438,7 @@ print(json.dumps(manifest["test_metrics"], ensure_ascii=False, indent=2))
 # %%
 import shutil
 zip_path = shutil.make_archive(RUN_DIR, "zip", RUN_DIR)
-print("Đã tạo:", zip_path)
+print("Created:", zip_path)
 
 # Colab: download to your machine
 # from google.colab import files; files.download(zip_path)

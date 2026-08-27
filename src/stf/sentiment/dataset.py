@@ -53,7 +53,7 @@ def normalize_labels(df: pd.DataFrame) -> pd.DataFrame:
         df["label_id"] = raw.astype(int)
     if df["label_id"].isna().any():
         bad = df.loc[df["label_id"].isna(), "label"].unique()[:5]
-        raise ValueError(f"Nhãn không hợp lệ: {bad}. Cần NEGATIVE/NEUTRAL/POSITIVE hoặc 0/1/2.")
+        raise ValueError(f"Invalid labels: {bad}. Expected NEGATIVE/NEUTRAL/POSITIVE or 0/1/2.")
     df["label_id"] = df["label_id"].astype(int)
     return df
 
@@ -63,7 +63,7 @@ def load_labeled(path: str | Path) -> pd.DataFrame:
     path = Path(path)
     df = pd.read_parquet(path) if path.suffix == ".parquet" else pd.read_csv(path)
     if "text" not in df.columns or "label" not in df.columns:
-        raise ValueError("File nhãn cần cột 'text' và 'label'.")
+        raise ValueError("Label file needs 'text' and 'label' columns.")
     df = df.dropna(subset=["text"]).reset_index(drop=True)
     return normalize_labels(df)
 

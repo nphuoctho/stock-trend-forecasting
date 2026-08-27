@@ -101,8 +101,8 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
     """Gather news listings for every ticker x year in the config window. The news->ticker mapping source."""
     if config.LISTINGS_PQ.exists() and not refresh:
         df = pd.read_parquet(config.LISTINGS_PQ)
-        _log(f"[listings] dùng lại: {len(df)} dòng, {df['url'].nunique()} url, "
-             f"{df['ticker'].nunique()} mã")
+        _log(f"[listings] reused: {len(df)} rows, {df['url'].nunique()} urls, "
+             f"{df['ticker'].nunique()} tickers")
         return df
 
     start_year = int(config.DATE_START[:4])
@@ -118,11 +118,11 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
                 recs.append({"ticker": code, "url": "https:" + href,
                              "list_date": d, "year": year})
             tot += len(rows)
-            _log(f"[listings] {code} {year}: {len(rows)} bài (luỹ kế mã {tot})")
+            _log(f"[listings] {code} {year}: {len(rows)} articles (ticker running total {tot})")
         config.NEWS_DIR.mkdir(parents=True, exist_ok=True)
         pd.DataFrame(recs).to_parquet(config.LISTINGS_PQ)  # save incrementally after each ticker
     df = pd.DataFrame(recs)
-    _log(f"[listings] XONG: {len(df)} dòng, {df['url'].nunique()} url duy nhất")
+    _log(f"[listings] done: {len(df)} rows, {df['url'].nunique()} unique urls")
     return df
 
 
@@ -201,7 +201,7 @@ def fetch_articles(
         for r in prev.to_dict("records"):
             store[r["url"]] = r
         with_body = sum(1 for r in store.values() if _has_body(r.get("body")))
-        _log(f"[articles] nạp {len(store)} bài cũ ({with_body} đã có body)")
+        _log(f"[articles] loaded {len(store)} existing articles ({with_body} already have a body)")
 
     if limit_urls is not None:
         urls = urls[:limit_urls]
@@ -222,7 +222,7 @@ def fetch_articles(
         if not _needs_body(url):
             continue
         if max_new is not None and n_new >= max_new:
-            _log(f"[articles] đạt batch {max_new} bài, dừng (còn lại để lần sau)")
+            _log(f"[articles] hit batch of {max_new}, stopping (rest left for next run)")
             break
         aid_m = ART_ID.search(url)
         aid = aid_m.group(1) if aid_m else str(abs(hash(url)))
@@ -256,7 +256,7 @@ def crawl(
     """Run the news pipeline end to end: listing -> articles (ts + title + body)."""
     listings = collect_listings(refresh=refresh)
     urls = listings["url"].drop_duplicates().tolist()
-    _log(f"[news] {len(urls)} url duy nhất để lấy nội dung")
+    _log(f"[news] {len(urls)} unique urls to fetch content for")
     return fetch_articles(urls, limit_urls=limit_urls, max_new=max_new)
 
 
@@ -264,5 +264,5 @@ def summary(articles: pd.DataFrame) -> None:
     """Print a news coverage summary."""
     with_ts = articles["published_at"].notna().sum() if "published_at" in articles else 0
     with_body = articles["body"].notna().sum() if "body" in articles else 0
-    _log("\n==== TỔNG KẾT TIN ====")
-    _log(f"articles : {len(articles)} bài | {with_ts} có timestamp | {with_body} có nội dung")
+    _log("\nNews summary")
+    _log(f"articles : {len(articles)} total | {with_ts} with timestamp | {with_body} with body")

@@ -28,49 +28,54 @@ def cmd_prices(args: argparse.Namespace) -> int:
 def cmd_news(args: argparse.Namespace) -> int:
     from stf.data import news
 
-    articles = news.crawl(refresh=args.refresh, limit_urls=args.limit_urls,
-                          max_new=args.batch)
+    articles = news.crawl(
+        refresh=args.refresh, limit_urls=args.limit_urls, max_new=args.batch
+    )
     news.summary(articles)
     return 0 if len(articles) else 1
 
 
 def cmd_verify(_args: argparse.Namespace) -> int:
     """Read saved data and print a coverage report. No network access."""
-    print("=== VERIFY DỮ LIỆU (offline) ===\n")
+    print("Data coverage report (offline)\n")
     ok = True
 
     # --- Prices ---
     price_files = sorted(config.PRICES_DIR.glob("*.parquet"))
     if not price_files:
-        print("[giá] CHƯA CÓ dữ liệu giá")
+        print("[prices] no price data")
         ok = False
     else:
         total = 0
         for f in price_files:
             df = pd.read_parquet(f)
             total += len(df)
-        print(f"[giá] {len(price_files)} mã, tổng {total} phiên")
+        print(f"[prices] {len(price_files)} tickers, {total} sessions total")
 
     # --- News ---
     if not config.ARTICLES_PQ.exists():
-        print("[tin] CHƯA CÓ articles.parquet")
+        print("[news] articles.parquet missing")
         ok = False
     else:
         a = pd.read_parquet(config.ARTICLES_PQ)
         with_ts = a["published_at"].notna().sum() if "published_at" in a else 0
         with_body = a["body"].notna().sum() if "body" in a else 0
-        print(f"[tin] {len(a)} bài | {with_ts} có timestamp | {with_body} có nội dung")
+        print(
+            f"[news] {len(a)} articles | {with_ts} with timestamp | {with_body} with body"
+        )
         if "published_at" in a:
             pa = pd.to_datetime(a["published_at"], errors="coerce", utc=True)
             if pa.notna().any():
-                print(f"      khoảng: {str(pa.min())[:10]} -> {str(pa.max())[:10]}")
+                print(f"      range: {str(pa.min())[:10]} -> {str(pa.max())[:10]}")
 
     if config.LISTINGS_PQ.exists():
         listings = pd.read_parquet(config.LISTINGS_PQ)
-        print(f"[map] {len(listings)} listing, {listings['ticker'].nunique()} mã "
-              f"(ánh xạ tin->mã)")
+        print(
+            f"[map] {len(listings)} listings, {listings['ticker'].nunique()} tickers "
+            f"(news->ticker)"
+        )
 
-    print("\nKẾT QUẢ:", "ĐẠT" if ok else "THIẾU DỮ LIỆU")
+    print("\nResult:", "OK" if ok else "MISSING DATA")
     return 0 if ok else 1
 
 
@@ -81,7 +86,7 @@ def cmd_sentiment_smoke(args: argparse.Namespace) -> int:
     """
     from stf.sentiment import dataset, model
 
-    print("=== SMOKE-TEST PhoBERT (dữ liệu giả, KHÔNG phải kết quả thật) ===\n")
+    print("PhoBERT smoke-test (fake data, not real results)\n")
     df = dataset.synthetic_dataset(n=args.n, seed=42)
     split = dataset.make_split(df, seed=42, time_aware=False)
     print("Split:", split.describe())
@@ -89,7 +94,7 @@ def cmd_sentiment_smoke(args: argparse.Namespace) -> int:
     print(f"Device: {model.get_device()} | model: {cfg.model_name}\n")
     manifest = model.fine_tune(split, cfg)
     print("\nTest macro-F1:", manifest["test_metrics"]["macro_f1"])
-    print("Manifest lưu tại:", (config.SENTIMENT_DIR / "manifest.json"))
+    print("Manifest saved to:", (config.SENTIMENT_DIR / "manifest.json"))
     return 0
 
 
@@ -100,7 +105,9 @@ def cmd_sentiment_train(args: argparse.Namespace) -> int:
     df = dataset.load_labeled(args.data)
     split = dataset.make_split(df, seed=args.seed, time_aware=not args.no_time_split)
     print("Split:", split.describe())
-    cfg = model.TrainConfig(epochs=args.epochs, batch_size=args.batch_size, seed=args.seed)
+    cfg = model.TrainConfig(
+        epochs=args.epochs, batch_size=args.batch_size, seed=args.seed
+    )
     print(f"Device: {model.get_device()} | model: {cfg.model_name}\n")
     manifest = model.fine_tune(split, cfg)
     print("\nTest macro-F1:", manifest["test_metrics"]["macro_f1"])
@@ -109,35 +116,55 @@ def cmd_sentiment_train(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="stf", description="Stock Trend Forecasting CLI")
+    parser = argparse.ArgumentParser(
+        prog="stf", description="Stock Trend Forecasting CLI"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_prices = sub.add_parser("prices", help="kéo giá OHLCV điều chỉnh")
-    p_prices.add_argument("--limit", type=int, default=None, help="chỉ lấy N mã đầu")
+    p_prices = sub.add_parser("prices", help="fetch adjusted OHLCV prices")
+    p_prices.add_argument(
+        "--limit", type=int, default=None, help="only take the first N tickers"
+    )
     p_prices.set_defaults(func=cmd_prices)
 
-    p_news = sub.add_parser("news", help="crawl tin (timestamp + tiêu đề + nội dung)")
-    p_news.add_argument("--limit-urls", type=int, default=None, help="chỉ lấy N bài đầu")
-    p_news.add_argument("--batch", type=int, default=None,
-                        help="chỉ crawl thêm N bài CHƯA có body rồi dừng (cho cron)")
-    p_news.add_argument("--refresh", action="store_true", help="cào lại listing")
+    p_news = sub.add_parser("news", help="crawl news (timestamp + title + body)")
+    p_news.add_argument(
+        "--limit-urls", type=int, default=None, help="only take the first N articles"
+    )
+    p_news.add_argument(
+        "--batch",
+        type=int,
+        default=None,
+        help="crawl N more articles missing a body, then stop (for cron)",
+    )
+    p_news.add_argument("--refresh", action="store_true", help="re-scrape the listing")
     p_news.set_defaults(func=cmd_news)
 
-    p_verify = sub.add_parser("verify", help="báo cáo coverage dữ liệu đã có (offline)")
+    p_verify = sub.add_parser(
+        "verify", help="coverage report for existing data (offline)"
+    )
     p_verify.set_defaults(func=cmd_verify)
 
-    p_smoke = sub.add_parser("sentiment-smoke",
-                             help="smoke-test PhoBERT bằng dữ liệu giả (verify code)")
-    p_smoke.add_argument("--n", type=int, default=60, help="số mẫu giả")
+    p_smoke = sub.add_parser(
+        "sentiment-smoke", help="smoke-test PhoBERT on fake data (verify code runs)"
+    )
+    p_smoke.add_argument("--n", type=int, default=60, help="number of fake samples")
     p_smoke.set_defaults(func=cmd_sentiment_smoke)
 
-    p_train = sub.add_parser("sentiment-train", help="fine-tune PhoBERT trên file nhãn thật")
-    p_train.add_argument("--data", required=True, help="file nhãn .csv/.parquet (cột text,label)")
+    p_train = sub.add_parser(
+        "sentiment-train", help="fine-tune PhoBERT on a real label file"
+    )
+    p_train.add_argument(
+        "--data", required=True, help="label file .csv/.parquet (text, label columns)"
+    )
     p_train.add_argument("--epochs", type=float, default=3.0)
     p_train.add_argument("--batch-size", type=int, default=16)
     p_train.add_argument("--seed", type=int, default=42)
-    p_train.add_argument("--no-time-split", action="store_true",
-                         help="chia ngẫu nhiên thay vì tách thời gian")
+    p_train.add_argument(
+        "--no-time-split",
+        action="store_true",
+        help="random split instead of time-based split",
+    )
     p_train.set_defaults(func=cmd_sentiment_train)
 
     args = parser.parse_args(argv)
