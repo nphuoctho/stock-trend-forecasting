@@ -4,8 +4,7 @@ Fine-tune `vinai/phobert-base` thành mô hình phân loại cảm xúc 3 lớp
 (NEGATIVE / NEUTRAL / POSITIVE) cho tin tài chính tiếng Việt.
 
 ## File
-- `phobert_finetune_colab.ipynb` — notebook chính (chạy trực tiếp trên Colab/Kaggle).
-- `phobert_finetune_colab.py` — bản nguồn dạng script (jupytext), dễ diff/review trong git.
+- `phobert_finetune_colab.ipynb` — notebook fine-tune, chạy trực tiếp trên Colab/Kaggle.
 
 ## Cách chạy
 
