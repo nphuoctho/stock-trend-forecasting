@@ -30,7 +30,6 @@ src/stf/                 package chính
     metrics.py           macro-F1, per-class, Cohen/Fleiss kappa
     model.py             fine-tune PhoBERT + sinh xác suất 3 lớp
 tests/                   test pipeline (offline)
-legacy/                  script spike giai đoạn đầu (tham chiếu)
 data/                    dữ liệu thô/xử lý (gitignore; tái tạo bằng script)
 models/                  checkpoint mô hình (gitignore)
 ```
