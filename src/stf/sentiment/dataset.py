@@ -1,8 +1,8 @@
 """Load sentiment-labeled data and prepare it for PhoBERT fine-tuning.
 
-Label sources (per plan.md Phase 2):
+Label sources:
   1. Public seed: the CafeF headline corpus (3 classes) for a quick baseline.
-  2. In-domain add-on: self-labeled samples following a fixed guideline (report Cohen/Fleiss κ).
+  2. In-domain add-on: self-labeled samples following a fixed guideline (report Cohen/Fleiss kappa).
 
 Expected label CSV/parquet format: a `text` column (str) and a `label` column
 (NEGATIVE/NEUTRAL/POSITIVE or 0/1/2). If a `date` column (ISO) exists, the split is done
@@ -120,6 +120,7 @@ def synthetic_dataset(n: int = 120, seed: int = 42) -> pd.DataFrame:
     Not for reporting results — only to check the train/eval code runs.
     """
     rng = np.random.default_rng(seed)
+    # Vietnamese phrases on purpose: the real model reads Vietnamese financial news.
     pos = ["cổ phiếu tăng mạnh", "lợi nhuận vượt kỳ vọng", "doanh thu kỷ lục",
            "khối ngoại mua ròng", "triển vọng tích cực"]
     neg = ["cổ phiếu lao dốc", "thua lỗ nặng", "khối ngoại bán tháo",

@@ -24,8 +24,9 @@ import pandas as pd
 from stf import config
 
 OUT_DIR = config.DATA / "labeled" / "indomain"
-GUIDELINE = OUT_DIR / "HUONG_DAN_GAN_NHAN.md"
+GUIDELINE = OUT_DIR / "labeling-guide.md"
 
+# Guideline stays in Vietnamese on purpose: annotators are Vietnamese and the news is too.
 _GUIDELINE_TEXT = """# Hướng dẫn gán nhãn cảm xúc tin tài chính (in-domain)
 
 Gán mỗi bài vào ĐÚNG MỘT trong 3 lớp, dựa trên TÁC ĐỘNG KỲ VỌNG lên giá cổ phiếu
