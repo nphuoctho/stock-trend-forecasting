@@ -4,9 +4,9 @@ Fine-tune `vinai/phobert-base` into a 3-class sentiment classifier
 (NEGATIVE / NEUTRAL / POSITIVE) for Vietnamese financial news.
 
 ## Files
-- `phobert_finetune_colab.ipynb` — the fine-tuning notebook, runs on Colab/Kaggle.
-- `phobert_finetune_colab.py` — the same notebook as a jupytext script (easier to diff/review).
-- `training-guide.md` — step-by-step run instructions and troubleshooting.
+- `phobert_finetune_colab.ipynb` - the fine-tuning notebook, runs on Colab/Kaggle.
+- `phobert_finetune_colab.py` - the same notebook as a jupytext script (easier to diff/review).
+- `training-guide.md` - step-by-step run instructions and troubleshooting.
 
 ## Quick start
 
@@ -41,10 +41,10 @@ transformers.
 ## Output
 
 Every run writes to `runs/phobert-sentiment-<timestamp>/`:
-- `best/` — model + tokenizer.
-- `manifest.json` — versions, seed, hyperparameters, test metrics (for reproducibility).
-- `test_classification_report.txt` / `test_report.json` — metrics to cite in the report.
-- `confusion_matrix.png` / `.csv` — ready to drop into the report.
-- `train_log_history.csv` — per-epoch loss/metric for debugging.
+- `best/` - model + tokenizer.
+- `manifest.json` - versions, seed, hyperparameters, test metrics (for reproducibility).
+- `test_classification_report.txt` / `test_report.json` - metrics to cite in the report.
+- `confusion_matrix.png` / `.csv` - ready to drop into the report.
+- `train_log_history.csv` - per-epoch loss/metric for debugging.
 
 The `predict_proba` helper then generates 3-class probabilities for the news corpus (next step).
