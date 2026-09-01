@@ -23,7 +23,7 @@ Press Play (or Shift+Enter) on each cell top to bottom:
 |---|---|---|
 | 1 | Check GPU | Prints "GPU: Tesla T4, 15360 MiB" |
 | 2 | Install libraries | ~1-2 min. May show a "RESTART SESSION" button |
-| — | **If it asks to RESTART:** restart, then continue FROM SECTION 3 (skip 1-2) | |
+| - | **If it asks to RESTART:** restart, then continue FROM SECTION 3 (skip 1-2) | |
 | 3 | Confirm versions | transformers 4.46.3, CUDA: True |
 | 4 | Download CafeF seed | "CafeF seed downloaded" |
 | 5 | Prepare labels | "CafeF seed only: 999 samples", distribution {0:186,1:249,2:564} |

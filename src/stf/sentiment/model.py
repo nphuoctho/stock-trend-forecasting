@@ -26,6 +26,7 @@ MAX_LEN = 256  # PhoBERT-base token ceiling
 @dataclass
 class TrainConfig:
     """Fine-tune hyperparameters. Saved to the manifest for reproducibility."""
+
     model_name: str = MODEL_NAME
     max_len: int = MAX_LEN
     epochs: float = 3.0
@@ -78,8 +79,11 @@ def _compute_metrics(eval_pred):
     preds = np.argmax(logits, axis=-1)
     m = classification_metrics(labels, preds)
     # Trainer picks the best model by macro_f1.
-    return {"macro_f1": m["macro_f1"], "accuracy": m["accuracy"],
-            "balanced_accuracy": m["balanced_accuracy"]}
+    return {
+        "macro_f1": m["macro_f1"],
+        "accuracy": m["accuracy"],
+        "balanced_accuracy": m["balanced_accuracy"],
+    }
 
 
 def fine_tune(
@@ -91,7 +95,6 @@ def fine_tune(
     """Fine-tune PhoBERT on split.train, pick the best by macro-F1 on val,
     evaluate on test. Return a result dict and save checkpoint + manifest.
     """
-    import torch
     from transformers import (
         AutoModelForSequenceClassification,
         AutoTokenizer,
@@ -114,9 +117,15 @@ def fine_tune(
         label2id=LABEL2ID,
     )
 
-    ds_train = _TextDataset(split.train["text"], split.train["label_id"], tokenizer, cfg.max_len)
-    ds_val = _TextDataset(split.val["text"], split.val["label_id"], tokenizer, cfg.max_len)
-    ds_test = _TextDataset(split.test["text"], split.test["label_id"], tokenizer, cfg.max_len)
+    ds_train = _TextDataset(
+        split.train["text"], split.train["label_id"], tokenizer, cfg.max_len
+    )
+    ds_val = _TextDataset(
+        split.val["text"], split.val["label_id"], tokenizer, cfg.max_len
+    )
+    ds_test = _TextDataset(
+        split.test["text"], split.test["label_id"], tokenizer, cfg.max_len
+    )
 
     args = TrainingArguments(
         output_dir=str(out_dir / "checkpoints"),
@@ -160,7 +169,11 @@ def fine_tune(
     manifest = {
         "config": asdict(cfg),
         "device": device,
-        "split_sizes": {"train": len(split.train), "val": len(split.val), "test": len(split.test)},
+        "split_sizes": {
+            "train": len(split.train),
+            "val": len(split.val),
+            "test": len(split.test),
+        },
         "test_metrics": test_metrics,
     }
     (out_dir / "manifest.json").write_text(
@@ -169,10 +182,12 @@ def fine_tune(
     return manifest
 
 
-def predict_proba(texts, model_dir: Path | None = None, *, batch_size: int = 32) -> np.ndarray:
+def predict_proba(
+    texts, model_dir: Path | None = None, *, batch_size: int = 32
+) -> np.ndarray:
     """Produce 3-class probabilities for a list of texts (using the fine-tuned model).
 
-    Returns an array of shape (len(texts), 3) — class order follows labels.LABELS.
+    Returns an array of shape (len(texts), 3) - class order follows labels.LABELS.
     """
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -180,7 +195,9 @@ def predict_proba(texts, model_dir: Path | None = None, *, batch_size: int = 32)
     model_dir = model_dir or (config.SENTIMENT_DIR / "best")
     device = get_device()
     tokenizer = AutoTokenizer.from_pretrained(str(model_dir), use_fast=True)
-    model = AutoModelForSequenceClassification.from_pretrained(str(model_dir)).to(device)
+    model = AutoModelForSequenceClassification.from_pretrained(str(model_dir)).to(
+        device
+    )
     model.eval()
 
     texts = list(texts)
@@ -188,8 +205,13 @@ def predict_proba(texts, model_dir: Path | None = None, *, batch_size: int = 32)
     with torch.no_grad():
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
-            enc = tokenizer(batch, truncation=True, max_length=MAX_LEN,
-                            padding=True, return_tensors="pt").to(device)
+            enc = tokenizer(
+                batch,
+                truncation=True,
+                max_length=MAX_LEN,
+                padding=True,
+                return_tensors="pt",
+            ).to(device)
             logits = model(**enc).logits
             probs = torch.softmax(logits, dim=-1).cpu().numpy()
             out.append(probs)

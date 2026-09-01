@@ -36,20 +36,24 @@ PAGE_SIZE = 20
 MAX_PAGES = 400  # guard against an infinite loop if the paginator repeats the last page
 
 # --- Data-extraction regexes ----------------------------------------------
-HREF = re.compile(r"href=(//vietstock\.vn/\d{4}/\d{2}/[^\s\"']+\.htm)", re.I)
+HREF = re.compile(r"href=(//vietstock\.vn/\d{4}/\d{2}/[^\s\"']+\.htm)", re.IGNORECASE)
 DATE = re.compile(r"\b(\d{2}/\d{2}/\d{4})\b")
 PUB = re.compile(r"\b(\d{2}/\d{2}/\d{4} \d{2}:\d{2})\b")  # itemprop=datePublished
-OG_TITLE = re.compile(r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)', re.I)
-TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
-ART_ID = re.compile(r"-(\d+)\.htm", re.I)
+OG_TITLE = re.compile(
+    r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)', re.IGNORECASE
+)
+TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
+ART_ID = re.compile(r"-(\d+)\.htm", re.IGNORECASE)
 # Article body block: <div itemprop="articleBody" id="vst_detail"> ... </div>
 BODY_BLOCK = re.compile(
     r'<div[^>]*itemprop=["\']articleBody["\'][^>]*id=["\']vst_detail["\'][^>]*>(.*?)</div>',
-    re.I | re.S,
+    re.IGNORECASE | re.DOTALL,
 )
 # Fallback for longform/feature articles with no vst_detail block: use og:description.
 OG_DESC = re.compile(
-    r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)', re.I)
+    r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)',
+    re.IGNORECASE,
+)
 TAG = re.compile(r"<[^>]+>")
 
 
@@ -57,7 +61,9 @@ def _log(msg: str) -> None:
     print(msg, flush=True)
 
 
-def get(url: str, params: dict | None = None, tries: int = 4) -> requests.Response | None:
+def get(
+    url: str, params: dict | None = None, tries: int = 4
+) -> requests.Response | None:
     """GET with exponential backoff. Returns None after retries run out (skip the bad article, don't kill the job)."""
     for i in range(tries):
         try:
@@ -65,29 +71,40 @@ def get(url: str, params: dict | None = None, tries: int = 4) -> requests.Respon
             if r.status_code == 200:
                 r.encoding = "utf-8"
                 return r
-            time.sleep(SLEEP * (2 ** i))  # 429/5xx: back off longer
+            time.sleep(SLEEP * (2**i))  # 429/5xx: back off longer
         except requests.RequestException:
-            time.sleep(SLEEP * (2 ** i))
+            time.sleep(SLEEP * (2**i))
     return None
 
 
 # --- Phase 1: listing (news -> ticker mapping) ----------------------------
+
 
 def list_ticker_year(code: str, year: int, *, to_date: str) -> list[tuple[str, str]]:
     """Walk every news page for one ticker in one year. Returns [(url, dd/mm/yyyy date)]."""
     rows: list[tuple[str, str]] = []
     seen: set[str] = set()
     for page in range(1, MAX_PAGES + 1):
-        r = get(BASE, params={
-            "view": 1, "code": code, "type": 1,
-            "fromDate": f"{year}-01-01", "toDate": to_date,
-            "channelID": 0, "page": page, "pageSize": PAGE_SIZE,
-        })
+        r = get(
+            BASE,
+            params={
+                "view": 1,
+                "code": code,
+                "type": 1,
+                "fromDate": f"{year}-01-01",
+                "toDate": to_date,
+                "channelID": 0,
+                "page": page,
+                "pageSize": PAGE_SIZE,
+            },
+        )
         if r is None:
             break
         hrefs = HREF.findall(r.text)
         dates = DATE.findall(r.text)
-        new = [(h, d) for h, d in zip(hrefs, dates + [""] * len(hrefs)) if h not in seen]
+        new = [
+            (h, d) for h, d in zip(hrefs, dates + [""] * len(hrefs)) if h not in seen
+        ]
         if not new:  # empty page / only articles already seen => year exhausted
             break
         for h, d in new:
@@ -101,8 +118,10 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
     """Gather news listings for every ticker x year in the config window. The news->ticker mapping source."""
     if config.LISTINGS_PQ.exists() and not refresh:
         df = pd.read_parquet(config.LISTINGS_PQ)
-        _log(f"[listings] reused: {len(df)} rows, {df['url'].nunique()} urls, "
-             f"{df['ticker'].nunique()} tickers")
+        _log(
+            f"[listings] reused: {len(df)} rows, {df['url'].nunique()} urls, "
+            f"{df['ticker'].nunique()} tickers"
+        )
         return df
 
     start_year = int(config.DATE_START[:4])
@@ -115,18 +134,29 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
             to_date = config.DATE_END if year == end_year else f"{year}-12-31"
             rows = list_ticker_year(code, year, to_date=to_date)
             for href, d in rows:
-                recs.append({"ticker": code, "url": "https:" + href,
-                             "list_date": d, "year": year})
+                recs.append(
+                    {
+                        "ticker": code,
+                        "url": "https:" + href,
+                        "list_date": d,
+                        "year": year,
+                    }
+                )
             tot += len(rows)
-            _log(f"[listings] {code} {year}: {len(rows)} articles (ticker running total {tot})")
+            _log(
+                f"[listings] {code} {year}: {len(rows)} articles (ticker running total {tot})"
+            )
         config.NEWS_DIR.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(recs).to_parquet(config.LISTINGS_PQ)  # save incrementally after each ticker
+        pd.DataFrame(recs).to_parquet(
+            config.LISTINGS_PQ
+        )  # save incrementally after each ticker
     df = pd.DataFrame(recs)
     _log(f"[listings] done: {len(df)} rows, {df['url'].nunique()} unique urls")
     return df
 
 
 # --- Phase 2: article content (timestamp + title + body) ------------------
+
 
 def extract_body(html: str) -> str | None:
     """Extract the article body from the vst_detail block, strip HTML, collapse whitespace.
@@ -170,7 +200,7 @@ def _has_body(val) -> bool:
     """True if body holds real content (not None, not NaN, not empty).
 
     Needed because pandas stores missing cells as NaN (float), and `not float('nan')`
-    is False — so an article without a body can look like it has one. Check via pd.isna
+    is False - so an article without a body can look like it has one. Check via pd.isna
     to be safe.
     """
     if val is None:
@@ -201,7 +231,9 @@ def fetch_articles(
         for r in prev.to_dict("records"):
             store[r["url"]] = r
         with_body = sum(1 for r in store.values() if _has_body(r.get("body")))
-        _log(f"[articles] loaded {len(store)} existing articles ({with_body} already have a body)")
+        _log(
+            f"[articles] loaded {len(store)} existing articles ({with_body} already have a body)"
+        )
 
     if limit_urls is not None:
         urls = urls[:limit_urls]
@@ -222,7 +254,9 @@ def fetch_articles(
         if not _needs_body(url):
             continue
         if max_new is not None and n_new >= max_new:
-            _log(f"[articles] hit batch of {max_new}, stopping (rest left for next run)")
+            _log(
+                f"[articles] hit batch of {max_new}, stopping (rest left for next run)"
+            )
             break
         aid_m = ART_ID.search(url)
         aid = aid_m.group(1) if aid_m else str(abs(hash(url)))
@@ -237,14 +271,19 @@ def fetch_articles(
             cache.write_text(html, encoding="utf-8")
             time.sleep(SLEEP)
         parsed = parse_article(html)
-        store[url] = {"url": url, "article_id": aid,
-                      "published_at": _to_iso(parsed["published_at_str"]),
-                      **parsed}
+        store[url] = {
+            "url": url,
+            "article_id": aid,
+            "published_at": _to_iso(parsed["published_at_str"]),
+            **parsed,
+        }
         n_new += 1
         if n_new % 100 == 0:
             _flush()
             with_body = sum(1 for r in store.values() if _has_body(r.get("body")))
-            _log(f"[articles] {i}/{len(urls)} | batch {n_new} | body {with_body}/{len(store)}")
+            _log(
+                f"[articles] {i}/{len(urls)} | batch {n_new} | body {with_body}/{len(store)}"
+            )
 
     _flush()
     return pd.DataFrame(list(store.values()))
@@ -262,7 +301,11 @@ def crawl(
 
 def summary(articles: pd.DataFrame) -> None:
     """Print a news coverage summary."""
-    with_ts = articles["published_at"].notna().sum() if "published_at" in articles else 0
+    with_ts = (
+        articles["published_at"].notna().sum() if "published_at" in articles else 0
+    )
     with_body = articles["body"].notna().sum() if "body" in articles else 0
     _log("\nNews summary")
-    _log(f"articles : {len(articles)} total | {with_ts} with timestamp | {with_body} with body")
+    _log(
+        f"articles : {len(articles)} total | {with_ts} with timestamp | {with_body} with body"
+    )
