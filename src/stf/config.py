@@ -11,17 +11,25 @@ from pathlib import Path
 
 # --- Study scope ----------------------------------------------------------
 
-# 10 high-liquidity VN30 tickers with enough news coverage (fixed in plan.md).
+# 10 high-liquidity VN30 tickers with enough news coverage
 TICKERS: tuple[str, ...] = (
-    "FPT", "GAS", "HPG", "MBB", "MWG",
-    "TCB", "VCB", "VHM", "VIC", "VNM",
+    "FPT",
+    "GAS",
+    "HPG",
+    "MBB",
+    "MWG",
+    "TCB",
+    "VCB",
+    "VHM",
+    "VIC",
+    "VNM",
 )
 
-# Data window: Jan 2020 -> Mar 31 2026 (extended from 2020-2025 on request).
+# Data window: Jan 2020 -> Mar 31 2026
 DATE_START = "2020-01-01"
 DATE_END = "2026-03-31"
 
-# HOSE session cutoff used in Phase 3 (news after this rolls to the next session).
+# HOSE session cutoff
 SESSION_CUTOFF = "15:00"
 TIMEZONE = "Asia/Ho_Chi_Minh"
 

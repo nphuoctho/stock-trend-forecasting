@@ -1,69 +1,65 @@
-# Dự báo xu hướng giá cổ phiếu từ cảm xúc tin tài chính - Stock Trend Forecasting
+# Stock Trend Forecasting
 
-**TÊN ĐỀ TÀI:** Xây dựng hệ thống dự báo xu hướng biến động giá cổ phiếu dựa trên phân tích cảm xúc tin tức tài chính bằng mô hình Transformer và chuỗi thời gian
+Stock price movement forecasting from Vietnamese financial-news sentiment, combining a
+Transformer (PhoBERT) sentiment branch with a time-series price branch. Market: HOSE/VN30.
 
-**TÊN ĐỀ TÀI (tiếng Anh):** Building a stock price movement forecasting system based on financial news sentiment analysis using Transformer and time-series models
+**Đề tài:** Xây dựng hệ thống dự báo xu hướng biến động giá cổ phiếu dựa trên phân tích cảm xúc tin tức tài chính bằng mô hình Transformer và chuỗi thời gian.
 
-**Cán bộ hướng dẫn:** TS. Đặng Văn Thìn
+**GVHD:** TS. Đặng Văn Thìn · **SV:** Nguyễn Phước Thọ (25410139) · Lớp LT.K2025.2.TTNT.
 
-**Thời gian thực hiện:** Từ ngày 15/07/2026 đến ngày 23/09/2026
+## Environment
 
-**Sinh viên thực hiện:** Nguyễn Phước Thọ – 25410139 – Lớp LT.K2025.2.TTNT
+- Python 3.12, managed with `uv`. Create/update the env with `uv sync`.
+- Run commands with `uv run`.
 
-## Môi trường
-
-- Python 3.12, quản lý bằng `uv`. Tạo/cập nhật môi trường bằng `uv sync`.
-- Chạy lệnh bằng `uv run`.
-
-## Cấu trúc
+## Layout
 
 ```
-src/stf/                 package chính
-  config.py              cấu hình tập trung: mã, cửa sổ thời gian, đường dẫn
+src/stf/                 main package
+  config.py              central config: tickers, date window, paths
   cli.py                 CLI: prices | news | verify | sentiment-smoke | sentiment-train
   data/
-    prices.py            loader giá OHLCV điều chỉnh (vnstock/VCI)
-    news.py              scraper tin Vietstock: timestamp + tiêu đề + nội dung
+    prices.py            adjusted OHLCV loader (vnstock/VCI)
+    news.py              Vietstock scraper: timestamp + title + body
   sentiment/
-    labels.py            định nghĩa 3 lớp NEGATIVE/NEUTRAL/POSITIVE
-    dataset.py           nạp nhãn, split tách thời gian (chống rò rỉ)
+    labels.py            the 3 classes NEGATIVE/NEUTRAL/POSITIVE
+    dataset.py           load labels, time-based split (leakage-safe)
     metrics.py           macro-F1, per-class, Cohen/Fleiss kappa
-    model.py             fine-tune PhoBERT + sinh xác suất 3 lớp
-tests/                   test pipeline (offline)
-data/                    dữ liệu thô/xử lý (gitignore; tái tạo bằng script)
-models/                  checkpoint mô hình (gitignore)
+    model.py             fine-tune PhoBERT + 3-class probabilities
+tests/                   offline pipeline tests
+data/                    raw/processed data (gitignored; rebuilt by scripts)
+models/                  model checkpoints (gitignored)
 ```
 
-## Chạy pipeline dữ liệu
+## Data pipeline
 
 ```bash
-# Kéo giá 10 mã VN30 (01/2020 -> 31/03/2026)
-uv run python -m stf.cli prices              # toàn bộ
-uv run python -m stf.cli prices --limit 1    # thử nhanh 1 mã
+# Fetch prices for the 10 VN30 tickers (2020-01 -> 2026-03-31)
+uv run python -m stf.cli prices              # full run
+uv run python -m stf.cli prices --limit 1    # quick 1-symbol test
 
-# Crawl tin (timestamp phút + tiêu đề + nội dung bài)
-uv run python -m stf.cli news                     # toàn bộ (chạy nền dài)
-uv run python -m stf.cli news --limit-urls 20     # thử nhanh 20 bài
+# Crawl news (minute timestamp + title + body)
+uv run python -m stf.cli news                     # full run (long)
+uv run python -m stf.cli news --limit-urls 20     # quick 20-article test
 
-# Báo cáo coverage dữ liệu đã có (offline, không tải mạng)
+# Coverage report for existing data (offline, no network)
 uv run python -m stf.cli verify
 ```
 
-## Phase 2 - PhoBERT sentiment
+## Phase 2: PhoBERT sentiment
 
 ```bash
-# Smoke-test pipeline bằng dữ liệu giả (verify code chạy thông, KHÔNG phải kết quả thật)
+# Smoke-test the pipeline on fake data (checks the code runs, not real results)
 uv run python -m stf.cli sentiment-smoke --n 60
 
-# Fine-tune trên file nhãn thật (.csv/.parquet có cột text, label)
+# Fine-tune on a real label file (.csv/.parquet with text, label columns)
 uv run python -m stf.cli sentiment-train --data data/labeled/seed.csv --epochs 3
 ```
 
-> Máy phát triển hiện tại không có GPU/CUDA. Fine-tune thật nên chạy trên GPU
-> (Google Colab/Kaggle). Xem `docs/phase2-phobert-guide.md` (trong thư mục docs của
-> project research) để biết quy trình training trên GPU và ràng buộc chống rò rỉ.
+> This machine has no GPU/CUDA. Real fine-tuning should run on a GPU (Google Colab/Kaggle).
+> See `notebooks/training-guide.md`.
 
-## Kiểm thử
+## Tests
 
 ```bash
 uv run pytest tests/ -q

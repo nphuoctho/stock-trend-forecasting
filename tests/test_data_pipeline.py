@@ -1,6 +1,6 @@
-"""Data pipeline tests — run offline, no network access.
+"""Data pipeline tests - run offline, no network access.
 
-    uv run pytest tests/test_data_pipeline.py -q
+uv run pytest tests/test_data_pipeline.py -q
 """
 
 from __future__ import annotations
@@ -11,11 +11,11 @@ from stf.data import news
 def test_extract_body_from_vst_detail():
     """Extract content correctly from the articleBody/vst_detail block and strip HTML."""
     html = (
-        '<html><body>'
+        "<html><body>"
         '<div itemprop="articleBody" id="vst_detail">'
-        '<p class=pTitle>Tiêu đề bài</p>'
-        '<p class=pBody>Hòa Phát bán 628,000 tấn thép trong tháng 8.</p>'
-        '</div></body></html>'
+        "<p class=pTitle>Tiêu đề bài</p>"
+        "<p class=pBody>Hòa Phát bán 628,000 tấn thép trong tháng 8.</p>"
+        "</div></body></html>"
     )
     body = news.extract_body(html)
     assert body is not None
@@ -32,9 +32,9 @@ def test_extract_body_missing_returns_none():
 def test_extract_body_fallback_og_description():
     """A longform article without vst_detail falls back to og:description."""
     html = (
-        '<html><head>'
+        "<html><head>"
         '<meta property="og:description" content="Chuyên đề cuộc đua lợi nhuận VN30 quý 3.">'
-        '</head><body>longform layout không có vst_detail</body></html>'
+        "</head><body>longform layout không có vst_detail</body></html>"
     )
     body = news.extract_body(html)
     assert body is not None

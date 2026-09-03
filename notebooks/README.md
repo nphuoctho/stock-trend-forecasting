@@ -1,41 +1,50 @@
-# Notebook fine-tune PhoBERT (Colab / Kaggle)
+# PhoBERT fine-tuning notebook (Colab / Kaggle)
 
-Fine-tune `vinai/phobert-base` thành mô hình phân loại cảm xúc 3 lớp
-(NEGATIVE / NEUTRAL / POSITIVE) cho tin tài chính tiếng Việt.
+Fine-tune `vinai/phobert-base` into a 3-class sentiment classifier
+(NEGATIVE / NEUTRAL / POSITIVE) for Vietnamese financial news.
 
-## File
-- `phobert_finetune_colab.ipynb` — notebook chính (chạy trực tiếp trên Colab/Kaggle).
-- `phobert_finetune_colab.py` — bản nguồn dạng script (jupytext), dễ diff/review trong git.
+## Files
+- `phobert_finetune_colab.ipynb` - the fine-tuning notebook, runs on Colab/Kaggle.
+- `phobert_finetune_colab.py` - the same notebook as a jupytext script (easier to diff/review).
+- `training-guide.md` - step-by-step run instructions and troubleshooting.
 
-## Cách chạy
+## Quick start
 
 ### Google Colab
-1. Upload `phobert_finetune_colab.ipynb` lên Colab.
+1. Upload `phobert_finetune_colab.ipynb`.
 2. Runtime > Change runtime type > **T4 GPU**.
-3. Chạy lần lượt từ mục 1. Nếu sau mục 2 Colab báo cần restart, restart rồi chạy tiếp
-   TỪ mục 3 (không chạy lại mục 2).
+3. Run cells in order. If Colab asks to restart after the install cell,
+   restart and continue FROM section 3 (don't re-run section 2).
 
 ### Kaggle
 1. New Notebook > Upload `phobert_finetune_colab.ipynb`.
-2. Settings > Accelerator > **GPU** (T4 x2 hoặc P100), và bật **Internet**.
-3. Chạy lần lượt.
+2. Settings > Accelerator > **GPU** (T4 x2 or P100), and turn **Internet** on.
+3. Run cells in order.
 
-## Dữ liệu
+See `training-guide.md` for the detailed walkthrough.
 
-- **Seed CafeF** (999 tiêu đề, gán nhãn sẵn): notebook tự tải từ repo công khai
-  `209sontung/Vietnamese-stock-article-classification`.
-- **In-domain (tuỳ chọn):** nếu đã gán nhãn tập in-domain (từ script
-  `stf.sentiment.make_indomain_sample`), lưu thành `indomain_labeled.csv`
-  (cột `text`, `label`) và upload lên notebook. Notebook tự gộp.
+## Data
 
-## Lưu ý version (tránh lỗi)
+- **CafeF seed** (999 pre-labeled headlines): the notebook downloads it from the public
+  repo `209sontung/Vietnamese-stock-article-classification`.
+- **In-domain (optional):** if you have labeled the in-domain sample (from
+  `stf.sentiment.make_indomain_sample`), save it as `indomain_labeled.csv`
+  (`text`, `label` columns) and upload it. The notebook merges it in automatically.
 
-Notebook pin `transformers==4.46.3`, `numpy<2`, `pandas<2.3` để tương thích ổn định
-với torch+CUDA có sẵn của Colab/Kaggle. KHÔNG cài lại torch. Nếu Kaggle báo xung đột
-phụ thuộc, bật Internet và chạy lại mục 2, hoặc dùng `--no-deps` cho transformers.
+## Version notes (avoid breakage)
 
-## Đầu ra
+The notebook pins `transformers==4.46.3`, `numpy<2`, `pandas<2.3` for stable compatibility
+with the torch+CUDA already on Colab/Kaggle. It does NOT reinstall torch. If Kaggle reports
+a dependency conflict, turn Internet on and re-run the install cell, or use `--no-deps` for
+transformers.
 
-- Mô hình + tokenizer lưu tại `phobert-sentiment-best/`.
-- Báo cáo macro-F1 + per-class trên tập test.
-- Hàm `predict_proba` để sinh xác suất 3 lớp cho corpus tin (bước inference tiếp theo).
+## Output
+
+Every run writes to `runs/phobert-sentiment-<timestamp>/`:
+- `best/` - model + tokenizer.
+- `manifest.json` - versions, seed, hyperparameters, test metrics (for reproducibility).
+- `test_classification_report.txt` / `test_report.json` - metrics to cite in the report.
+- `confusion_matrix.png` / `.csv` - ready to drop into the report.
+- `train_log_history.csv` - per-epoch loss/metric for debugging.
+
+The `predict_proba` helper then generates 3-class probabilities for the news corpus (next step).
