@@ -1,0 +1,53 @@
+\chapter{KẾT LUẬN TẠM THỜI VÀ KẾ HOẠCH TIẾP THEO}
+\label{ch:ket-luan}
+
+\emph{Đây là kết luận tính đến thời điểm báo cáo tiến độ. Kết luận định lượng cuối cùng
+sẽ được bổ sung sau khi hoàn thành thực nghiệm ở Chương~\ref{ch:ket-qua}.}
+
+\section{Những phần đã hoàn thành}
+
+Tính đến thời điểm này, đồ án đã hoàn thành phần nền tảng của hệ thống:
+
+\begin{itemize}[nosep]
+  \item Xác định rõ bài toán, mục tiêu và phạm vi nghiên cứu (Chương~\ref{ch:mo-dau}).
+  \item Khảo sát các công trình liên quan và xác định khoảng trống nghiên cứu
+        (Chương~\ref{ch:tong-quan}).
+  \item Thiết kế kiến trúc hệ thống hai nhánh, quy trình xử lý dữ liệu và giao thức đánh
+        giá theo thời gian có kiểm soát rò rỉ (Chương~\ref{ch:phuong-phap}).
+  \item Thu thập và kiểm tra dữ liệu: giá của 10 mã VN30 trong giai đoạn 2020 đến quý I
+        năm 2026, cùng 10.695 bài tin tức Vietstock có mốc thời gian đến phút và nội dung bài.
+  \item Xây dựng và chạy thử pipeline tinh chỉnh PhoBERT cho phân loại cảm xúc ba lớp.
+\end{itemize}
+
+\section{Đối chiếu với mục tiêu nghiên cứu}
+
+Xét theo các mục tiêu đặt ra ở Chương~\ref{ch:mo-dau}, mục tiêu về xây dựng bộ dữ liệu
+có thể truy nguyên đã cơ bản đạt được, do dữ liệu giá và tin tức đều có nguồn, mốc thời
+gian và độ phủ rõ ràng. Các mục tiêu còn lại, gồm đánh giá PhoBERT ở tầng cảm xúc, kết
+hợp hai nguồn dữ liệu, huấn luyện mô hình dự báo và đo phần đóng góp của cảm xúc, đang
+trong giai đoạn thực hiện và sẽ được trả lời bằng số liệu ở Chương~\ref{ch:ket-qua}.
+
+Việc chọn PhoBERT làm mô hình ngôn ngữ nền phù hợp với dữ liệu tiếng Việt, tương tự cách
+FinBERT được thích nghi cho ngữ liệu tài chính tiếng Anh
+\cite{Nguyen2020_200300744v3,Yang2020_200608097v2}. Mức sàn của đồ án là mô hình LSTM hai
+nhánh kết hợp giá và cảm xúc, kế thừa ý tưởng từ các nghiên cứu quốc tế nhưng thay đổi
+ngôn ngữ, thị trường và mục tiêu phân loại ba lớp
+\cite{Halder2022_221107392v1,Gu2024_240716150v1}.
+
+\section{Kế hoạch hoàn thiện}
+
+Các bước còn lại để hoàn thành đồ án gồm:
+
+\begin{enumerate}[nosep]
+  \item Tinh chỉnh PhoBERT trên GPU, sinh xác suất cảm xúc cho toàn bộ corpus tin tức.
+        Dự kiến hoàn thành trong tuần đầu tháng 9.
+  \item Tổng hợp cảm xúc theo mã và ngày giao dịch, ghép với đặc trưng giá, tạo nhãn ba lớp.
+  \item Chạy các mô hình đối chứng và LSTM hai nhánh, thực hiện thí nghiệm loại bỏ đặc
+        trưng có và không có cảm xúc, kèm khoảng tin cậy. Dự kiến hoàn thành trong hai tuần kế tiếp.
+  \item Điền kết quả vào Chương~\ref{ch:ket-qua}, hoàn thiện kết luận định lượng và nộp
+        trước hạn ngày 23 tháng 9.
+\end{enumerate}
+
+Giá trị chính của đồ án không nằm ở giả định rằng cảm xúc chắc chắn cải thiện dự báo, mà
+ở việc xây dựng một phép đo có thể phân biệt tín hiệu thực với lợi thế do rò rỉ dữ liệu.
+Cách tiếp cận thận trọng này được giữ nhất quán cho tới khi có kết quả cuối cùng.

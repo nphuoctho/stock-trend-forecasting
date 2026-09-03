@@ -1,0 +1,49 @@
+% ============================================================================
+% BaoCaoDATN_progress.tex - progress report build (content only up to current state)
+% Chapters 1-3 complete; chapters 4-5 marked in-progress/planned.
+% Build: xelatex BaoCaoDATN_progress -> biber BaoCaoDATN_progress -> xelatex x2
+% ============================================================================
+\documentclass[13pt, a4paper, oneside]{report}
+
+\input{preamble}
+\addbibresource{references.bib}
+
+\newif\ifShowDiagram
+\ShowDiagramtrue
+
+\begin{document}
+
+% ------------------------------------------------------------------ FRONT
+\pagenumbering{gobble}
+
+\input{frontmatter/00-bia-chinh}
+\input{frontmatter/01-bia-phu}
+\input{frontmatter/03-loi-cam-on}
+
+\tableofcontents
+\listoffigures
+\listoftables
+\input{frontmatter/04-danh-muc-viet-tat}
+
+% ------------------------------------------------------------------ BODY
+\clearpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\input{frontmatter/06-trang-thai}
+\input{frontmatter/05-tom-tat}
+
+\input{chapters/01-mo-dau}
+\input{chapters/02-tong-quan}
+\input{chapters/03-phuong-phap}
+\input{chapters/04-ket-qua-progress}
+\input{chapters/05-ket-luan-progress}
+\input{chapters/06-huong-phat-trien}
+
+% ------------------------------------------------------------------ BACK
+\printbibliography[title={TÀI LIỆU THAM KHẢO}, heading=bibintoc]
+
+\appendix
+\input{chapters/07-phu-luc}
+
+\end{document}

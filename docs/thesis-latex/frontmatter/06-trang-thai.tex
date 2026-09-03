@@ -1,0 +1,28 @@
+% Trang trạng thái tiến độ - chỉ có trong bản báo cáo tiến độ
+\chapter*{TRẠNG THÁI TIẾN ĐỘ}
+\addcontentsline{toc}{chapter}{Trạng thái tiến độ}
+
+Bản báo cáo này trình bày đồ án đến trạng thái hiện tại (ngày 01 tháng 9 năm 2026).
+Nội dung được viết đúng đến phần đã thực hiện, các phần chưa hoàn thành được đánh dấu rõ
+là đang thực hiện hoặc dự kiến, không viết trước kết quả chưa có.
+
+\begin{table}[H]
+  \centering
+  \caption{Trạng thái hoàn thành theo chương.}
+  \begin{tabular}{p{1.6cm} p{7.5cm} p{3.4cm}}
+    \toprule
+    \textbf{Chương} & \textbf{Nội dung} & \textbf{Trạng thái} \\
+    \midrule
+    1 & Mở đầu & Đã hoàn thành \\
+    2 & Tổng quan & Đã hoàn thành \\
+    3 & Phương pháp và dữ liệu & Đã hoàn thành phần lớn \\
+    4 & Kết quả thực nghiệm & Đang thực hiện, chưa có số liệu \\
+    5 & Kết luận và kế hoạch & Kết luận tạm thời \\
+    6 & Hướng phát triển & Đã có khung \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\noindent\textbf{Tóm tắt trạng thái:} Dữ liệu đã thu thập đầy đủ (giá 10 mã VN30 và
+10.695 bài tin có mốc thời gian, nội dung). Pipeline huấn luyện PhoBERT đã chạy thử
+thông suốt. Bước tiếp theo là huấn luyện chính thức trên GPU để có số liệu cho Chương 4.

@@ -1,3 +1,4 @@
+# LaTeX build artifacts
 *.aux
 *.log
 *.out
@@ -9,4 +10,15 @@
 *.blg
 *.run.xml
 *.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Compiled PDFs (build from source with xelatex)
+*.pdf
+
+# Source documents kept locally, not in the repo
+*.docx
+
+# Working files (task briefs, source extracts, planning notes)
 _sources/
+plans/

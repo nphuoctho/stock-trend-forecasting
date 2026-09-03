@@ -2,24 +2,69 @@
 \chapter*{TÓM TẮT ĐỒ ÁN}
 \addcontentsline{toc}{chapter}{Tóm tắt đồ án}
 
-Đồ án xây dựng một hệ thống dự báo xu hướng biến động giá cổ phiếu trên thị trường
-chứng khoán Việt Nam (sàn HOSE, nhóm VN30) dựa trên việc kết hợp phân tích cảm xúc
-tin tức tài chính tiếng Việt với dữ liệu chuỗi thời gian về giá.
+Đồ án nghiên cứu bài toán dự báo xu hướng biến động giá cổ phiếu trên thị trường chứng
+khoán Việt Nam bằng cách kết hợp tin tức tài chính tiếng Việt với dữ liệu giá theo chuỗi
+thời gian. Bối cảnh của bài toán xuất phát từ thực tế giá cổ phiếu không chỉ phản ánh
+lịch sử giao dịch mà còn phản ứng trước những thông tin về kết quả kinh doanh, kế hoạch
+đầu tư, thay đổi quản trị, chính sách, rủi ro pháp lý và các sự kiện bất thường. Phạm
+vi nghiên cứu tập trung vào sàn HOSE và một nhóm mã thuộc VN30. Mục tiêu là xác định
+hướng biến động của phiên giao dịch kế tiếp theo ba lớp tăng, đi ngang và giảm, thay vì
+dự báo trực tiếp giá trị tuyệt đối.
 
-Về hướng tiếp cận, hệ thống gồm hai nhánh. Nhánh cảm xúc sử dụng mô hình Transformer
-tiếng Việt PhoBERT được tinh chỉnh (fine-tune) để phân loại tin tức thành ba lớp
-tiêu cực, trung tính và tích cực, từ đó sinh ra đặc trưng cảm xúc theo mã và theo ngày.
-Nhánh giá sử dụng các đặc trưng kỹ thuật trích từ dữ liệu OHLCV điều chỉnh. Hai nhánh
-được hợp nhất và đưa vào mô hình chuỗi thời gian để dự báo xu hướng phiên kế tiếp theo
-ba lớp tăng, đi ngang và giảm.
+Hệ thống được tổ chức thành hai nhánh. Nhánh thứ nhất sử dụng PhoBERT, một mô hình
+Transformer tiền huấn luyện cho tiếng Việt, để phân loại tin tức tài chính thành ba
+lớp tích cực, trung tính và tiêu cực \cite{Nguyen2020_200300744v3}. Nhãn được hiểu theo
+tác động kỳ vọng của nội dung đối với doanh nghiệp hoặc cổ phiếu liên quan, không chỉ
+theo sắc thái chung của câu văn. Sau khi suy luận, hệ thống giữ lại xác suất của cả ba
+lớp thay vì chỉ giữ nhãn có xác suất cao nhất. Các xác suất này được tổng hợp theo mã
+cổ phiếu và ngày giao dịch cùng số lượng tin, tỷ lệ lớp, độ phân tán và cờ cho biết có
+tin.
 
-Về cách giải quyết, đồ án tuân thủ một giao thức đánh giá chống rò rỉ dữ liệu gồm mốc
-cắt thông tin theo phiên, chia dữ liệu theo thời gian, kiểm định walk-forward và so
-sánh có kiểm soát giữa mô hình có và không dùng cảm xúc (ablation).
+Nhánh thứ hai sử dụng dữ liệu OHLCV điều chỉnh cùng các đặc trưng kỹ thuật. Nhóm đặc
+trưng dự kiến gồm lợi suất, lợi suất log, tỷ lệ giữa giá đóng cửa và đường trung bình
+động, RSI, MACD, OBV, thay đổi khối lượng và độ biến động. Hai nhánh được căn chỉnh
+theo mã và ngày sau khi áp dụng quy tắc thời điểm. Tin được chuyển về múi giờ Việt Nam;
+tin sau giờ cutoff, tin cuối tuần hoặc tin vào ngày nghỉ được ánh xạ sang phiên giao
+dịch kế tiếp. Tại ngày quan sát $t$, hệ thống chỉ sử dụng thông tin có thể biết đến
+ngày đó, còn giá của phiên kế tiếp chỉ dùng để tạo nhãn mục tiêu.
 
-Về kết quả, đồ án cung cấp một pipeline hoàn chỉnh từ thu thập dữ liệu đến dự báo, cùng
-bảng so sánh các mô hình theo chỉ số macro-F1 kèm khoảng tin cậy, qua đó đo lường phần
-đóng góp của tín hiệu cảm xúc tin tức đối với bài toán dự báo xu hướng giá.
+Về kiến trúc, các mô hình được xếp theo từng tầng để tách câu hỏi về dữ liệu khỏi câu
+hỏi về độ phức tạp. Tầng đầu gồm mô hình luôn chọn lớp phổ biến nhất và mô hình ngẫu
+nhiên theo phân bố lớp. Tầng tiếp theo gồm các mô hình cổ điển và LSTM chỉ sử dụng giá.
+Mức sàn chính là LSTM hai nhánh, trong đó nhánh thị trường và nhánh cảm xúc được xử lý
+riêng trước khi ghép biểu diễn và phân loại. Temporal Fusion Transformer được xem là
+phương án mở rộng khi dữ liệu, tài nguyên và kết quả của mức sàn cho phép.
+
+Về phương pháp, đồ án xây dựng pipeline từ khảo sát tài liệu, thu thập và làm sạch dữ
+liệu, loại bỏ bản ghi trùng, lưu provenance, gắn tin với mã cổ phiếu, đồng bộ theo
+phiên, tinh chỉnh mô hình sentiment, tạo đặc trưng, huấn luyện và đánh giá. Bộ dữ liệu
+tin tức gồm tiêu đề, nội dung khi có thể thu thập, nguồn, URL, thời điểm công bố và
+mã liên quan. Những bài đề cập nhiều mã được lưu theo quan hệ nhiều mã; những bản ghi
+thiếu thời điểm hoặc không xác định được mã được đánh dấu và không đưa trực tiếp vào
+bảng đặc trưng chính.
+
+Dữ liệu được chia theo thứ tự thời gian bằng walk-forward validation, có tập kiểm tra
+cuối được khóa sau khi lựa chọn cấu hình. Scaler, imputer, ngưỡng tạo nhãn, lựa chọn
+đặc trưng và các tham số khác chỉ được học từ phần huấn luyện của từng cửa sổ. Mô hình
+có cảm xúc được so sánh với mô hình chỉ dùng giá trên cùng ngày train, validation và
+test, cùng cách tiền xử lý, seed hoặc tập seed và tiêu chí dừng. Thiết kế này nhằm hạn
+chế rò rỉ dữ liệu, đồng thời tách phần đóng góp của tín hiệu cảm xúc khỏi ảnh hưởng của
+kiến trúc hoặc cách chia mẫu.
+
+Kết quả được tổ chức thành hai tầng. Tầng thứ nhất báo cáo chất lượng phân loại cảm xúc
+bằng accuracy, precision, recall, F1 theo lớp, macro-F1 và ma trận nhầm lẫn. Tầng thứ
+hai báo cáo macro-F1, balanced accuracy, macro OvR-AUC và các chỉ số theo lớp cho bài
+toán dự báo, cùng chênh lệch giữa hai cấu hình loại bỏ đặc trưng. Khi số cửa sổ đủ lớn,
+độ không chắc chắn của chênh lệch có thể được ước lượng bằng bootstrap theo khối ngày
+hoặc theo fold.
+
+Đồ án không đặt trước giả định rằng tín hiệu cảm xúc chắc chắn cải thiện dự báo. Tin
+tức có thể yếu, xuất hiện trễ, đã được thị trường biết trước, phản ánh lại biến động
+giá hoặc chỉ hữu ích trong một số giai đoạn và một số mã. Khi chưa có số liệu chạy
+chính thức, các ô kết quả được giữ ở trạng thái chưa điền, không thay bằng số tham
+chiếu từ công trình khác. Một kết quả không cải thiện hoặc cải thiện không ổn định vẫn
+có giá trị nếu được thu nhận bằng giao thức hợp lệ, được phân tích cùng giới hạn dữ liệu
+và không bị diễn giải thành quan hệ nhân quả.
 
 \vspace{0.5cm}
 \noindent\textbf{Từ khóa:} dự báo xu hướng giá cổ phiếu, phân tích cảm xúc, PhoBERT,

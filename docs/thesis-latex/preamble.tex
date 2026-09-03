@@ -76,6 +76,23 @@
 \usepackage{xurl}
 \usepackage{enumitem}
 \usepackage{amsmath, amssymb}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc}
+
+% Double border frame for the title pages (like the school's docx template).
+% Draws an outer thick rule and an inner thin rule around the page margins.
+\newcommand{\coverframe}{%
+  \begin{tikzpicture}[remember picture, overlay]
+    \draw[line width=1.5pt]
+      ($(current page.north west)+(2.0cm,-1.8cm)$)
+      rectangle
+      ($(current page.south east)+(-1.5cm,1.8cm)$);
+    \draw[line width=0.5pt]
+      ($(current page.north west)+(2.15cm,-1.95cm)$)
+      rectangle
+      ($(current page.south east)+(-1.65cm,1.95cm)$);
+  \end{tikzpicture}%
+}
 
 % --- Custom commands for the title pages ---
 \newcommand{\thesistitle}{Xây dựng hệ thống dự báo xu hướng biến động giá cổ phiếu dựa trên phân tích cảm xúc tin tức tài chính bằng mô hình Transformer và chuỗi thời gian}

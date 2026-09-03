@@ -2,36 +2,53 @@
 \label{ch:phuong-phap}
 
 Chương này trình bày cơ sở lý thuyết, dữ liệu, kiến trúc hệ thống và giao thức đánh giá
-của đề tài. Phương pháp được thiết kế theo nguyên tắc xây dựng một mức sàn có thể
-kiểm chứng trước, sau đó mới mở rộng sang mô hình phức tạp hơn. Mức sàn phải bao gồm
-baseline, mô hình chỉ dùng giá, mô hình hai nhánh có sentiment, ablation, walk-forward
-và kiểm tra train-only preprocessing. Temporal Fusion Transformer được xem là tầng
-mở rộng, không thay thế các đối chứng bắt buộc.
+của đề tài. Quy trình được thiết kế để nối hai nguồn thông tin có bản chất khác nhau:
+tin tức tài chính tiếng Việt mô tả sự kiện và kỳ vọng, còn dữ liệu thị trường ghi nhận
+kết quả giao dịch theo thời gian. Vì vậy, các bước thu thập, làm sạch, gắn mã, ánh xạ
+thời điểm, tạo nhãn và chia tập được mô tả trước khi trình bày phần huấn luyện mô hình.
+
+Phương pháp được xây dựng theo hai tầng. Tầng bắt buộc khóa một mức sàn gồm baseline,
+mô hình chỉ dùng giá, mô hình hai nhánh, phép loại bỏ đặc trưng và đánh giá walk-forward.
+Tầng mở rộng mới xem xét các mô hình phức tạp hơn như Temporal Fusion Transformer,
+fusion có cổng hoặc biểu diễn sự kiện. Cách tổ chức này giúp trả lời từng câu hỏi riêng:
+dữ liệu có đủ và hợp lệ hay không, mô hình giá có học được tín hiệu hay không, và sau
+đó sentiment có bổ sung thông tin hay không. Nếu một tầng trước chưa được kiểm tra,
+điểm số của tầng sau không được dùng để che lấp vấn đề ở tầng dữ liệu.
 
 \section{Tổng quan kiến trúc hệ thống}
 \label{sec:pp-kien-truc}
 
-Hệ thống gồm hai nhánh xử lý song song rồi hợp nhất. Nhánh cảm xúc nhận tin tức tiếng
-Việt, tinh chỉnh PhoBERT để tạo xác suất ba lớp và tổng hợp tín hiệu theo mã, ngày.
-Nhánh giá nhận OHLCV điều chỉnh, tạo lợi suất và chỉ báo kỹ thuật theo lịch phiên.
-Hai nhánh được căn chỉnh theo mã và ngày sau khi áp dụng quy tắc cutoff, tạo thành
-feature table dùng cho dự báo lớp UP, FLAT hoặc DOWN của phiên kế tiếp.
+Hệ thống gồm hai nhánh xử lý riêng trước khi hợp nhất. Nhánh cảm xúc nhận tiêu đề và
+nội dung tin tức tiếng Việt trong phạm vi được phép sử dụng, tinh chỉnh PhoBERT để tạo
+xác suất của ba lớp tích cực, trung tính và tiêu cực, rồi tổng hợp tín hiệu theo mã và
+ngày giao dịch. Nhánh giá nhận OHLCV điều chỉnh, tính lợi suất, độ biến động, khối
+lượng và các chỉ báo kỹ thuật theo lịch phiên. Sau khi áp dụng quy tắc cutoff, hai nhánh
+được căn chỉnh bằng khóa mã cổ phiếu và ngày giao dịch.
+
+Mỗi dòng của bảng đặc trưng phải cho biết trạng thái dữ liệu cần thiết, chẳng hạn ngày
+đó có tin hay không, tin có timestamp hợp lệ hay không và giá có đủ lịch sử hay không.
+Feature table tạo ra từ bước này được dùng để dự báo lớp UP, FLAT hoặc DOWN của phiên
+kế tiếp. Giá của phiên kế tiếp chỉ xuất hiện ở cột nhãn sau khi dữ liệu đầu vào đã được
+khóa, không được quay ngược trở lại để tạo đặc trưng cho ngày quan sát.
 
 \subsection{Nguyên tắc thiết kế}
 
-Kiến trúc được xây dựng theo năm nguyên tắc. Thứ nhất, mọi dữ liệu phải có mốc thời
-gian và nguồn gốc để kiểm tra tính hợp lệ theo thời điểm. Thứ hai, tín hiệu sentiment
-được biểu diễn bằng xác suất thay vì chỉ một nhãn cứng để giữ thông tin không chắc
-chắn. Thứ ba, mô hình có sentiment phải được so sánh với price-only dưới cùng điều
-kiện. Thứ tư, các phép biến đổi học tham số phải được fit trong từng cửa sổ huấn
-luyện. Thứ năm, tầng mở rộng chỉ được thực hiện khi không làm giảm chất lượng kiểm
-chứng của mức sàn.
+Kiến trúc được xây dựng theo năm nguyên tắc. Thứ nhất, mỗi bản ghi phải có mốc thời
+gian, nguồn gốc và trạng thái ánh xạ để kiểm tra khả năng sử dụng tại thời điểm dự báo.
+Thứ hai, tín hiệu sentiment được lưu bằng xác suất thay vì chỉ một nhãn cứng, nhằm giữ
+lại thông tin về mức độ không chắc chắn và cho phép tính các đại lượng tổng hợp khác
+nhau. Thứ ba, mô hình có sentiment phải được đặt cạnh mô hình chỉ dùng giá trong cùng
+điều kiện, nếu không không thể quy phần chênh lệch cho văn bản. Thứ tư, mọi phép biến
+đổi có học tham số phải được fit trong cửa sổ huấn luyện tương ứng. Thứ năm, mô hình mở
+rộng chỉ được thực hiện sau khi mức sàn đã vượt qua các kiểm tra dữ liệu, rò rỉ và độ
+ổn định. Năm nguyên tắc này cũng là tiêu chí để quyết định một kết quả có thể đưa vào
+phân tích chính hay chỉ ghi ở phần bổ sung.
 
 \subsection{Cơ sở lý thuyết của Transformer và self-attention}
 
-Transformer biểu diễn một chuỗi token bằng các vector và dùng cơ chế attention để
-đánh trọng số các vị trí liên quan. Với ma trận truy vấn $Q$, khóa $K$ và giá trị $V$,
-scaled dot-product attention được viết như sau:
+Transformer biểu diễn chuỗi token bằng các vector và dùng attention để xác định mức độ
+liên quan giữa các vị trí. Với ma trận truy vấn $Q$, khóa $K$ và giá trị $V$, scaled
+dot-product attention được viết như sau:
 
 \begin{equation}
   \operatorname{Attention}(Q,K,V)=
@@ -39,27 +56,32 @@ scaled dot-product attention được viết như sau:
   \label{eq:scaled-attention}
 \end{equation}
 
-trong đó $d_k$ là số chiều của khóa. Việc chia cho $\sqrt{d_k}$ giúp ổn định độ lớn
-của tích vô hướng trước khi đưa qua softmax. Multi-head attention thực hiện nhiều
-phép chiếu song song rồi ghép các kết quả, nhờ đó mô hình có thể học các dạng quan hệ
-khác nhau giữa token. Trong mô hình ngôn ngữ, attention giúp một token được biểu diễn
-theo ngữ cảnh của cả câu. FinBERT và PhoBERT là hai ví dụ về việc dùng backbone thuộc
-họ BERT cho miền tài chính hoặc tiếng Việt \cite{Yang2020_200608097v2,
+trong đó $d_k$ là số chiều của khóa. Phép chia cho $\sqrt{d_k}$ giúp giữ độ lớn của
+tích vô hướng trong khoảng ổn định trước khi áp dụng softmax. Multi-head attention
+thực hiện nhiều phép chiếu song song rồi ghép kết quả, nhờ đó mô hình có thể học các
+kiểu quan hệ khác nhau giữa các token. Trong mô hình ngôn ngữ, mỗi token được biểu diễn
+theo ngữ cảnh của toàn bộ câu. Điều này đặc biệt hữu ích với tin tài chính, vì ý nghĩa
+của một con số hoặc một động từ thường phụ thuộc vào doanh nghiệp, chủ thể và câu đứng
+trước hoặc sau nó. FinBERT và PhoBERT là hai ví dụ về việc dùng backbone thuộc họ BERT
+cho miền tài chính hoặc tiếng Việt \cite{Yang2020_200608097v2,
 Nguyen2020_200300744v3}.
 
 Một encoder Transformer thường gồm multi-head attention, mạng feed-forward theo từng
-vị trí, kết nối tắt và chuẩn hóa. Vì self-attention không tự biểu diễn thứ tự, mô hình
-cần thông tin vị trí hoặc một cách mã hóa thứ tự tương đương. Trong đề tài, PhoBERT đã
-có tokenizer và embedding theo thiết kế của backbone. Ở nhánh chuỗi thời gian, nếu
-TFT được chạy, thứ tự của các ngày được giữ trong TimeSeriesDataSet và mọi biến được
-đánh dấu theo vai trò tĩnh, đã biết trước hoặc quan sát được.
+vị trí, kết nối tắt và chuẩn hóa. Vì self-attention không tự chứa thông tin thứ tự, mô
+hình cần embedding vị trí hoặc một cách mã hóa tương đương. Các khối này giúp mô hình
+vừa học quan hệ giữa những vị trí xa nhau, vừa duy trì đường truyền gradient ổn định.
+PhoBERT đã cung cấp tokenizer và embedding theo thiết kế của backbone. Nếu chạy TFT,
+thứ tự ngày được giữ trong TimeSeriesDataSet; các biến cũng phải được khai báo rõ là
+biến tĩnh, đã biết trước hay chỉ quan sát được tại thời điểm đó. Một biến chỉ được xem
+là đã biết tại thời điểm dự báo khi thông tin tạo ra biến đó thật sự có thể quan sát,
+không phải chỉ vì nó xuất hiện trong bảng dữ liệu sau này.
 
 \subsection{Cơ sở lý thuyết của PhoBERT}
 
-PhoBERT là mô hình ngôn ngữ tiền huấn luyện dành cho tiếng Việt. Đầu vào của PhoBERT
-được tách từ theo quy ước phù hợp rồi đi qua tokenizer BPE để sinh chuỗi token con.
-Khi tinh chỉnh cho sentiment, một vector đại diện được lấy từ encoder và đưa qua head
-phân loại. Với ba lớp, logits $\mathbf{z}$ được chuyển thành xác suất:
+PhoBERT là mô hình ngôn ngữ tiền huấn luyện dành cho tiếng Việt. Văn bản được tách từ
+theo quy ước phù hợp rồi đưa qua tokenizer BPE để sinh chuỗi token con. Khi tinh chỉnh
+cho sentiment, biểu diễn của encoder được đưa qua head phân loại. Với ba lớp, logits
+$\mathbf{z}$ được chuyển thành xác suất:
 
 \begin{equation}
   p_c=\frac{\exp(z_c)}{\sum_{k=1}^{3}\exp(z_k)},
@@ -67,16 +89,19 @@ phân loại. Với ba lớp, logits $\mathbf{z}$ được chuyển thành xác 
   \label{eq:sentiment-softmax}
 \end{equation}
 
-Việc chọn PhoBERT không loại bỏ yêu cầu thích nghi miền. Tên công ty, mã cổ phiếu,
-thuật ngữ tài chính và cách viết phần trăm có thể khác ngữ liệu tiền huấn luyện. Vì
-vậy, dữ liệu tinh chỉnh phải giữ dấu tiếng Việt, ghi rõ quy tắc tách từ, giới hạn độ
-dài, xử lý thực thể và cách loại trùng. Mô hình được kiểm tra trên một tập in-domain
-theo thời gian, thay vì chỉ dựa vào một mốc accuracy của tập seed.
+Việc chọn PhoBERT không loại bỏ yêu cầu thích nghi với miền tài chính. Tên công ty, mã
+cổ phiếu, thuật ngữ chuyên ngành và cách viết phần trăm có thể khác ngữ liệu tiền huấn
+luyện. Vì vậy, tập tinh chỉnh phải ghi rõ quy tắc tách từ, giới hạn độ dài, xử lý thực
+thể và loại trùng. Phần dữ liệu được dùng để sinh đặc trưng cho dự báo cũng phải được
+xử lý bằng checkpoint đã được khóa theo quy tắc thời gian. Mô hình được kiểm tra trên
+tập in-domain đã khóa, không chỉ dựa vào accuracy của một tập seed. Kết quả phân loại
+sentiment cần được báo cáo riêng với kết quả dự báo để tránh đồng nhất hai loại chất
+lượng khác nhau.
 
 \subsection{Cơ sở lý thuyết của LSTM}
 
 LSTM đọc chuỗi theo thứ tự thời gian và duy trì trạng thái ẩn $\mathbf{h}_t$ cùng trạng
-thái ô nhớ $\mathbf{c}_t$. Với đầu vào $\mathbf{x}_t$, một bước cập nhật có thể mô tả
+thái ô nhớ $\mathbf{c}_t$. Với đầu vào $\mathbf{x}_t$, một bước cập nhật được mô tả
 bằng:
 
 \begin{align}
@@ -91,56 +116,103 @@ bằng:
 \end{align}
 
 Trong đó $\mathbf{i}_t$, $\mathbf{f}_t$ và $\mathbf{o}_t$ lần lượt là cổng vào, cổng
-quên và cổng ra. LSTM phù hợp với mức sàn vì có thể mô hình hóa một cửa sổ giá hoặc
-một cửa sổ đặc trưng sentiment mà không yêu cầu đồ thị liên mã. Trong hệ thống, LSTM
-được dùng ở hai nhánh với số ngày quan sát giống nhau để phép so sánh có ý nghĩa.
+quên và cổng ra. Cổng quên quyết định phần thông tin cũ được giữ lại, cổng vào điều
+chỉnh thông tin mới đi vào ô nhớ, còn cổng ra tạo trạng thái ẩn dùng ở bước tiếp theo.
+Nhờ cơ chế này, LSTM có thể giữ những phụ thuộc kéo dài qua nhiều phiên mà không phải
+truyền toàn bộ chuỗi vào một phép tổng hợp đơn giản.
+
+LSTM phù hợp với mức sàn vì có thể mô hình hóa cửa sổ giá hoặc cửa sổ sentiment mà
+không yêu cầu đồ thị liên mã. Trong hệ thống, hai nhánh LSTM dùng cùng số ngày quan sát,
+cùng quy tắc padding hoặc loại mẫu và cùng điều kiện dừng để phép so sánh có ý nghĩa.
+Việc thêm nhánh sentiment làm tăng số tham số, nên số chiều trạng thái và thời gian
+huấn luyện cũng cần được ghi lại khi phân tích chênh lệch.
 
 \subsection{Cơ sở lý thuyết của Temporal Fusion Transformer}
 
-TFT được đưa vào như một mô hình mở rộng cho chuỗi nhiều biến. Tư tưởng của TFT là
-kết hợp các bộ mã hóa chuỗi với cơ chế chọn biến và attention có gating. Một biến có
-thể được đánh trọng số khác nhau theo từng thời điểm và từng trạng thái dự báo. Trong
-bài toán này, các biến động lượng, volatility, tỷ lệ sentiment và cờ có tin có thể
-được xem là những nhóm biến khác nhau.
+TFT được đưa vào như mô hình mở rộng cho chuỗi nhiều biến. Mô hình kết hợp bộ mã hóa
+chuỗi với cơ chế chọn biến, các khối có cổng và attention. Vì vậy, một biến có thể có
+mức quan trọng khác nhau tùy thời điểm và trạng thái dự báo. Trong bài toán này, động
+lượng, volatility, tỷ lệ sentiment và cờ có tin là những nhóm biến cần được phân biệt.
 
-TFT trong đề tài phải được cấu hình cho phân loại. Đầu ra cuối là logits kích thước
-3 và hàm mất mát là cross-entropy. Cấu hình hồi quy phân vị, nếu có trong thư viện,
-không được dùng cho mục tiêu phân loại. Variable importance và attention được lưu như
-chứng cứ mô tả cách mô hình sử dụng biến, nhưng không được diễn giải như ảnh hưởng
-nhân quả. Các nghiên cứu Transformer cho movement và chuỗi thời gian đa phương thức
-cho thấy hướng này có tiềm năng biểu diễn phong phú, song độ phức tạp và khác biệt
-thị trường vẫn cần được kiểm tra riêng \cite{Boyle2023_230503835v1,
-Omranpour2024_241210540v1}.
+Nếu được chạy, TFT phải được cấu hình cho phân loại. Đầu ra cuối là logits kích thước
+3 và loss là cross-entropy. Cấu hình hồi quy phân vị có sẵn trong thư viện không được
+dùng thay cho mục tiêu này. Các biến cũng phải được khai báo rõ theo trạng thái biết
+trước, biến tĩnh hoặc biến chỉ quan sát được tại thời điểm dự báo. Tin tức sau cutoff
+không được đưa vào nhóm biến đã biết tại ngày trước đó.
+
+Variable importance và attention chỉ được lưu như bằng chứng mô tả cách mô hình sử dụng
+biến, không phải ảnh hưởng nhân quả. Các nghiên cứu Transformer cho movement và chuỗi
+đa phương thức cho thấy tiềm năng của hướng này, nhưng độ phức tạp, số lượng tham số,
+khả năng quá khớp và khác biệt thị trường vẫn phải được kiểm tra riêng
+\cite{Boyle2023_230503835v1,Omranpour2024_241210540v1}.
 
 \subsection{Luồng xử lý tổng thể}
 
-Luồng dữ liệu gồm các bước:
+Luồng xử lý của hệ thống gồm các bước:
 
 \begin{enumerate}[nosep]
-  \item khóa phạm vi mã, thời gian, cutoff, công thức nhãn và seed;
-  \item thu thập tin tức, OHLCV và lịch giao dịch, sau đó lưu provenance;
+  \item khóa phạm vi mã, khoảng thời gian, cutoff, công thức nhãn và seed;
+  \item thu thập tin tức, OHLCV và lịch giao dịch, đồng thời lưu provenance;
   \item làm sạch, loại trùng, kiểm tra timestamp và ánh xạ bài viết theo mã;
   \item tạo nhánh sentiment và nhánh giá bằng các phép biến đổi độc lập;
-  \item căn chỉnh hai nhánh theo mã và ngày giao dịch, tạo nhãn ở thời điểm hợp lệ;
-  \item chạy thang mô hình từ baseline đến LSTM hai nhánh, TFT chỉ khi đủ điều kiện;
-  \item đánh giá walk-forward, ablation và bootstrap, rồi lưu manifest kết quả.
+  \item căn chỉnh hai nhánh theo mã và ngày giao dịch, sau đó tạo nhãn ở thời điểm hợp lệ;
+  \item chạy thang mô hình từ baseline đến LSTM hai nhánh, chỉ chạy TFT khi đủ điều kiện;
+  \item đánh giá bằng walk-forward, ablation và bootstrap, rồi lưu manifest kết quả.
 \end{enumerate}
 
 \ifShowDiagram
-Hình~\ref{fig:kien-truc} minh họa các bước chính của pipeline, trong đó các khối TFT
-và gated cross-attention được đánh dấu là mở rộng. Cách thể hiện này giúp tách phần
-graduation floor khỏi các lựa chọn chưa chắc được chạy trong thực nghiệm cuối.
+Hình~\ref{fig:kien-truc} minh họa các bước chính của pipeline. Các khối TFT và gated
+cross-attention được đánh dấu là mở rộng, còn mô hình hai nhánh LSTM được xem là mức
+sàn. Cách phân biệt này giúp người đọc nhận biết phần bắt buộc với phần chỉ được chạy
+khi dữ liệu và thời gian cho phép.
 \else
-Luồng xử lý gồm các bước chính của pipeline, trong đó các khối TFT và gated
-cross-attention được đánh dấu là mở rộng. Cách thể hiện này giúp tách phần
-graduation floor khỏi các lựa chọn chưa chắc được chạy trong thực nghiệm cuối.
+Luồng xử lý gồm các bước chính của pipeline. Các khối TFT và gated cross-attention
+được đánh dấu là mở rộng, còn mô hình hai nhánh LSTM được xem là mức sàn. Cách phân
+biệt này giúp người đọc nhận biết phần bắt buộc với phần chỉ được chạy khi dữ liệu và
+thời gian cho phép.
 \fi
 
 \ifShowDiagram
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.94\linewidth,height=0.82\textheight,keepaspectratio]{figures/architecture.png}
-  \caption{Kiến trúc tổng thể của pipeline dự báo xu hướng giá.}
+  \begin{tikzpicture}[
+      node distance=6mm and 10mm,
+      font=\small,
+      stage/.style={
+        rectangle, rounded corners=2pt, draw=black!55, thick,
+        text width=10.5cm, minimum height=9mm, align=center,
+        fill=gray!6, inner sep=4pt},
+      model/.style={
+        rectangle, rounded corners=2pt, draw=blue!65, very thick,
+        text width=10.5cm, minimum height=9mm, align=center,
+        fill=blue!8, inner sep=4pt},
+      floor/.style={
+        rectangle, rounded corners=2pt, draw=green!55!black, very thick,
+        text width=10.5cm, minimum height=9mm, align=center,
+        fill=green!10, inner sep=4pt},
+      ext/.style={
+        rectangle, rounded corners=2pt, draw=violet!60, very thick, dashed,
+        text width=10.5cm, minimum height=9mm, align=center,
+        fill=violet!6, inner sep=4pt},
+      arr/.style={-{Stealth[length=2.5mm]}, thick, black!65},
+    ]
+    \node[stage] (g1) {\textbf{1. Thu thập dữ liệu}\\ Giá OHLCV 10 mã VN30 + tin tức Vietstock (2020--2026)};
+    \node[model, below=of g1] (g2) {\textbf{2. Phân tích cảm xúc}\\ PhoBERT tinh chỉnh $\rightarrow$ xác suất 3 lớp: Tích cực / Trung tính / Tiêu cực};
+    \node[stage, below=of g2] (g3) {\textbf{3. Đặc trưng giá}\\ Lợi suất + chỉ báo kỹ thuật (MA, RSI, MACD, biến động)};
+    \node[stage, below=of g3] (g4) {\textbf{4. Căn chỉnh và gán nhãn}\\ Gộp cảm xúc + giá theo mã-ngày, cutoff 15:00, nhãn UP / FLAT / DOWN};
+    \node[floor, below=of g4] (g5) {\textbf{5. Mô hình dự báo}\\ Baseline $\rightarrow$ LSTM một nhánh $\rightarrow$ \textbf{LSTM hai nhánh (sàn tốt nghiệp)}};
+    \node[ext, below=of g5] (g6) {\textbf{Mở rộng:} Temporal Fusion Transformer (TFT), gated cross-attention};
+    \node[stage, below=of g6] (g7) {\textbf{6. Đánh giá}\\ Walk-forward + ablation có/không cảm xúc, macro-F1, bootstrap CI};
+
+    \draw[arr] (g1) -- (g2);
+    \draw[arr] (g2) -- (g3);
+    \draw[arr] (g3) -- (g4);
+    \draw[arr] (g4) -- (g5);
+    \draw[arr] (g5) -- (g6);
+    \draw[arr] (g6) -- (g7);
+  \end{tikzpicture}
+  \caption{Kiến trúc tổng thể của pipeline dự báo xu hướng giá. Khối xanh dương là mô
+  hình cảm xúc PhoBERT, khối xanh lá là mức sàn tốt nghiệp, khối nét đứt là phần mở rộng.}
   \label{fig:kien-truc}
 \end{figure}
 \fi
@@ -150,38 +222,51 @@ graduation floor khỏi các lựa chọn chưa chắc được chạy trong th�
 
 \subsection{Phạm vi dữ liệu và nguồn thu thập}
 
-Dữ liệu gồm hai bảng chính. Bảng tin tức chứa mã bản ghi, URL, nguồn, tiêu đề, nội
-dung nếu có, timestamp đăng hoặc cập nhật, thời điểm thu thập và mã cổ phiếu. Bảng giá
-chứa mã, ngày giao dịch, OHLCV điều chỉnh và cờ chất lượng. Giai đoạn nghiên cứu kéo
-dài từ năm 2020 đến quý I năm 2026, với khoảng 10 mã HOSE thuộc VN30 được chốt trong
-manifest.
+Dữ liệu gồm hai bảng chính. Bảng tin tức lưu mã bản ghi, URL, nguồn, tiêu đề, nội dung
+nếu có, timestamp đăng hoặc cập nhật, thời điểm thu thập và mã cổ phiếu liên quan. Bảng
+giá lưu mã, ngày giao dịch, OHLCV điều chỉnh và cờ chất lượng. Theo thiết kế hiện hành,
+giai đoạn thực nghiệm được quản lý từ năm 2020 đến quý I năm 2026, với danh sách 10 mã
+HOSE thuộc VN30 được ghi trong manifest. Nếu phạm vi thực tế thay đổi theo độ phủ dữ
+liệu, manifest phải ghi mốc bắt đầu, mốc kết thúc và lý do thay đổi thay vì để phạm vi
+chỉ xuất hiện trong phần mô tả.
 
-Nguồn tin ưu tiên là Vietstock theo mã vì cách ánh xạ trực tiếp giúp giảm mơ hồ giữa
-bài viết và cổ phiếu. CafeF, VnEconomy hoặc Stockbiz chỉ được dùng bổ sung khi kiểm
-tra được độ phủ, nội dung, timestamp và điều khoản sử dụng. Dữ liệu giá được thu thập
-qua thư viện \texttt{vnstock} với nguồn VCI theo cấu hình của đề tài. Một nguồn bổ sung
-như \texttt{vnquant} chỉ được dùng để cross-check nếu semantics của adjusted price,
-coverage và schema được so sánh trước, không tự động trộn vào tập chính.
+Nguồn tin hiện được ưu tiên là Vietstock theo mã, vì cách tổ chức này giúp giảm mơ hồ
+khi ánh xạ bài viết với cổ phiếu. CafeF, VnEconomy hoặc Stockbiz chỉ được bổ sung sau
+khi kiểm tra độ phủ, nội dung, timestamp và điều kiện sử dụng. Theo đề cương, các nguồn
+này là nhóm nguồn dự kiến và có thể điều chỉnh khi khả năng truy cập hợp lệ hoặc cấu
+trúc trang thay đổi. Dữ liệu giá được thu thập qua thư viện \texttt{vnstock} với nguồn
+VCI theo cấu hình của đề tài. Một nguồn khác như \texttt{vnquant} chỉ dùng để đối chiếu
+khi semantics của adjusted price, coverage và schema đã được so sánh, không tự động
+trộn vào tập chính. Việc tách nguồn chính và nguồn đối chiếu giúp phát hiện sai lệch
+nhưng không làm tăng số quan sát bằng cách ghép các bản ghi chưa cùng quy ước.
 
 \subsection{Kiểm tra chất lượng và provenance}
 
 Mỗi bản ghi tin được gắn hash của văn bản chuẩn hóa, nguồn và URL. Bản ghi trùng tiêu
-đề, nội dung và timestamp gần nhau được đánh dấu để kiểm tra trước khi loại. Nếu một
-bài được gắn với nhiều mã hợp lệ, hệ thống giữ quan hệ nhiều mã nhưng ghi rõ cách mở
-rộng bản ghi. Nếu không thể xác định mã hoặc thời điểm, bản ghi không được đưa vào
-feature table chính.
+đề, nội dung hoặc có timestamp gần nhau được đánh dấu để kiểm tra trước khi loại. Việc
+loại trùng được thực hiện trước khi chia tập sentiment và trước khi tổng hợp đặc trưng,
+vì bản sao ở hai split có thể làm tăng giả tạo kết quả. Nếu một bài được gắn với nhiều
+mã hợp lệ, hệ thống giữ quan hệ nhiều mã và ghi rõ cách mở rộng bản ghi. Một bài có thể
+được tính cho nhiều mã trong bảng liên kết, nhưng không được xem là nhiều bài độc lập
+khi tính độ bất định.
 
-Các thống kê phải bao gồm số bài theo nguồn, theo mã và theo năm, tỷ lệ thiếu nội
-dung, tỷ lệ thiếu timestamp, số bản ghi trùng, độ phủ ngày có tin và số phiên giá hợp
-lệ. Cùng với đó, manifest lưu thời điểm crawl, phiên bản mã nguồn, hash file dữ liệu
-và quy tắc làm sạch. Mục tiêu của bước này là tránh tạo ra một corpus có vẻ lớn nhưng
-không thể truy nguyên hoặc không thể tái lập.
+Nếu không xác định được mã hoặc thời điểm, bản ghi không được đưa vào feature table
+chính. Những bản ghi bị loại vẫn được thống kê theo nguồn và lý do loại để người đọc
+đánh giá coverage. Trường hợp timestamp đăng và timestamp cập nhật khác nhau phải giữ
+cả hai trường nếu có; quy tắc chọn thời điểm sử dụng phải được khóa trước khi tạo mẫu.
+
+Các thống kê phải bao gồm số bài theo nguồn, mã và năm, tỷ lệ thiếu nội dung, tỷ lệ
+thiếu timestamp, số bản ghi trùng, độ phủ ngày có tin và số phiên giá hợp lệ. Cần ghi
+thêm số bài gắn với một mã và nhiều mã, số ngày không có tin, số bản ghi bị chuyển sang
+phiên kế tiếp và số bản ghi không thể xác minh. Manifest cũng lưu thời điểm crawl,
+phiên bản mã nguồn, hash file dữ liệu và quy tắc làm sạch. Mục tiêu của bước này là bảo
+đảm corpus có thể truy nguyên, thay vì chỉ tạo ra một tập dữ liệu lớn nhưng khó kiểm tra.
 
 \subsection{Dữ liệu giá}
 
-Dữ liệu OHLCV được sử dụng theo giá điều chỉnh để tính lợi suất và hạn chế đứt gãy do
-chia tách, cổ tức hoặc sự kiện doanh nghiệp. Với giá đóng cửa điều chỉnh $C^{\mathrm{adj}}_{i,t}$
-của mã $i$ tại ngày $t$, lợi suất mục tiêu được định nghĩa là:
+Dữ liệu OHLCV được dùng theo giá điều chỉnh để tính lợi suất và hạn chế đứt gãy do chia
+tách, cổ tức hoặc sự kiện doanh nghiệp. Với giá đóng cửa điều chỉnh
+$C^{\mathrm{adj}}_{i,t}$ của mã $i$ tại ngày $t$, lợi suất mục tiêu được định nghĩa là:
 
 \begin{equation}
   r_{i,t+1}=\frac{C^{\mathrm{adj}}_{i,t+1}}
@@ -190,53 +275,71 @@ của mã $i$ tại ngày $t$, lợi suất mục tiêu được định nghĩa 
 \end{equation}
 
 Các kiểm tra cơ bản gồm thứ tự thời gian, ngày trùng, giá không dương, khối lượng
-không hợp lệ và phiên bị thiếu. Không dùng giá trị của ngày $t+1$ để tạo đặc trưng tại
-ngày $t$. Những ngày đầu cửa sổ không đủ dữ liệu cho moving average hoặc volatility
-được loại khỏi mẫu của mô hình hoặc xử lý bằng một quy tắc đã ghi trong manifest.
+không hợp lệ và phiên bị thiếu. Dữ liệu từ nguồn chính được đối chiếu với nguồn thay
+thế trong phạm vi cần thiết để phát hiện ngày thiếu, bản ghi bất thường hoặc sai lệch
+do thay đổi đơn vị. Các sự kiện chia tách, trả cổ tức bằng cổ phiếu hoặc điều chỉnh giá
+được xem xét khi xây dựng chuỗi, vì nếu dùng không nhất quán có thể tạo ra lợi suất bất
+thường không phản ánh giao dịch.
+
+Giá trị của ngày $t+1$ chỉ dùng để tạo nhãn, không dùng để tạo đặc trưng tại ngày $t$.
+Những ngày đầu chuỗi chưa đủ dữ liệu cho moving average hoặc volatility được loại khỏi
+mẫu hoặc xử lý theo quy tắc ghi trong manifest. Mọi khác biệt giữa giá đóng cửa gốc
+và giá điều chỉnh phải được giải thích trong báo cáo dữ liệu, không tự động coi một
+chuỗi là sai chỉ vì hai nguồn có cách điều chỉnh khác nhau.
 
 \subsection{Dữ liệu tin tức và ánh xạ theo phiên}
 
-Tin giữ cả tiêu đề và nội dung nhằm phục vụ audit, nhưng chính sách đầu vào phải được
-khóa trước khi huấn luyện. Graduation floor ưu tiên tiêu đề vì phù hợp với seed công
-khai và giảm khác biệt độ dài. Nội dung được lưu để kiểm tra và có thể dùng trong một
-phân tích nhạy cảm nếu được gán nhãn, tách thời gian và báo cáo riêng.
+Tin giữ cả tiêu đề và nội dung để phục vụ audit, nhưng chính sách đầu vào phải được
+khóa trước khi huấn luyện. Mức sàn ưu tiên tiêu đề vì phù hợp với tập seed công khai và
+giảm khác biệt về độ dài. Nội dung được lưu để kiểm tra, chỉ dùng trong phân tích nhạy
+cảm khi đã được gán nhãn, tách thời gian và báo cáo riêng. Khi một bài chỉ có tiêu đề,
+hệ thống không được tự suy ra nội dung còn thiếu; trường thiếu phải được lưu để phân
+tích coverage.
 
-Tất cả timestamp được chuyển về múi giờ Việt Nam. Với mỗi ngày giao dịch $t$, chỉ tin
-có timestamp không muộn hơn 15 giờ của ngày đó được xem là có thể quan sát tại mốc
-quyết định. Tin sau 15 giờ được chuyển sang nhóm của phiên giao dịch kế tiếp theo quy
-tắc bảo thủ, vì vậy không được dùng để tạo đặc trưng của phiên đã đóng. Tin vào cuối
-tuần, ngày nghỉ hoặc ngày không giao dịch cũng được gán đến phiên hợp lệ tiếp theo.
-Quy tắc này có thể làm trễ một phần tín hiệu, nhưng giúp giảm nguy cơ đánh giá lạc
-quan do dùng thông tin xuất hiện sau cutoff.
+Tất cả timestamp được chuyển về múi giờ Việt Nam. Với mỗi ngày giao dịch $t$, tin có
+timestamp không muộn hơn 15 giờ của ngày đó mới được xem là có thể quan sát tại mốc ra
+quyết định. Tin sau 15 giờ được chuyển sang phiên giao dịch kế tiếp theo quy tắc bảo
+thủ, nên không được dùng để tạo đặc trưng cho phiên đã đóng. Tin vào cuối tuần, ngày
+nghỉ hoặc ngày không giao dịch cũng được gán sang phiên hợp lệ tiếp theo. Quy tắc này
+có thể làm trễ một phần tín hiệu, nhưng giảm nguy cơ đánh giá lạc quan do dùng tin xuất
+hiện sau cutoff.
+
+Ánh xạ được thực hiện sau khi chuẩn hóa timezone và sắp xếp lịch giao dịch, không dựa
+chỉ vào ngày in trong URL. Với tin có thời điểm đăng và thời điểm cập nhật, trường được
+dùng cho dự báo phải được ghi trong manifest. Timestamp thiếu, mâu thuẫn hoặc chỉ có
+ngày mà không có giờ không được gán một giờ mặc định rồi đưa thẳng vào tập chính; bản
+ghi phải được đánh dấu để loại hoặc phân tích riêng.
 
 \subsection{Tiền xử lý văn bản tiếng Việt}
 
-Quy trình tiền xử lý văn bản gồm các bước:
+Quy trình tiền xử lý văn bản gồm các bước sau:
 
 \begin{enumerate}[nosep]
-  \item chuẩn hóa Unicode, khoảng trắng, ký hiệu phần trăm và cách viết số;
+  \item chuẩn hóa Unicode, khoảng trắng, ký hiệu phần trăm và cách viết số, nhưng giữ
+    lại các ký hiệu có thể mang nghĩa tài chính;
   \item tách từ bằng công cụ phù hợp với PhoBERT, giữ dấu tiếng Việt và các token tài
-    chính có ý nghĩa;
+    chính có ý nghĩa như mã cổ phiếu, tên công ty và đơn vị tiền tệ;
   \item nhận diện và che một số thực thể như tổ chức, địa danh hoặc mã cổ phiếu khi
     mục tiêu là học ngữ cảnh, đồng thời giữ bản gốc trong vùng provenance;
-  \item giới hạn độ dài và xử lý bài rỗng bằng quy tắc loại bản ghi, không tự tạo câu
-    thay thế;
-  \item dùng tokenizer BPE của checkpoint PhoBERT và ghi lại chiều dài, số token bị
-    cắt cùng cấu hình.
+  \item loại HTML, quảng cáo, phần điều hướng, bài rỗng và nội dung không thuộc văn bản
+    tin theo quy tắc đã định, không tự tạo câu thay thế;
+  \item giới hạn độ dài theo checkpoint, dùng tokenizer BPE của PhoBERT và ghi lại
+    chiều dài cùng số token bị cắt trong từng bản ghi.
 \end{enumerate}
 
-Không xóa một cách máy móc mọi số liệu, dấu phần trăm hoặc ký hiệu tăng giảm, vì chúng
-có thể mang tín hiệu tài chính. Nếu một phép loại dấu câu hoặc mask thực thể được sử
-dụng, ảnh hưởng của nó phải được giữ cố định giữa các split. Mọi biến đổi nhìn thấy
-toàn bộ corpus, chẳng hạn vocabulary mới hoặc thống kê chọn token, phải được loại khỏi
-đường đi của thực nghiệm chính hoặc fit trong phần train.
+Không xóa máy móc số liệu, dấu phần trăm hoặc ký hiệu tăng giảm vì chúng có thể mang
+tín hiệu tài chính. Nếu sử dụng phép loại dấu câu hoặc mask thực thể, quy tắc đó phải
+giữ nguyên giữa các split. Mọi biến đổi nhìn thấy toàn bộ corpus, chẳng hạn vocabulary
+mới hoặc thống kê chọn token, phải được loại khỏi thực nghiệm chính hoặc fit trong phần
+train.
 
 \subsection{Tạo tập sentiment và gán nhãn}
 
 Tập seed gồm các tiêu đề tài chính đã gán nhãn ba lớp, được dùng để kiểm tra nhanh
-pipeline. Tập in-domain được mở rộng bằng hướng dẫn gán nhãn cố định. Người gán nhãn
-đọc nội dung ở dạng được phép sử dụng, xác định chủ thể chính, sự kiện và hướng tác
-động kỳ vọng đến giá trong ngắn hạn. Các quy tắc cơ bản là:
+pipeline. Tập in-domain được mở rộng theo một hướng dẫn gán nhãn cố định. Người gán
+nhãn đọc phần nội dung được phép sử dụng, xác định chủ thể chính, sự kiện và hướng tác
+động kỳ vọng đến giá trong ngắn hạn. Việc đọc nội dung đầy đủ chỉ được thực hiện khi
+nội dung đó thuộc thời điểm và phạm vi được phép sử dụng. Các quy tắc cơ bản là:
 
 \begin{itemize}[nosep]
   \item tích cực nếu thông tin hàm ý triển vọng hoặc tác động có lợi rõ ràng;
@@ -245,38 +348,48 @@ pipeline. Tập in-domain được mở rộng bằng hướng dẫn gán nhãn 
 \end{itemize}
 
 Tin có hai chiều trái ngược được gán theo tác động nổi trội nếu hướng dẫn cho phép,
-hoặc giữ trong nhóm bất đồng để thảo luận. Báo cáo annotation phải ghi số người gán,
-số mẫu, phân bố lớp, tỷ lệ bất đồng và Cohen's hoặc Fleiss' kappa tùy số người gán.
-Các mẫu dùng để đánh giá dự báo phải được tách theo thời gian khỏi dữ liệu được dùng
-để fine-tune sentiment trong fold tương ứng.
+hoặc giữ trong nhóm bất đồng để thảo luận. Tin không thể xác định chủ thể hoặc hướng
+tác động không được ép vào lớp tích cực chỉ vì có từ ngữ mang sắc thái thuận lợi. Báo
+cáo annotation phải ghi số người gán, số mẫu, phân bố lớp, tỷ lệ bất đồng và Cohen's
+hoặc Fleiss' kappa tùy số người tham gia. Các mẫu dùng để đánh giá dự báo phải tách theo
+thời gian khỏi dữ liệu dùng để fine-tune sentiment trong fold tương ứng. Quy tắc này
+giúp tránh việc mô hình sentiment được huấn luyện từ văn bản tương lai rồi tạo tín hiệu
+cho một phép đánh giá được gọi là ngoài mẫu.
 
 \section{Nhánh cảm xúc: tinh chỉnh PhoBERT}
 \label{sec:pp-phobert}
 
 \subsection{Thiết lập bài toán phân loại}
 
-Mỗi bài viết hợp lệ được xem là một mẫu có nhãn $y_j$ thuộc ba lớp NEGATIVE, NEUTRAL
-hoặc POSITIVE. Mô hình sử dụng checkpoint \texttt{vinai/phobert-base} làm encoder,
-theo sau là dropout và head tuyến tính. Logits được chuyển thành xác suất theo
-Phương trình~\ref{eq:sentiment-softmax}. Head tuyến tính là cấu hình chính vì có ít
-tham số bổ sung và dễ tái lập. Một biến thể PhoBERT kết hợp CNN hoặc BiLSTM chỉ được
-dùng để so sánh nếu thời gian và dữ liệu cho phép.
+Mỗi bài viết hợp lệ là một mẫu có nhãn $y_j$ thuộc một trong ba lớp NEGATIVE, NEUTRAL
+hoặc POSITIVE. Nhãn được hiểu theo hướng tác động tiềm năng của nội dung đối với doanh
+nghiệp hoặc cổ phiếu liên quan, không phải chỉ theo cảm xúc chung của người viết. Mô
+hình sử dụng checkpoint \texttt{vinai/phobert-base} làm encoder, sau đó là dropout và
+head tuyến tính. Logits được chuyển thành xác suất theo Phương trình~\ref{eq:sentiment-softmax}.
+Head tuyến tính được chọn làm cấu hình chính vì có ít tham số bổ sung và dễ tái lập.
+PhoBERT kết hợp CNN hoặc BiLSTM chỉ được thêm vào khi dữ liệu và tiến độ cho phép, và
+chỉ được so sánh sau khi cấu hình cơ sở đã được khóa.
 
-PhoBERT được chọn theo ngôn ngữ của dữ liệu, trong khi FinBERT được xem là đối chiếu
-khái niệm ở miền tiếng Anh \cite{Nguyen2020_200300744v3,Yang2020_200608097v2}.
-Không dịch toàn bộ tin sang tiếng Anh trong graduation floor, vì dịch máy có thể làm
-thay đổi sắc thái, tên riêng và thông tin số. Nếu có thí nghiệm dịch, đó phải là một
-baseline riêng với phiên bản công cụ và cấu hình được ghi lại.
+PhoBERT được chọn theo ngôn ngữ của dữ liệu, còn FinBERT được dùng làm đối chiếu khái
+niệm ở miền tiếng Anh \cite{Nguyen2020_200300744v3,Yang2020_200608097v2}. Mức sàn
+không dịch toàn bộ tin sang tiếng Anh vì dịch máy có thể làm thay đổi sắc thái, tên
+riêng và số liệu. Nếu có thí nghiệm dịch, đó phải là một baseline riêng với phiên bản
+công cụ và cấu hình được ghi lại.
 
 \subsection{Chia dữ liệu và huấn luyện}
 
 Tập sentiment được chia theo thời gian hoặc theo nguyên tắc không trùng nguồn trước
-khi huấn luyện. Tập validation dùng để chọn epoch, learning rate và ngưỡng dừng sớm.
-Tập test chỉ được dùng một lần cho báo cáo cuối của cấu hình đã khóa. Khi mô hình
-sentiment được dùng trong walk-forward, có hai lựa chọn hợp lệ: tinh chỉnh lại trong
-từng fold bằng dữ liệu nhãn quá khứ, hoặc dùng một checkpoint đóng băng được huấn
-luyện hoàn toàn trước phần test. Không được fine-tune trên nhãn hoặc văn bản gắn với
-thời gian tương lai rồi gọi kết quả là ngoài mẫu.
+khi huấn luyện. Tập huấn luyện dùng để cập nhật tham số, tập validation dùng để chọn
+epoch, learning rate, trọng số lớp và dừng sớm, còn tập test chỉ dùng một lần cho cấu
+hình đã khóa. Các bài trùng hoặc gần trùng phải được phát hiện trước khi chia tập; nếu
+không, mô hình có thể ghi nhớ câu chữ và tạo ra đánh giá lạc quan.
+
+Khi mô hình sentiment được dùng trong walk-forward, có hai cách hợp lệ: tinh chỉnh lại
+trong từng fold bằng nhãn của quá khứ, hoặc dùng một checkpoint đóng băng được huấn
+luyện hoàn toàn trước giai đoạn test. Cách được chọn phải được ghi trong manifest và
+áp dụng nhất quán cho tất cả mô hình so sánh. Không được fine-tune trên nhãn hoặc văn
+bản của tương lai rồi gọi đầu ra là ngoài mẫu. Nếu dữ liệu gán nhãn không đủ cho việc
+tinh chỉnh lại ở mỗi fold, giới hạn này phải được nêu cùng phạm vi diễn giải.
 
 Hàm mất mát cơ bản là cross-entropy:
 
@@ -295,7 +408,9 @@ Nếu lớp mất cân bằng, dùng trọng số $w_c$ được tính từ ph�
 \end{equation}
 
 Trọng số, cách lấy mẫu lại, seed, batch size, số epoch, tokenizer và checkpoint đều
-được ghi vào manifest. Không chọn checkpoint dựa trên kết quả của tập test.
+được ghi trong manifest. Checkpoint không được chọn dựa trên kết quả của tập test. Ngoài
+điểm số tổng hợp, cần giữ ma trận nhầm lẫn và các mẫu dự đoán sai đại diện để phân tích
+những trường hợp phủ định, số liệu, tên riêng, tin có nhiều sự kiện và bài trung tính.
 
 \subsection{Đầu ra xác suất và tổng hợp theo mã, ngày}
 
@@ -312,15 +427,22 @@ $n_{i,t}=|\mathcal{N}_{i,t}|$. Xác suất trung bình của lớp $c$ được 
 Vector đặc trưng sentiment gồm $\bar p_{\mathrm{NEG}}$, $\bar p_{\mathrm{NEU}}$,
 $\bar p_{\mathrm{POS}}$, chênh lệch $\bar p_{\mathrm{POS}}-\bar p_{\mathrm{NEG}}$,
 số tin, độ lệch chuẩn của xác suất, tỷ lệ tin tích cực hoặc tiêu cực và biến nhị phân
-\texttt{has\_news}. Ngày không có tin được gán prior trung tính cho vector xác suất,
-đặt số tin và các tỷ lệ bằng không, đồng thời đặt \texttt{has\_news}=0. Ngày có tin
-trung tính vẫn có số tin dương và \texttt{has\_news}=1, nên hai tình huống không bị
-đồng nhất hoàn toàn.
+\texttt{has\_news}. Có thể bổ sung các cửa sổ tổng hợp ngắn hạn như một ngày, ba ngày
+hoặc năm ngày giao dịch gần nhất để kiểm tra khả năng tín hiệu kéo dài sau ngày công bố.
 
-Các đặc trưng được tổng hợp sau cutoff. Không được dùng số tin hoặc xác suất của bài
-đăng sau cutoff để mô tả ngày đã kết thúc. Nếu một bài gắn với nhiều mã, việc nhân bản
-đặc trưng được ghi rõ để tránh đếm bài như một quan sát độc lập trong phân tích độ
-không chắc chắn.
+Ngày không có tin được gán prior trung tính cho vector xác suất, đặt số tin và các tỷ
+lệ bằng không, đồng thời đặt \texttt{has\_news}=0 trong cấu hình mức sàn. Ngày có tin
+trung tính vẫn có số tin dương và \texttt{has\_news}=1, nên hai trường hợp được phân
+biệt. Ngoài cấu hình chính, có thể so sánh việc đặt vector bằng không hoặc giữ giá trị
+gần nhất trong một giới hạn thời gian trên tập validation. Không được chọn cách biểu
+diễn ngày không có tin dựa trên điểm của holdout.
+
+Các đặc trưng được tổng hợp sau cutoff. Không dùng số tin hoặc xác suất của bài đăng
+sau cutoff để mô tả ngày đã kết thúc. Nếu một bài gắn với nhiều mã, cách nhân bản đặc
+trưng phải được ghi rõ để không đếm bài như nhiều quan sát độc lập khi phân tích độ
+không chắc chắn. Mức độ phủ tin, số lượng bài và tỷ lệ bản ghi bị loại cũng được lưu
+để khi diễn giải một ngày ít tín hiệu có thể phân biệt giữa ``không có tin'' và ``có tin
+nhưng mô hình không chắc chắn''.
 
 \section{Nhánh giá và ghép đặc trưng}
 \label{sec:pp-ghep}
@@ -339,16 +461,18 @@ Từ adjusted OHLCV, hệ thống tạo các nhóm đặc trưng sau:
 \end{itemize}
 
 Các chỉ báo được tính từ dữ liệu đến ngày quan sát $t$. Để giảm phụ thuộc vào mức giá
-tuyệt đối, các đại lượng có đơn vị giá được chuyển thành tỷ lệ hoặc sai khác tương
-đối. Các giá trị khuyết ở đầu chuỗi được xử lý bằng cách loại mẫu chưa đủ lịch sử
-hoặc dùng quy tắc imputation đã khóa. Scaler, imputer và bất kỳ phép chọn đặc trưng
-nào đều chỉ fit trên train của fold.
+tuyệt đối, các đại lượng có đơn vị giá được chuyển thành tỷ lệ hoặc sai khác tương đối.
+Mỗi chỉ báo phải được tính bằng một cửa sổ chỉ nhìn về quá khứ, không dùng giá của phiên
+kế tiếp. Giá trị khuyết ở đầu chuỗi được xử lý bằng cách loại mẫu chưa đủ lịch sử hoặc
+dùng quy tắc imputation đã khóa. Scaler, imputer và mọi phép chọn đặc trưng chỉ được fit
+trên train của fold. Số lượng chỉ báo cũng được giới hạn ở mức cần thiết, tránh đưa quá
+nhiều biến tương quan cao vào mô hình khi quy mô dữ liệu chưa đủ lớn.
 
 \subsection{Căn chỉnh hai nguồn dữ liệu}
 
 Mỗi dòng feature table có khóa $(i,t)$ gồm vector giá $\mathbf{x}^{p}_{i,t}$, vector
 sentiment $\mathbf{x}^{s}_{i,t}$, cờ chất lượng, thông tin mã và nhãn mục tiêu. Với
-cửa sổ dài $L$, đầu vào của mô hình tại ngày $t$ là:
+cửa sổ quan sát dài $L$, đầu vào của mô hình tại ngày $t$ là:
 
 \begin{equation}
   X^{p}_{i,t}=[\mathbf{x}^{p}_{i,t-L+1},\ldots,\mathbf{x}^{p}_{i,t}],
@@ -357,15 +481,17 @@ cửa sổ dài $L$, đầu vào của mô hình tại ngày $t$ là:
   \label{eq:input-windows}
 \end{equation}
 
-Các mã được chia theo ngày để bảo đảm mọi mẫu cùng một fold dùng cùng mốc lịch. Nếu
-ngày không có tin, vector sentiment vẫn được tạo theo quy tắc ở trên, không loại bỏ
-ngày một cách có chọn lọc vì có thể tạo sai lệch giữa giai đoạn nhiều tin và ít tin.
+Các mã được chia theo ngày để bảo đảm mọi mẫu trong một fold dùng cùng mốc lịch. Nếu
+ngày không có tin, vector sentiment vẫn được tạo theo quy tắc ở trên. Không loại bỏ
+ngày một cách có chọn lọc vì việc đó có thể làm sai lệch so sánh giữa giai đoạn nhiều
+tin và giai đoạn ít tin. Những ngày thiếu giá hoặc thiếu lịch sử đủ dài phải được ghi
+rõ lý do loại; không được loại riêng các ngày cho kết quả dự báo khó.
 
 \subsection{Gán nhãn xu hướng phiên kế tiếp}
 
 Lợi suất mục tiêu được tính theo Phương trình~\ref{eq:next-return}. Với cửa sổ huấn
-luyện $w$, chọn hai phân vị $q^-_w$ và $q^+_w$ từ tập các lợi suất chỉ trong phần
-train. Quy tắc phân lớp là:
+luyện $w$, chọn hai phân vị $q^-_w$ và $q^+_w$ từ lợi suất chỉ trong phần train. Quy
+tắc phân lớp là:
 
 \begin{equation}
  y_{i,t+1}=\begin{cases}
@@ -377,9 +503,13 @@ train. Quy tắc phân lớp là:
 \end{equation}
 
 Trong protocol chính, $q^-_w$ và $q^+_w$ được lấy từ hai phân vị thấp và cao đã khóa
-trong cấu hình. Nếu thay bằng ngưỡng cố định, ngưỡng đó phải được ghi rõ và không được
-điều chỉnh dựa trên test. Mục đích của việc fit ngưỡng theo train là tránh cho phân bố
-lợi suất của giai đoạn tương lai quyết định trước tỷ lệ lớp của giai đoạn quá khứ.
+trong cấu hình. Nếu dùng ngưỡng cố định, ngưỡng đó phải được ghi rõ và không được điều
+chỉnh dựa trên test. Việc lựa chọn ngưỡng cũng phải cân bằng hai yêu cầu: lớp đi ngang
+cần phản ánh các biến động nhỏ chưa có hướng rõ rệt, nhưng phân bố ba lớp không nên lệch
+đến mức mô hình chỉ cần dự đoán một lớp phổ biến là đạt điểm cao. Fit ngưỡng theo train
+giúp phân phối lợi suất tương lai không quyết định trước tỷ lệ lớp của giai đoạn quá khứ.
+Phân bố nhãn được báo cáo theo mã và từng giai đoạn để người đọc đánh giá độ khó của
+bài toán.
 
 \subsection{Hợp nhất bằng LSTM hai nhánh}
 
@@ -392,7 +522,7 @@ Nhánh giá và nhánh sentiment sử dụng hai encoder LSTM riêng:
   \label{eq:two-branch-encoders}
 \end{equation}
 
-Hai trạng thái cuối được ghép bằng concat và đưa qua một lớp hợp nhất:
+Hai trạng thái cuối được ghép bằng concat và đưa qua head hợp nhất:
 
 \begin{equation}
   \mathbf{z}_{i,t}=\left[\mathbf{h}^{p}_{i,t};\mathbf{h}^{s}_{i,t}\right],
@@ -403,43 +533,52 @@ Hai trạng thái cuối được ghép bằng concat và đưa qua một lớp 
 \end{equation}
 
 trong đó $\phi$ là hàm kích hoạt và $\hat{\mathbf{y}}$ là xác suất của ba lớp. Mô hình
-price-only dùng cùng nhánh giá và head tương ứng nhưng loại bỏ $\mathbf{h}^{s}$. Khi
-so sánh, số chiều ẩn, cửa sổ, seed và ngân sách huấn luyện phải được giữ gần nhất có
-thể. Chênh lệch tham số do nhánh sentiment phải được báo cáo, không che giấu như một
-thay đổi kiến trúc không liên quan.
+price-only dùng nhánh giá và head tương ứng nhưng không có $\mathbf{h}^{s}$. Khi so
+sánh, số chiều ẩn, cửa sổ, seed, ngân sách huấn luyện, tiêu chí dừng sớm và cách fit
+tiền xử lý phải gần như nhau. Chênh lệch tham số do nhánh sentiment phải được báo cáo
+để người đọc đánh giá đúng mức độ khác nhau giữa hai cấu hình. Nếu hai cấu hình có
+khác biệt ngoài sự có mặt của sentiment, khác biệt đó phải được xem là một yếu tố gây
+nhiễu trong phép ablation.
 
 \section{Thang mô hình dự báo}
 \label{sec:pp-mo-hinh}
 
-Đồ án xây dựng theo nguyên tắc thang leo. Mỗi tầng trả lời một câu hỏi kiểm chứng
-riêng và chỉ mở rộng khi tầng trước có dữ liệu hợp lệ.
+Đồ án được xây dựng theo nguyên tắc thang leo. Mỗi tầng trả lời một câu hỏi kiểm chứng
+riêng và chỉ mở rộng sau khi tầng trước có dữ liệu hợp lệ.
 
 \subsection{Tầng baseline}
 
-Tầng đầu gồm majority và random. Majority cho biết mức điểm có thể đạt nếu chỉ luôn
-chọn lớp phổ biến. Random được sinh theo một quy tắc đã khóa, có seed và được chạy
-trên cùng tập test. Khi cần, có thể báo cáo thêm random đều để phân biệt ảnh hưởng của
-phân bố lớp với ảnh hưởng của mô hình.
+Tầng đầu gồm majority và random. Majority cho biết mức điểm có thể đạt nếu luôn chọn
+lớp phổ biến trong phần huấn luyện. Random được sinh theo quy tắc đã khóa, có seed và
+chạy trên cùng tập test. Khi cần, có thể báo cáo thêm random đều để phân biệt ảnh hưởng
+của phân bố lớp với ảnh hưởng của mô hình. Hai mốc này không phải mô hình học được quy
+luật từ dữ liệu, nhưng cần thiết để kiểm tra một kiến trúc có thực sự vượt qua dự đoán
+đơn giản hay chỉ tận dụng mất cân bằng lớp.
 
 \subsection{Tầng mô hình cổ điển chỉ giá}
 
 Logistic Regression, Random Forest và XGBoost chỉ nhận vector đặc trưng giá. Các mô
-hình này cung cấp mốc phi tuần tự cho việc kiểm tra feature engineering. Chúng không
-được phép nhận bất kỳ cột sentiment nào, kể cả số tin, cờ có tin hoặc metadata phát
-sinh từ văn bản.
+hình này tạo mốc phi tuần tự để kiểm tra feature engineering và cho biết dữ liệu có tín
+hiệu đủ rõ trước khi dùng mô hình sâu hay không. Chúng không được nhận bất kỳ cột
+sentiment nào, kể cả số tin, cờ có tin hoặc metadata phát sinh từ văn bản. Siêu tham số
+của mỗi mô hình được chọn trên validation, còn test chỉ được dùng sau khi cấu hình đã
+được khóa.
 
 \subsection{Tầng LSTM chỉ giá}
 
 LSTM chỉ giá nhận $X^p$ trong một cửa sổ cố định và dự báo ba lớp. Đây là baseline sâu
-để tách câu hỏi ``mạng LSTM có khai thác được lịch sử giá hay không'' khỏi câu hỏi
-``sentiment có bổ sung thông tin hay không''. Các siêu tham số được chọn trên validation
-và giữ nguyên khi chạy ablation.
+để tách câu hỏi ``LSTM có khai thác được lịch sử giá hay không'' khỏi câu hỏi
+``sentiment có bổ sung thông tin hay không''. Siêu tham số được chọn trên validation và
+giữ nguyên khi chạy ablation. Đầu vào chỉ bao gồm những đặc trưng có thể quan sát đến
+ngày $t$, còn nhãn được tạo từ lợi suất của phiên kế tiếp.
 
 \subsection{Tầng LSTM hai nhánh có sentiment}
 
-Đây là graduation floor của đề tài. Nhánh sentiment nhận chuỗi đặc trưng tổng hợp theo
-ngày, nhánh giá nhận chuỗi kỹ thuật, hai trạng thái được ghép bằng concat và đi qua
-head phân loại. Thí nghiệm ablation chạy hai cấu hình:
+Đây là mức sàn của đề tài. Nhánh sentiment nhận chuỗi đặc trưng tổng hợp theo ngày,
+nhánh giá nhận chuỗi kỹ thuật, hai trạng thái được ghép bằng concat rồi đưa qua head
+phân loại. Nhánh sentiment không nhận giá của phiên tương lai và nhánh giá không nhận
+metadata của bài viết ngoài các đặc trưng đã được quy định. Thí nghiệm ablation chạy
+hai cấu hình:
 
 \begin{enumerate}[nosep]
   \item \textbf{Price-only}: chỉ sử dụng $X^p$;
@@ -447,47 +586,53 @@ head phân loại. Thí nghiệm ablation chạy hai cấu hình:
 \end{enumerate}
 
 Hai cấu hình phải có cùng ngày train, validation, test, cùng cách fit preprocessing,
-cùng seed hoặc cùng tập seed, cùng quy tắc nhãn và cùng metric. Nếu sentiment không
-cải thiện, kết quả vẫn được giữ và phân tích theo độ ổn định, thay vì thay đổi protocol
-cho đến khi xuất hiện một bảng điểm có lợi.
+cùng seed hoặc tập seed, cùng quy tắc nhãn và cùng metric. Nếu sentiment không cải thiện,
+kết quả vẫn được giữ và phân tích theo độ ổn định, không thay đổi protocol để tìm một
+bảng điểm có lợi.
 
 \subsection{Tầng TFT mở rộng}
 
-TFT chỉ được chạy khi các baseline và LSTM hai nhánh đã có số liệu, không còn lỗi
-cutoff và còn đủ nguồn lực. Mô hình nhận các biến thời gian, biến tĩnh hoặc biến quan
-sát theo cấu hình rõ ràng, sử dụng output size bằng 3 và loss phân loại. Kết quả TFT
-chỉ được so sánh với các tầng trước nếu dùng cùng holdout và quy tắc tạo nhãn. Nếu
-không kiểm soát được cấu hình loss hoặc thời gian chạy, TFT được cắt khỏi thực nghiệm
-chính mà không làm giảm acceptance của graduation floor.
+TFT chỉ được chạy khi các baseline và LSTM hai nhánh đã có số liệu, cutoff không còn
+lỗi và còn đủ nguồn lực. Mô hình nhận các biến thời gian, biến tĩnh hoặc biến quan sát
+theo cấu hình rõ ràng, dùng output size bằng 3 và loss phân loại. Các biến không được
+khai báo chỉ vì chúng có sẵn trong một bảng dữ liệu, mà phải được kiểm tra theo thời
+điểm có thể quan sát. Kết quả TFT chỉ được so sánh với các tầng trước khi dùng cùng
+holdout và quy tắc tạo nhãn. Nếu không kiểm soát được loss hoặc thời gian chạy, TFT
+được loại khỏi thực nghiệm chính mà không ảnh hưởng đến mức sàn.
 
 \subsection{Huấn luyện và kiểm soát độ phức tạp}
 
 Mô hình được huấn luyện bằng cross-entropy cho ba lớp, có early stopping theo macro-F1
 trên validation. Dropout, weight decay và gradient clipping có thể được dùng để hạn
-chế overfitting, nhưng các lựa chọn phải được khóa trước hoặc ghi đầy đủ số lần thử.
-Mỗi mô hình lưu checkpoint tốt nhất theo metric đã chọn, seed, cửa sổ, số tham số và
-thời gian huấn luyện. Không sử dụng test để điều chỉnh kiến trúc sau mỗi lần chạy.
+chế overfitting, nhưng lựa chọn và số lần thử phải được ghi lại. Nếu lớp mất cân bằng,
+trọng số loss hoặc cách lấy mẫu lại chỉ được tính từ train. Mỗi mô hình lưu checkpoint
+tốt nhất theo metric đã chọn, seed, cửa sổ, số tham số và thời gian huấn luyện. Tập test
+không được dùng để điều chỉnh kiến trúc sau mỗi lần chạy.
 
 \section{Giao thức đánh giá chống rò rỉ}
 \label{sec:pp-danh-gia}
 
-Đánh giá là phần trung tâm của phương pháp. Một split theo thời gian đơn giản chưa đủ
-để bảo đảm sạch nếu scaler, threshold, feature selection hoặc checkpoint đã nhìn thấy
-dữ liệu tương lai. Giao thức được thiết kế theo walk-forward, có holdout cuối được khóa
-và có audit các phép biến đổi.
+Đánh giá là phần trung tâm của phương pháp. Một split theo thời gian chưa đủ bảo đảm
+kết quả sạch nếu scaler, threshold, feature selection hoặc checkpoint đã nhìn thấy dữ
+liệu tương lai. Protocol vì vậy dùng walk-forward, khóa holdout cuối và audit các phép
+biến đổi.
 
 \subsection{Walk-forward và holdout cuối}
 
 Tất cả mã được chia theo mốc ngày chung. Một cửa sổ walk-forward gồm train ở quá khứ,
-validation ở đoạn kế tiếp và test ở đoạn sau nữa. Sau khi hoàn tất lựa chọn cấu hình,
-holdout cuối được giữ nguyên, chỉ chạy một lần để báo cáo. Có thể dùng expanding window
-để tăng dần dữ liệu train hoặc rolling window để giới hạn độ dài lịch sử; lựa chọn nào
-được dùng phải ghi trong manifest cùng độ dài các đoạn và bước dịch cửa sổ.
+validation ở đoạn kế tiếp và test ở đoạn sau. Sau khi chọn cấu hình, holdout cuối được
+giữ nguyên và chỉ chạy một lần để báo cáo. Có thể dùng expanding window để tăng dần dữ
+liệu train hoặc rolling window để giới hạn lịch sử; lựa chọn, độ dài các đoạn và bước
+dịch cửa sổ phải được ghi trong manifest. Mỗi cửa sổ phải chỉ rõ ngày cuối của train,
+ngày bắt đầu và kết thúc của validation, ngày bắt đầu và kết thúc của test, cùng số mẫu
+thực sự sau khi tạo cửa sổ lịch sử.
 
-Với expanding window, không được trộn mẫu của một ngày giữa train và test. Các mã có
-cùng ngày phải nằm trong cùng split để tránh một mã tiết lộ thông tin về trạng thái
-thị trường cho mã khác qua cách chia lệch. Các mẫu tạo từ cửa sổ lịch sử cũng phải
-được cắt theo ngày mục tiêu, không chỉ theo ngày bắt đầu cửa sổ.
+Với expanding window, không trộn mẫu của một ngày giữa train và test. Các mã cùng ngày
+phải nằm trong cùng split để tránh một mã tiết lộ trạng thái thị trường cho mã khác qua
+cách chia lệch. Mẫu được tạo từ cửa sổ lịch sử cũng phải cắt theo ngày mục tiêu, không
+chỉ theo ngày bắt đầu cửa sổ. Nếu một mẫu dùng lịch sử có phần nằm ở giai đoạn trước
+nhưng nhãn mục tiêu nằm sau mốc chia, mẫu đó thuộc split của nhãn và phải được kiểm tra
+riêng trong audit.
 
 \subsection{Kiểm soát điểm nhìn và các phép biến đổi}
 
@@ -504,30 +649,32 @@ Bảng kiểm leakage gồm các hạng mục:
   \item lựa chọn siêu tham số chỉ dùng train và validation, không dùng holdout.
 \end{itemize}
 
-Mỗi fold cần lưu một số ví dụ audit bằng tay, chẳng hạn tin trước cutoff, tin sau
-cutoff, tin cuối tuần và ngày không có tin. Nếu phát hiện bản ghi không thể xác minh,
-bản ghi đó bị loại khỏi phân tích chính và tỷ lệ loại được báo cáo.
+Mỗi fold cần lưu một số ví dụ audit bằng tay, gồm tin trước cutoff, tin sau cutoff, tin
+cuối tuần và ngày không có tin. Cần kiểm tra cả trường hợp bài gắn nhiều mã, bài gần
+trùng giữa hai nguồn, ngày đầu chuỗi thiếu chỉ báo và mẫu có nhãn ở phiên kế tiếp. Nếu
+bản ghi không thể xác minh, bản ghi đó bị loại khỏi phân tích chính và tỷ lệ loại phải
+được báo cáo.
 
 \subsection{Các chỉ số đánh giá}
 
-Với ma trận nhầm lẫn của ba lớp, precision, recall và F1 được tính riêng cho từng
-lớp. Macro-F1 là trung bình số học của F1 ba lớp:
+Từ ma trận nhầm lẫn của ba lớp, precision, recall và F1 được tính riêng cho từng lớp.
+Macro-F1 là trung bình số học của F1 ba lớp:
 
 \begin{equation}
   \operatorname{MacroF1}=\frac{1}{3}\sum_{c=1}^{3}F1_c.
   \label{eq:macro-f1}
 \end{equation}
 
-Balanced accuracy là trung bình recall của ba lớp. Macro OvR-AUC được tính bằng cách
-xem mỗi lớp lần lượt là positive và hai lớp còn lại là negative, rồi lấy trung bình
-các AUC. Directional accuracy có thể được báo cáo như tỷ lệ dự đoán đúng lớp, nhưng
-không được dùng một mình khi phân bố lớp mất cân bằng. Các chỉ số phải được tính trên
-dự đoán ngoài mẫu của từng fold, sau đó tổng hợp theo một quy tắc đã khóa.
+Balanced accuracy là trung bình recall của ba lớp. Macro OvR-AUC xem mỗi lớp lần lượt
+là positive, hai lớp còn lại là negative, rồi lấy trung bình các AUC. Directional
+accuracy có thể được báo cáo như tỷ lệ dự đoán đúng lớp, nhưng không dùng một mình khi
+phân bố lớp mất cân bằng. Các chỉ số được tính trên dự đoán ngoài mẫu của từng fold,
+sau đó tổng hợp theo quy tắc đã khóa.
 
 \subsection{Ablation và khoảng tin cậy}
 
-Phép ablation chính so sánh price-only với price plus sentiment. Cùng một ngày test
-được dùng cho hai mô hình để tạo chênh lệch theo cặp:
+Phép ablation chính so sánh price-only với price plus sentiment. Hai mô hình dùng cùng
+ngày test để tạo chênh lệch theo cặp:
 
 \begin{equation}
   \Delta_m= m(\mathrm{price+sentiment})-m(\mathrm{price\text{-}only}),
@@ -535,15 +682,15 @@ Phép ablation chính so sánh price-only với price plus sentiment. Cùng mộ
 \end{equation}
 
 với $m$ là macro-F1, balanced accuracy hoặc macro OvR-AUC. Khoảng tin cậy được ước
-lượng bằng bootstrap theo khối ngày hoặc theo fold để hạn chế giả định độc lập sai
-trong chuỗi thời gian. Số lần resample, seed và cách xử lý fold phải được ghi lại.
-Nếu khoảng tin cậy của $\Delta_m$ chứa 0, kết luận phù hợp là chưa có bằng chứng rõ
-rằng sentiment cải thiện metric đó trong protocol hiện tại, không phải khẳng định
-sentiment vô dụng trong mọi bối cảnh.
+lượng bằng bootstrap theo khối ngày hoặc theo fold để hạn chế giả định độc lập không
+phù hợp với chuỗi thời gian. Số lần resample, seed và cách xử lý fold phải được ghi
+lại. Nếu khoảng tin cậy của $\Delta_m$ chứa 0, kết luận phù hợp là chưa có bằng chứng
+rõ rằng sentiment cải thiện metric đó trong protocol hiện tại, không phải khẳng định
+sentiment không hữu ích trong mọi bối cảnh.
 
 \subsection{Phân tích độ bền và điều kiện phát huy tín hiệu}
 
-Sau khi bảng graduation floor ổn định, có thể phân tầng kết quả theo ngày có nhiều
+Sau khi bảng mức sàn ổn định, có thể phân tầng kết quả theo ngày có nhiều
 tin và ít tin, theo volatility thấp hoặc cao, theo trạng thái tăng hoặc giảm, và theo
 mã cổ phiếu. Các phân tích này phải được xem là bổ sung vì làm tăng số phép so sánh.
 Số lần thử và tiêu chí phân tầng cần được ghi rõ để tránh chọn riêng một nhóm có kết
@@ -553,20 +700,19 @@ báo cáo cả số quan sát của từng nhóm.
 \subsection{Giải thích mô hình}
 
 Với LSTM hai nhánh, giải thích cơ bản dùng feature ablation hoặc occlusion: lần lượt
-che nhóm sentiment, số tin, hoặc một nhóm chỉ báo rồi đo thay đổi metric. Với TFT,
-variable importance và attention được lưu như mô tả bổ sung. Không có phương pháp nào
-trong số này tự chứng minh rằng biến sentiment gây ra lợi suất. Mọi diễn giải phải
-dùng các cụm như ``mô hình đặt trọng số cao hơn'' hoặc ``metric thay đổi khi che biến'',
+che nhóm sentiment, số tin hoặc một nhóm chỉ báo rồi đo thay đổi metric. Với TFT,
+variable importance và attention được lưu như thông tin bổ sung. Không phương pháp nào
+trong số này tự chứng minh biến sentiment gây ra lợi suất. Vì vậy, diễn giải nên dùng
+các cụm như ``mô hình đặt trọng số cao hơn'' hoặc ``metric thay đổi khi che biến'',
 không dùng cụm ``sentiment gây ra biến động''.
 
 \subsection{Tái lập và báo cáo}
 
-Mỗi lần chạy cần lưu seed, phiên bản Python và thư viện, checkpoint, danh sách mã,
-hash dữ liệu, thời gian crawl, cấu hình model, split, metric và số lần thử. Báo cáo
-phải phân biệt ba trạng thái: đã đo, chưa chạy và không áp dụng. Các ô số chưa có kết
-quả không được thay bằng số tham chiếu từ bài khác. Cùng với bảng điểm, cần báo cáo
-coverage, số bản ghi bị loại, phân bố lớp, kappa của nhãn và các giới hạn về nguồn dữ
-liệu.
+Mỗi lần chạy cần lưu seed, phiên bản Python và thư viện, checkpoint, danh sách mã, hash
+dữ liệu, thời gian crawl, cấu hình model, split, metric và số lần thử. Báo cáo phải
+phân biệt ba trạng thái: đã đo, chưa chạy và không áp dụng. Ô số chưa có kết quả không
+được thay bằng số tham chiếu từ bài khác. Cùng với bảng điểm, cần báo cáo coverage, số
+bản ghi bị loại, phân bố lớp, kappa của nhãn và các giới hạn về nguồn dữ liệu.
 
 Bảng~\ref{tab:cau-hinh} tóm tắt các quyết định thiết kế chính của pipeline.
 
