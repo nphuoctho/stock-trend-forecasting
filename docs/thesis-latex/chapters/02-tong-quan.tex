@@ -1,293 +1,639 @@
 \chapter{TỔNG QUAN}
 \label{ch:tong-quan}
 
-Chương này phân tích các hướng nghiên cứu liên quan đến bài toán dự báo xu hướng cổ
-phiếu từ dữ liệu giá và tin tức. Việc khảo sát được tổ chức theo ba trụ. Trụ thứ nhất
-là phân tích cảm xúc tài chính, gồm các backbone ngôn ngữ và vấn đề thích nghi miền.
-Trụ thứ hai là mô hình chuỗi thời gian, từ baseline chỉ giá đến LSTM và Transformer.
-Trụ thứ ba là hợp nhất tin tức với giá, trong đó các nghiên cứu được phân biệt theo
-điểm cảm xúc, embedding ngữ cảnh, sự kiện và LLM. Sau cùng, chương đối chiếu các hướng
-theo dữ liệu, mục tiêu, cách đánh giá và mức độ tái lập để xác định vị trí của đề tài.
+Chương này khảo sát các công trình liên quan đến bài toán sử dụng tin tức tài chính để
+dự báo xu hướng biến động giá cổ phiếu. Nội dung được tổ chức theo ba hướng chính.
+Hướng thứ nhất nghiên cứu biểu diễn và phân loại cảm xúc trong văn bản tài chính.
+Hướng thứ hai nghiên cứu mô hình hóa dữ liệu giá và các chỉ báo kỹ thuật dưới dạng
+chuỗi thời gian. Hướng thứ ba nghiên cứu cách hợp nhất dữ liệu văn bản với dữ liệu thị
+trường trong một mô hình dự báo đa phương thức. Bên cạnh các công trình quốc tế, chương
+trình bày riêng các nghiên cứu trên dữ liệu Việt Nam vì khác biệt về ngôn ngữ, nguồn tin,
+cấu trúc thị trường và cách tổ chức phiên giao dịch có thể làm thay đổi kết quả thực
+nghiệm.
 
-Một nguyên tắc quan trọng khi đọc các công trình trước là không đồng nhất kết quả tự
-báo cáo với bằng chứng có thể chuyển giao. Phần lớn tài liệu quốc tế sử dụng dữ liệu
-tiếng Anh, thị trường Mỹ hoặc Trung Quốc, khung thời gian và cách chia mẫu riêng. Vì
-vậy, các công trình được dùng ở đây chủ yếu để rút ra bài học về biểu diễn, kiến trúc
-và thiết kế thực nghiệm. Mọi mức cải thiện của hệ thống trên HOSE phải được kiểm tra
-lại bằng dữ liệu và protocol của đề tài.
+Việc tổng quan không nhằm khẳng định một kiến trúc luôn tốt hơn các kiến trúc còn lại.
+Một phương pháp có thể đạt kết quả cao trên thị trường, giai đoạn hoặc bộ dữ liệu của
+công trình gốc nhưng chưa chắc giữ được ưu thế khi chuyển sang dữ liệu tiếng Việt và
+thị trường HOSE. Do đó, mỗi công trình được xem xét theo dữ liệu sử dụng, nhiệm vụ dự
+báo, cách xây dựng đặc trưng, phương pháp học, kết quả được báo cáo và hạn chế còn tồn
+tại. Những kết quả định lượng của các nghiên cứu trước chỉ được dùng như căn cứ tham
+khảo về phương pháp, không được xem là bằng chứng trực tiếp cho hiệu quả của mô hình
+trên dữ liệu của đề tài.
 
 \section{Phân tích cảm xúc tin tức tài chính}
 \label{sec:tq-sentiment}
 
-Phân tích cảm xúc tin tức tài chính là bài toán suy ra thái độ hoặc tác động kỳ vọng
-của một đoạn văn đối với doanh nghiệp hay thị trường. Trong đề tài này, sentiment
-không được hiểu như cảm xúc tâm lý chung của tác giả, mà là tín hiệu định hướng cho
-phản ứng kỳ vọng của giá. Một bài viết có thể được gán tích cực nếu nội dung hàm ý
-triển vọng tốt hơn cho doanh nghiệp, tiêu cực nếu hàm ý rủi ro hoặc suy giảm, và trung
-tính nếu thông tin chủ yếu mô tả sự kiện mà chưa cho thấy hướng tác động rõ ràng. Cách
-định nghĩa theo tác động kỳ vọng giúp nhãn phù hợp hơn với mục tiêu dự báo, nhưng cũng
-đòi hỏi hướng dẫn gán nhãn chặt chẽ vì nhiều tin có thể chứa cả hai chiều thông tin.
+Phân tích cảm xúc tin tức tài chính là quá trình xác định hướng tác động mà một bài
+viết có thể tạo ra đối với doanh nghiệp, mã cổ phiếu hoặc toàn bộ thị trường. Trong
+ngữ cảnh dự báo, cảm xúc không chỉ là thái độ tích cực hay tiêu cực thể hiện trong câu
+chữ. Một bài viết có thể sử dụng nhiều từ tích cực nhưng lại mô tả một rủi ro đối với
+doanh nghiệp, hoặc có thể trình bày một sự kiện trung tính nhưng làm thay đổi kỳ vọng
+của nhà đầu tư. Vì vậy, nhãn trong đề tài được hiểu theo tác động kỳ vọng trong ngắn
+hạn: tích cực khi thông tin gợi ra triển vọng thuận lợi, tiêu cực khi thông tin cho thấy
+rủi ro hoặc diễn biến bất lợi, và trung tính khi bài viết chủ yếu mô tả sự kiện mà chưa
+thể hiện rõ hướng tác động.
 
 \subsection{Từ mô hình ngôn ngữ tổng quát đến mô hình miền tài chính}
 
-BERT và các biến thể Transformer tạo biểu diễn ngữ cảnh bằng cách cho mỗi token tương
-tác với các token khác trong chuỗi. Khi được tinh chỉnh trên dữ liệu có nhãn, backbone
-này có thể học những dấu hiệu ngôn ngữ phù hợp với tác vụ phân loại. FinBERT là một
-ví dụ về việc đưa mô hình BERT vào miền truyền thông tài chính, qua đó tạo nền tảng
-cho các pipeline sentiment rồi dự báo chuyển động cổ phiếu \cite{Yang2020_200608097v2}.
-Điểm đáng chú ý là từ điển tài chính không chỉ gồm các từ có sắc thái tích cực hoặc
-tiêu cực trong ngôn ngữ thông thường. Một từ như ``tăng'' có thể mô tả chi phí tăng,
-doanh thu tăng hoặc rủi ro tăng, nên cần xét ngữ cảnh và chủ thể được đề cập.
+BERT đặt nền tảng cho hướng tiền huấn luyện một mô hình ngôn ngữ trên lượng văn bản
+lớn trước khi tinh chỉnh cho một nhiệm vụ cụ thể. Nhờ cơ chế Transformer và self-
+attention, mô hình có thể tạo biểu diễn phụ thuộc vào ngữ cảnh thay vì gán một ý nghĩa
+cố định cho từng từ. Khi được tinh chỉnh trên dữ liệu có nhãn, biểu diễn này có thể
+phục vụ phân loại văn bản, nhận dạng thực thể hoặc trích xuất thông tin. Tuy nhiên,
+mô hình ngôn ngữ tổng quát thường được huấn luyện trên nhiều loại văn bản khác nhau,
+trong đó thuật ngữ tài chính chỉ chiếm một phần. Đây là lý do các nghiên cứu sau đó
+phát triển các mô hình thích nghi với miền tài chính.
 
-Đối với tiếng Việt, PhoBERT là lựa chọn backbone phù hợp vì được tiền huấn luyện trên
-ngữ liệu tiếng Việt và có tokenizer tương ứng với đặc trưng tách từ của ngôn ngữ này
-\cite{Nguyen2020_200300744v3}. Tuy nhiên, PhoBERT không tự động trở thành mô hình
-sentiment tài chính chỉ nhờ tiền huấn luyện. Mô hình vẫn cần được tinh chỉnh trên dữ
-liệu có nhãn của miền tài chính, cần kiểm tra sự khác biệt giữa tiêu đề và nội dung,
-và cần đánh giá trên phần dữ liệu theo thời gian không trùng với dữ liệu huấn luyện.
+FinBERT là đại diện tiêu biểu cho hướng này. Yang và cộng sự công bố FinBERT như một
+mô hình ngôn ngữ được tiền huấn luyện và tinh chỉnh cho truyền thông tài chính
+\cite{Yang2020_200608097v2}. Mục tiêu của công trình là giải quyết sự khác biệt về
+ngữ nghĩa giữa ngôn ngữ thông thường và ngôn ngữ tài chính. Trong tài chính, cùng một
+từ có thể mang sắc thái khác nhau tùy vào chủ thể và chỉ tiêu được đề cập. Chẳng hạn,
+``tăng'' có thể mô tả doanh thu tăng, chi phí tăng hoặc rủi ro tăng. Vì vậy, cách phân
+loại chỉ dựa trên từ khóa khó phản ánh đầy đủ tác động của bản tin. FinBERT cung cấp
+một backbone phù hợp hơn cho các nhiệm vụ sentiment và dự báo chuyển động trong các
+công trình sử dụng tin tức tiếng Anh.
+
+Kết quả quan trọng của hướng FinBERT không chỉ nằm ở một con số accuracy cụ thể, mà
+ở việc cho thấy việc thích nghi backbone với miền dữ liệu có thể cải thiện chất lượng
+biểu diễn khi dữ liệu gán nhãn không lớn. Hạn chế của FinBERT đối với đề tài là mô hình
+được xây dựng cho tiếng Anh và không giải quyết trực tiếp các hiện tượng tách từ,
+viết tắt, tên doanh nghiệp hoặc cách diễn đạt đặc thù của tin tức Việt Nam.
+
+Đối với tiếng Việt, PhoBERT là mô hình đơn ngữ được tiền huấn luyện trên ngữ liệu tiếng
+Việt và có bộ tách từ phù hợp với đặc trưng của ngôn ngữ này \cite{Nguyen2020_200300744v3}.
+Khác biệt về tách từ có ý nghĩa thực tế vì tiếng Việt thường biểu diễn một đơn vị ngữ
+nghĩa bằng nhiều âm tiết được ngăn cách bởi khoảng trắng. Một mô hình sử dụng tokenizer
+không phù hợp có thể làm vỡ tên riêng, thuật ngữ hoặc mã cổ phiếu trước khi văn bản
+được đưa vào bộ mã hóa. PhoBERT vì thế là lựa chọn hợp lý cho bước phân tích cảm xúc
+tiếng Việt.
+
+Tuy nhiên, PhoBERT chỉ giải quyết phần nền tảng ngôn ngữ, không tự động bảo đảm mô
+hình hiểu đúng miền tài chính. Tên mã, tên doanh nghiệp, số liệu tăng trưởng, thông
+tin về phát hành cổ phiếu, thay đổi nhân sự và các câu phủ định có thể không xuất hiện
+đủ trong dữ liệu tiền huấn luyện. Mô hình vẫn cần được tinh chỉnh trên tập dữ liệu tài
+chính có hướng dẫn gán nhãn rõ ràng. Kết quả của bước này cũng phải được đánh giá riêng
+trước khi dùng xác suất cảm xúc làm đặc trưng cho nhánh dự báo giá.
 
 \subsection{Các công trình sentiment và chuyển động cổ phiếu quốc tế}
 
-Một dòng nghiên cứu kết hợp trực tiếp sentiment với mô hình chuỗi thời gian là
-FinBERT-LSTM. Halder xây dựng pipeline trong đó tín hiệu từ tin tức được đưa vào LSTM
-để dự báo giá, còn Gu và cộng sự phát triển một biến thể cùng dòng với cách tổ chức
-dữ liệu và mô hình được cải tiến hơn \cite{Halder2022_221107392v1,
-Gu2024_240716150v1}. Các công trình này có giá trị như mẫu kiến trúc cho việc tách
-nhánh văn bản và nhánh giá, nhưng có những khác biệt cần lưu ý: dữ liệu chủ yếu là
-tiếng Anh, mục tiêu là giá hoặc biến động trong bối cảnh khác, và cách ghép đặc trưng
-không thể được xem là giao thức chuẩn cho HOSE.
+Một dòng công trình gần với đề tài là trích xuất tín hiệu từ tin tức, sau đó đưa tín
+hiệu này vào mô hình chuỗi thời gian. Halder (2022) xây dựng pipeline FinBERT-LSTM
+cho bài toán dự báo giá cổ phiếu từ sentiment của tin tức
+\cite{Halder2022_221107392v1}. Tác giả mô tả quá trình phát triển từ các mô hình chuỗi
+thời gian đơn giản đến LSTM, sau đó bổ sung FinBERT để phân tích cảm xúc tin tức trước
+khi dự báo. Phần dữ liệu số cung cấp lịch sử giá, còn phần dữ liệu văn bản cung cấp
+thông tin được trích xuất từ tin tức tài chính tiếng Anh. Các biểu diễn hoặc điểm
+sentiment được kết hợp với dữ liệu giá rồi đưa vào LSTM.
 
-Chen đề xuất sử dụng embedding ngữ cảnh từ BERT thay vì chỉ nén mỗi bài viết thành một
-điểm sentiment, sau đó đưa biểu diễn vào mô hình RNN cho dự báo chuyển động. Công trình
-này cho thấy việc giữ thông tin ngữ cảnh có thể là một hướng mở rộng đáng chú ý, đồng
-thời nhấn mạnh việc đánh giá bằng mô phỏng giao dịch thay vì chỉ nhìn vào accuracy
-\cite{Chen2021_210708721v1}. Tuy nhiên, mô phỏng giao dịch vẫn phụ thuộc vào giả định
-về chi phí, thời điểm khớp lệnh và khả năng thực hiện, nên không thể thay thế việc
-kiểm tra phân loại ngoài mẫu trong graduation floor của đề tài.
+Kết quả chính của Halder là cấu hình FinBERT-LSTM cho kết quả tốt hơn các cấu hình
+chỉ dùng MLP, RNN hoặc LSTM trong phạm vi thí nghiệm của bài. Công trình vì vậy cung
+cấp một mẫu thiết kế gần với kiến trúc hai nhánh của đề tài: mô hình ngôn ngữ xử lý
+tin tức, LSTM xử lý chuỗi thị trường và hai nguồn được đưa vào cùng quy trình dự báo.
+Tuy nhiên, bài toán của Halder thiên về dự báo giá và dữ liệu tiếng Anh, không phải
+phân loại ba lớp tăng, giảm và đi ngang của phiên kế tiếp. Khác biệt về thị trường,
+múi giờ, lịch tin và cách hình thành giá cần được kiểm soát nếu muốn áp dụng ý tưởng
+này cho HOSE. Việc ghép đặc trưng cũng chưa giải quyết đầy đủ vấn đề tin được công bố
+trước hay sau giờ đóng cửa trong bối cảnh của đề tài.
 
-Jiang nghiên cứu sentiment tài chính bằng FinBERT gắn với dự báo chuyển động, còn Siala
-và cộng sự tập trung trực tiếp vào câu hỏi sentiment do LLM tạo ra cải thiện dự báo ở
-mức nào \cite{Jiang2023_230602136v3,Siala2026_260200086v3}. Những hướng này củng cố
-quan điểm rằng biến sentiment nên được đánh giá bằng phép so sánh có và không có tín
-hiệu trên cùng dữ liệu. Chúng không cho phép kết luận trước rằng tín hiệu do PhoBERT
-tạo ra sẽ có tác dụng tương tự trên văn bản tiếng Việt.
+Gu và cộng sự (2024) tiếp tục phát triển dòng FinBERT-LSTM cho bài toán dự báo giá
+\cite{Gu2024_240716150v1}. Công trình sử dụng dữ liệu giá cổ phiếu cùng tin tức tài
+chính tiếng Anh, trong đó FinBERT tạo biểu diễn hoặc điểm cảm xúc và LSTM học quan hệ
+theo thời gian. Điểm đáng chú ý là bài nghiên cứu trình bày một phiên bản được hoàn
+thiện hơn về mặt kỹ thuật của pipeline, qua đó củng cố cách tách bước xử lý văn bản
+khỏi bước mô hình hóa chuỗi giá. Kết quả được công bố cho thấy việc đưa sentiment
+vào cấu hình FinBERT-LSTM có thể cải thiện khả năng dự báo so với các cấu hình đối
+chứng trong bộ dữ liệu riêng của công trình.
+
+Hạn chế của Gu và cộng sự là kết quả vẫn phụ thuộc vào dữ liệu tiếng Anh, bài toán giá
+được lựa chọn và cách ghép tin với phiên giao dịch. Đây là dự báo giá tuyệt đối chứ
+không phải nhiệm vụ phân loại xu hướng ba lớp của đề tài. Ngoài ra, nếu quy trình chia
+dữ liệu, chuẩn hóa hoặc ghép timestamp không được mô tả theo cùng một chuẩn, chênh
+lệch giữa mô hình có và không có tin tức có thể không hoàn toàn phản ánh giá trị của
+sentiment. Công trình là cơ sở để tham khảo kiến trúc, nhưng không thể được dùng để
+đặt trước kỳ vọng hiệu năng cho cổ phiếu Việt Nam.
+
+Chen (2021) nghiên cứu dự báo chuyển động cổ phiếu từ tin tức bằng embedding ngữ
+cảnh được tinh chỉnh từ BERT \cite{Chen2021_210708721v1}. Thay vì nén mỗi bài viết
+thành một nhãn tích cực hoặc tiêu cực, phương pháp giữ lại embedding ngữ cảnh của tin
+tức rồi tổng hợp theo đơn vị thời gian để đưa vào mô hình dự báo hướng biến động. Dữ
+liệu của công trình gồm các cặp tin tức tài chính tiếng Anh và dữ liệu chuyển động giá
+trong bối cảnh thị trường của nghiên cứu. Cách làm này cho phép mô hình sử dụng những
+sắc thái không thể hiện trong một điểm sentiment duy nhất.
+
+Kết quả được báo cáo của Chen cho thấy embedding ngữ cảnh có thể hỗ trợ dự báo chuyển
+động và công trình còn xem xét giá trị qua mô phỏng giao dịch. Đây là điểm quan trọng
+về mặt phương pháp vì hiệu năng phân loại không phải lúc nào cũng đồng nghĩa với giá
+trị kinh tế. Dù vậy, bộ dữ liệu và môi trường tiếng Anh rất khác với dữ liệu tiếng Việt.
+Mô phỏng giao dịch còn phụ thuộc vào giả định về thời điểm khớp lệnh, phí giao dịch và
+thanh khoản, nên không được chuyển trực tiếp thành tiêu chí bắt buộc trong mức sàn của
+đề tài. Đối với phạm vi hiện tại, bài này chủ yếu gợi ý cách giữ thông tin ngữ cảnh và
+cách phân tích kết quả, còn đặc trưng đầu vào của đề tài vẫn ưu tiên vector xác suất
+sentiment dễ tái lập.
+
+Chen và cộng sự (2019) đi theo hướng giàu thông tin hơn bằng cách trích xuất sự kiện
+chi tiết trong tin tức thay vì chỉ phân loại cảm xúc \cite{Chen2019_191005078v1}.
+Đơn vị thông tin được quan tâm gồm sự kiện, chủ thể, loại sự kiện và hướng tác động
+đối với cổ phiếu. Các tín hiệu ở mức sự kiện sau đó được đưa vào mô hình dự báo chuyển
+động. Kết quả của công trình cho thấy biểu diễn sự kiện có thể bổ sung cho dữ liệu giá
+vì hai bài viết có cùng sắc thái chung vẫn có thể mô tả những sự kiện kinh tế khác
+nhau. Hạn chế là việc xác định schema sự kiện và tạo nhãn ở mức chi tiết đòi hỏi nhiều
+công sức hơn so với sentiment ba lớp. Các lỗi nhận dạng chủ thể hoặc thời điểm sự
+kiện cũng có thể truyền sang bước dự báo. Do đó, event-level signal phù hợp như một
+hướng mở rộng sau khi pipeline sentiment cơ bản đã được kiểm soát.
+
+Jiang và Zeng (2023) xem xét việc sử dụng FinBERT cho phân tích sentiment tài chính
+và áp dụng đầu ra vào dự báo chuyển động cổ phiếu \cite{Jiang2023_230602136v3}.
+Công trình đại diện cho cách tiếp cận end-to-end gọn: văn bản tài chính được đưa qua
+FinBERT, kết quả sentiment được liên kết với dữ liệu chuyển động và mô hình dự báo
+được đánh giá trên dữ liệu riêng của nghiên cứu. Kết quả công bố củng cố nhận định
+rằng sentiment miền tài chính có thể được sử dụng như một nguồn tín hiệu cho bài toán
+movement prediction. Tuy nhiên, mô hình, thị trường và ngôn ngữ của công trình không
+phải dữ liệu HOSE. Ngoài ra, việc một mô hình FinBERT phân loại tốt không tự động cho
+thấy xác suất sentiment có giá trị gia tăng sau khi đã biết lịch sử giá. Điểm này cần
+được kiểm tra bằng ablation trong đề tài.
+
+Các nghiên cứu gần đây mở rộng pipeline bằng mô hình ngôn ngữ lớn. Elahi và Taghvaei
+(2024) nghiên cứu việc kết hợp dữ liệu tài chính có cấu trúc với bài viết bằng LLM
+\cite{Elahi2024_241101368v1}. Dữ liệu số và văn bản được xử lý ở các dạng khác nhau,
+sau đó LLM được dùng để tạo hoặc hợp nhất thông tin phục vụ dự báo chuyển động giá.
+Kết quả công bố cho thấy hướng hợp nhất LLM có tiềm năng khai thác nhiều ngữ cảnh hơn
+so với việc chỉ dùng một điểm sentiment. Hạn chế là gain phụ thuộc vào checkpoint,
+prompt, thời điểm truy cập và bộ dữ liệu của bài. Nếu mô hình thay đổi phiên bản, kết
+quả khó được tái lập hoàn toàn và chi phí suy luận có thể lớn đối với pipeline thực
+nghiệm nhiều mã.
+
+Liang và cộng sự (2024) đề xuất FinGPT theo hướng làm giàu ngữ cảnh và xét đến quá
+trình lan truyền của tin tức \cite{Liang2024_241210823v2}. Thay vì coi mỗi tin là một
+quan sát độc lập, công trình quan tâm đến mức độ tin được phổ biến và mối liên hệ giữa
+ngữ cảnh tin với dự báo sentiment-based stock movement. Đây là một bước mở rộng hợp
+lý vì cùng một nội dung có thể có tác động khác nhau tùy thời điểm và mức độ được thị
+trường biết đến. Kết quả của công trình cho thấy việc bổ sung ngữ cảnh lan truyền là
+một hướng có thể nâng chất lượng biểu diễn. Dù vậy, cách tiếp cận này yêu cầu nhiều
+metadata hơn, mô hình lớn hơn và một quy trình kiểm soát dữ liệu phức tạp hơn mức sàn
+của đề tài.
+
+Siala, Khanfir và Papadakis (2026) đặt câu hỏi trực tiếp về mức cải thiện mà sentiment
+do LLM tạo ra mang lại cho dự báo chuyển động giá \cite{Siala2026_260200086v3}.
+Điểm đáng chú ý của công trình không phải giả định tin tức luôn hữu ích, mà là so
+sánh dự báo có tín hiệu sentiment với dự báo đối chứng để đo phần thông tin gia tăng.
+Kết quả được công bố trong nghiên cứu mới cho thấy tác động của sentiment LLM cần được
+đo trên từng khung dữ liệu và không nên suy rộng thành lợi ích ổn định cho mọi thị
+trường. Hạn chế là đây là một preprint rất mới, dữ liệu và giao thức không trùng với
+đề tài, đồng thời LLM làm tăng yêu cầu về chi phí và khả năng tái lập. Tư tưởng kiểm
+tra phần đóng góp biên của sentiment là bài học trực tiếp cho thiết kế ablation của
+đề tài.
+
+\subsection{Các công trình về dữ liệu và cảm xúc trong bối cảnh Việt Nam}
+
+Các nghiên cứu quốc tế cho thấy khả năng của từng thành phần, nhưng câu hỏi quan trọng
+đối với đề tài là các thành phần đó đã được kiểm chứng đến đâu trên tiếng Việt và thị
+trường Việt Nam. Đề cương tổng hợp một số công trình theo hướng này. Các nghiên cứu
+dưới đây được trình bày bằng thông tin tác giả, năm, dữ liệu, phương pháp, kết quả và
+hạn chế. Những chi tiết dưới đây được giới hạn trong thông tin đã được công bố và tổng
+hợp trong đề cương, không suy diễn thêm khi nguồn khảo sát chưa nêu rõ.
+
+Nguyen Son Tung và cộng sự (2021) xây dựng một tập dữ liệu hơn 1.000 tiêu đề tin tức
+chứng khoán được thu thập từ CafeF. Dữ liệu được gán ba nhãn tích cực, trung tính và
+tiêu cực, sau đó nhóm tác giả so sánh PhoBERT với SVM, Logistic Regression, LSTM,
+Random Forest và Naive Bayes. PhoBERT đạt độ chính xác khoảng 93\% trên tập dữ liệu
+của nhóm, cao hơn hoặc cạnh tranh với các mô hình đối chứng trong phạm vi thí nghiệm.
+Kết quả này cung cấp bằng chứng thực nghiệm ban đầu rằng PhoBERT có thể nhận diện
+sentiment của tiêu đề tài chính tiếng Việt và là nền tảng phù hợp để xây dựng bộ
+phân loại cho đề tài.
+
+Hạn chế thứ nhất của công trình là dữ liệu chỉ gồm tiêu đề. Tiêu đề ngắn giúp việc
+thu thập và gán nhãn thuận lợi, nhưng thường không chứa điều kiện, thời hạn, chủ thể
+hoặc chi tiết giải thích cho sự kiện. Hạn chế thứ hai là công trình dừng ở phân loại
+cảm xúc, chưa đưa đầu ra của mô hình vào một bộ dự báo xu hướng phiên kế tiếp. Vì vậy,
+độ chính xác sentiment khoảng 93\% không thể được hiểu là độ chính xác dự báo giá.
+Ngoài ra, tập dữ liệu chỉ hơn 1.000 mẫu còn nhỏ so với sự đa dạng của tin tức trên
+nhiều năm và nhiều doanh nghiệp.
+
+Vu và cộng sự (2023) nghiên cứu sentiment được trích xuất từ tin tức và phản ứng của
+thị trường chứng khoán Việt Nam. Công trình cung cấp thêm bằng chứng thực nghiệm về
+mối liên hệ giữa thông tin trên báo chí và diễn biến thị trường. Dữ liệu được tổ chức
+từ tin tức và các quan sát thị trường Việt Nam, còn phương pháp tập trung vào việc
+trích xuất hoặc tổng hợp cảm xúc rồi phân tích phản ứng của thị trường. Kết quả này
+giúp củng cố động cơ nghiên cứu mối liên hệ giữa văn bản và giá, nhưng không được dùng
+như một con số cam kết cho hệ thống hiện tại.
+
+Hạn chế của Vu và cộng sự nằm ở mục tiêu nghiên cứu. Trọng tâm của công trình là đo
+phản ứng thị trường và mối liên hệ thống kê, không phải xây dựng một pipeline dự báo
+phiên giao dịch kế tiếp với nhánh PhoBERT và nhánh chuỗi thời gian trong cùng kiến
+trúc. Thông tin khảo sát trong đề cương cũng không đủ để thay thế một mô tả chi tiết
+về quy tắc cutoff, cách chia dữ liệu hoặc phép ablation. Vì vậy, công trình được dùng
+như bằng chứng bối cảnh, còn câu hỏi sentiment có cải thiện dự báo hay không phải
+được kiểm tra riêng trên dữ liệu của đề tài.
+
+Phong và cộng sự (2026) nghiên cứu dự báo VN-Index từ tin tức Vietnamnet trong giai
+đoạn 2019 đến 2025. Bộ dữ liệu gồm 6.480 bài viết. Nhóm tác giả trích xuất polarity,
+subjectivity, compound score và tỷ lệ cảm xúc từ tiêu đề, phần trích dẫn và phần nội
+dung. Các đặc trưng văn bản được kết hợp với chỉ báo kỹ thuật để phân loại nhị phân,
+trong đó một lớp là ``tăng'' và lớp còn lại là ``không đổi hoặc giảm''.
+
+Về phương pháp, công trình so sánh Naive Bayes, Logistic Regression, SVM, Random
+Forest, Gradient Boosting, AdaBoost và CatBoost. Việc đánh giá được thực hiện bằng
+ten-fold cross-validation. Kết quả được công bố cho thấy các mô hình tổ hợp, đặc biệt
+là CatBoost, Gradient Boosting và Random Forest, thường đạt kết quả tốt hơn các mô
+hình tuyến tính và xác suất trên nhiều chỉ số. Công trình chứng minh rằng đặc trưng
+cảm xúc dựa trên từ vựng, khi kết hợp với chỉ báo kỹ thuật, có thể tạo tín hiệu cho dự
+báo VN-Index.
+
+Tuy nhiên, Phong và cộng sự chưa sử dụng mô hình ngôn ngữ tiền huấn luyện để trích
+xuất biểu diễn ngữ cảnh. Bước dự báo cũng chưa dùng kiến trúc học sâu cho chuỗi và
+chưa đánh giá theo walk-forward validation. Bài toán chỉ có hai lớp ở cấp chỉ số,
+khác với bài toán ba lớp ở cấp nhiều mã của đề tài. Đặc biệt, ten-fold cross-validation
+có thể trộn các giai đoạn khác nhau của thị trường nếu các nếp gấp không bảo toàn thứ
+tự thời gian. Vì vậy, kết quả của công trình có giá trị tham khảo về feature engineering
+và các mô hình cổ điển, nhưng không thể dùng để kết luận trực tiếp về khả năng khái quát
+trong điều kiện dự báo thực tế.
+
+Một công trình được trình bày dưới dạng tóm tắt tại SOICT 2025 sử dụng GPT-4o để
+trích xuất cảm xúc theo 33 khía cạnh tài chính từ hơn 16.000 tin tức và công bố doanh
+nghiệp bằng tiếng Việt. Các tín hiệu theo khía cạnh được hợp nhất với chỉ báo kỹ thuật
+và dữ liệu cơ bản để dự báo trên 30 cổ phiếu VN30 trong giai đoạn 2019 đến 2024. Theo
+kết quả được công bố trong tóm tắt, XGBoost đạt AUC tối đa 0,67. Đây là kết quả đáng
+chú ý vì công trình đã mở rộng sentiment từ một nhãn chung sang nhiều khía cạnh tài
+chính, đồng thời đưa thực nghiệm lên quy mô nhiều mã.
+
+Hạn chế cần lưu ý là bằng chứng hiện có trong phạm vi khảo sát mới nằm ở tóm tắt hội
+nghị, chưa phải mô tả đầy đủ của toàn bộ quy trình, dữ liệu và phép đánh giá. GPT-4o
+là mô hình thương mại, nên phiên bản, prompt, chi phí và khả năng kiểm soát quá trình
+trích xuất có thể thay đổi. Việc sử dụng mô hình thương mại cũng làm giảm mức độ tái
+lập so với một checkpoint mở có thể lưu trữ và triển khai nội bộ. Công trình này gợi
+ý giá trị của sentiment theo khía cạnh, nhưng không buộc đề tài phải dùng LLM thương
+mại; thay vào đó, đề tài cần cân nhắc sự cân bằng giữa độ chi tiết và khả năng kiểm
+chứng.
+
+Luong Nhu Y và cộng sự (2023) tập trung vào cổ phiếu ACB. Nhóm tác giả kết hợp cảm
+xúc của tin tức tiếng Việt được xử lý bằng PhoBERT với dữ liệu giá đóng cửa trong giai
+đoạn 2012 đến 2022. Ba loại mô hình được so sánh là Decision Tree, Random Forest và
+LSTM. Nhiệm vụ được xây dựng dưới dạng hồi quy giá đóng cửa, kết quả được đánh giá
+bằng $R^2$ và RMSE. Trong phạm vi các thí nghiệm được báo cáo, LSTM có bổ sung cảm xúc
+đạt kết quả tốt nhất.
+
+Đóng góp của công trình là cho thấy PhoBERT có thể được nối với một mô hình dự báo
+giá cho dữ liệu cổ phiếu Việt Nam. Tuy nhiên, nghiên cứu chỉ dùng một mã ACB và dự
+báo mức giá tuyệt đối, không phải hướng biến động ba lớp. Mô hình tốt trên ACB cũng
+chưa cho biết tín hiệu có ổn định ở các doanh nghiệp thuộc ngành khác hoặc trong các
+giai đoạn thị trường khác hay không. Công trình chưa cung cấp đối chứng nhiều mã và
+chưa giải quyết đầy đủ việc đồng bộ tin theo thời điểm công bố, do đó còn khoảng cách
+giữa kết quả hồi quy đơn mã và mục tiêu phân loại đa mã của đề tài.
+
+Một công trình khác của Chen và cộng sự (2024) đề xuất mô hình deep fusion gồm một
+nhánh BERT được tinh chỉnh cho tin tức tài chính và một nhánh LSTM xử lý giá cùng các
+chỉ báo kỹ thuật. Thực nghiệm được tiến hành trên 12 bộ dữ liệu cổ phiếu. Hai nguồn
+được học biểu diễn riêng trước khi hợp nhất, thay vì nối toàn bộ dữ liệu thô ngay từ
+đầu. Kết quả cho thấy cách học biểu diễn riêng theo từng nguồn rồi fusion có thể cải
+thiện dự báo xu hướng so với các mô hình đối chứng trên các bộ dữ liệu được nghiên cứu.
+
+Công trình cung cấp cơ sở phương pháp trực tiếp cho thiết kế hai nhánh của đề tài:
+nhánh văn bản tập trung vào thông tin ngôn ngữ, nhánh giá tập trung vào động lực chuỗi
+thời gian, sau đó mô hình học cách kết hợp hai biểu diễn. Hạn chế là dữ liệu, ngôn ngữ
+và điều kiện thị trường của 12 bộ dữ liệu khác với Việt Nam. Kết quả của công trình
+cũng chưa trả lời câu hỏi liệu một backbone tiếng Việt mở như PhoBERT có tạo giá trị
+gia tăng ổn định trên HOSE hay không. Vì vậy, đề tài kế thừa cấu trúc deep fusion ở
+mức đơn giản, đồng thời đặt trọng tâm vào kiểm soát dữ liệu và phép so sánh ablation.
 
 \subsection{Đặc thù của sentiment tài chính tiếng Việt}
 
-Trong bối cảnh tiếng Việt, khó khăn đầu tiên là thiếu dữ liệu có nhãn lớn, nhất quán
-và có mô tả rõ ràng về tiêu chí gán nhãn. Một bộ dữ liệu tiêu đề có thể thuận tiện để
-khởi tạo fine-tune, nhưng tiêu đề ngắn thường bỏ qua điều kiện, thời hạn và chủ thể
-được mô tả trong thân bài. Ngược lại, dùng toàn văn giúp tăng ngữ cảnh nhưng làm tăng
-chi phí làm sạch, giới hạn độ dài và rủi ro một bài chứa nhiều sự kiện trái chiều.
+Kết quả của các công trình Việt Nam cho thấy có thể xây dựng mô hình sentiment có
+hiệu quả nhất định, nhưng chất lượng đầu ra còn phụ thuộc mạnh vào cách tạo dữ liệu.
+Thách thức đầu tiên là thiếu bộ dữ liệu lớn, đồng nhất và có hướng dẫn gán nhãn rõ
+ràng. Tiêu đề dễ thu thập và phù hợp với pipeline xử lý nhanh, nhưng thường lược bỏ
+điều kiện, thời hạn, chủ thể và quan hệ nguyên nhân. Dùng toàn văn có thể cung cấp
+thêm ngữ cảnh, nhưng làm tăng chi phí làm sạch, xử lý độ dài và phân giải các bài chứa
+nhiều sự kiện trái chiều. Nhãn nên phản ánh tác động kỳ vọng đối với cổ phiếu, không
+chỉ phản ánh sắc thái của một câu riêng lẻ.
 
-Khó khăn thứ hai là sự trùng lặp theo nguồn. Cùng một thông cáo có thể được đăng lại
-ở nhiều trang hoặc gắn với nhiều mã. Nếu một bản sao xuất hiện ở cả train và test,
-mô hình có thể ghi nhớ câu chữ thay vì học quy luật sentiment. Vì thế, loại trùng cần
-được thực hiện ở cấp văn bản chuẩn hóa, đồng thời ghi lại URL, nguồn, thời điểm thu
-thập và hash dữ liệu.
+Thách thức thứ hai là trùng lặp giữa các nguồn. Một thông cáo có thể được đăng lại trên
+nhiều trang với tiêu đề gần giống nhau, trong khi một bài viết có thể đề cập đến nhiều
+mã. Nếu các bản sao xuất hiện ở cả tập huấn luyện và kiểm thử, mô hình có thể ghi nhớ
+câu chữ hoặc tên doanh nghiệp thay vì học quy luật cảm xúc. Quy trình vì vậy cần loại
+trùng ở cấp văn bản chuẩn hóa, đồng thời lưu URL, nguồn, thời điểm công bố và mã băm
+để có thể kiểm tra lại các trường hợp nghi ngờ.
 
-Khó khăn thứ ba là sentiment của một bài không nhất thiết có tác động cùng chiều với
-lợi suất. Tin có thể đã được thị trường biết trước, có thể mô tả một sự kiện dài hạn
-nhưng không ảnh hưởng phiên kế tiếp, hoặc chỉ tác động đến biến động chứ không tác
-động đến chiều giá. Tài liệu nguồn của đề tài cũng xem việc phản ứng giá yếu hoặc
-không ổn định là khả năng cần kiểm tra, không phải dấu hiệu thất bại của mô hình.
+Thách thức thứ ba là cảm xúc của bài viết không nhất thiết cùng chiều với lợi suất của
+phiên sau. Tin có thể đã được thị trường biết trước, có tác động dài hạn, bị phản ánh
+vào giá trước thời điểm thu thập hoặc chỉ làm tăng biến động mà không xác định hướng.
+Một bài viết trung tính cũng có thể có giá trị vì nó xác nhận kỳ vọng đang tồn tại. Do
+đó, mối quan hệ giữa sentiment và giá phải được xem là giả thuyết thực nghiệm. Tín hiệu
+yếu hoặc không ổn định không tự động có nghĩa pipeline thất bại, mà có thể cho thấy
+thông tin đã được phản ánh vào giá hoặc cách ánh xạ thời gian chưa phù hợp.
 
 \subsection{Đánh giá chất lượng nhãn và đầu ra sentiment}
 
-Đánh giá sentiment cần tách khỏi đánh giá dự báo. Ở tầng thứ nhất, mô hình được kiểm
-tra bằng accuracy, precision, recall và F1 theo lớp, trong đó macro-F1 được ưu tiên khi
-phân bố lớp không cân bằng. Tập in-domain cần được gán nhãn theo hướng dẫn cố định;
-độ đồng thuận giữa hai người gán có thể báo cáo bằng Cohen's kappa, còn từ ba người
-gán trở lên có thể dùng Fleiss' kappa. Các mẫu bất đồng phải được ghi nhận thay vì
-loại bỏ tùy ý cho đến khi đạt điểm số mong muốn.
+Đánh giá sentiment cần được tách khỏi đánh giá dự báo xu hướng. Ở tầng phân loại văn
+bản, mô hình được đánh giá bằng accuracy, precision, recall và F1 theo từng lớp.
+Macro-F1 nên được ưu tiên khi số lượng mẫu tích cực, trung tính và tiêu cực không cân
+bằng. Accuracy khoảng 93\% của một tập nhỏ không thể được dùng thay thế cho phân tích
+theo lớp hoặc kiểm tra trên thời gian khác. Nếu có nhiều người gán nhãn, độ đồng thuận
+có thể được báo cáo bằng Cohen's kappa hoặc Fleiss' kappa. Các mẫu bất đồng cần được
+ghi nhận và giải thích, không chỉ loại bỏ cho đến khi điểm số tăng.
 
-Đầu ra được dùng ở tầng dự báo không chỉ là nhãn argmax. Với mỗi bài viết, mô hình
-trả về vector xác suất ba chiều
+Đầu ra đưa sang nhánh dự báo cũng không nên chỉ là nhãn có xác suất cao nhất. Với mỗi
+bài viết, mô hình tạo vector:
 \[
-  \mathbf{p}_{i,j,t} = (p_{\mathrm{NEG}},p_{\mathrm{NEU}},p_{\mathrm{POS}}),
-  \qquad \sum_{c} p_{c}=1,
+  \mathbf{p}_{i,j,t}=(p_{\mathrm{NEG}},p_{\mathrm{NEU}},p_{\mathrm{POS}}),
+  \qquad \sum_c p_c=1,
 \]
 trong đó $i$ là mã cổ phiếu, $j$ là bài viết và $t$ là ngày được ánh xạ. Vector này
-giữ lại mức độ không chắc chắn của mô hình. Sau đó, các vector được tổng hợp theo mã
-và ngày cùng với số tin, độ phân tán và cờ có tin. Cách làm này cho phép mô hình dự
-báo phân biệt ngày có nhiều tin trung tính với ngày hoàn toàn không có tin.
+giữ lại mức độ không chắc chắn của mô hình. Các vector được tổng hợp cùng số tin,
+độ phân tán, tỷ lệ lớp và cờ có tin theo từng mã và ngày. Nhờ đó, ngày có nhiều tin
+trung tính được phân biệt với ngày không có tin, còn ngày có một bài rất tích cực được
+phân biệt với ngày có nhiều bài trái chiều.
 
 \section{Dự báo xu hướng giá bằng mô hình chuỗi thời gian}
 \label{sec:tq-timeseries}
 
-Nhánh chuỗi thời gian biểu diễn trạng thái thị trường bằng lịch sử OHLCV, lợi suất và
-các chỉ báo kỹ thuật. Mục tiêu của nhánh này không phải tái tạo chính xác mức giá,
-mà là cung cấp một baseline có năng lực để kiểm tra sentiment có bổ sung thông tin
-hay không. Các nghiên cứu dự báo xu hướng quốc tế thường sử dụng lịch sử giá kết hợp
-đặc trưng kỹ thuật, sau đó mở rộng sang mô hình sâu hoặc mô hình quan hệ giữa nhiều
-mã \cite{Feng2018_181009936v2,Xu2021_211013716v2}.
+Nhánh chuỗi thời gian biểu diễn trạng thái thị trường qua OHLCV, lợi suất và các chỉ
+báo kỹ thuật. Mục tiêu của nhánh này là tạo một baseline đủ mạnh để kiểm tra sentiment
+có thực sự cung cấp thông tin mới hay chỉ lặp lại những gì đã có trong giá. Dữ liệu
+thị trường có thứ tự thời gian và chịu ảnh hưởng của thay đổi chế độ, nên việc đánh
+giá phải bảo toàn quan hệ trước sau. Các nghiên cứu dự báo xu hướng thường bắt đầu bằng
+lịch sử giá, sau đó mở rộng sang mô hình sâu hoặc mô hình mô tả quan hệ giữa nhiều mã
+\cite{Feng2018_181009936v2,Xu2021_211013716v2}.
 
 \subsection{Baseline chỉ giá và các mô hình cổ điển}
 
-Baseline majority dự đoán lớp xuất hiện nhiều nhất trong phần huấn luyện. Baseline
-random sinh dự đoán theo phân bố lớp của phần huấn luyện và dùng seed cố định. Hai
-baseline này có vai trò kiểm tra xem mô hình học được tín hiệu vượt qua một quy tắc
-đơn giản hay không. Nếu một mô hình sâu chỉ nhỉnh hơn majority ở accuracy nhưng thua
-macro-F1, kết luận về hiệu quả cần dựa vào chỉ số cân bằng hơn.
+Baseline majority luôn dự đoán lớp phổ biến nhất trong phần huấn luyện. Baseline
+random dự đoán theo phân bố lớp của phần huấn luyện với seed cố định. Hai mốc này cho
+biết mức hiệu năng có thể đạt mà không cần học quan hệ phức tạp. Nếu mô hình sâu chỉ
+cao hơn majority ở accuracy nhưng thấp hơn ở macro-F1, việc kết luận mô hình tốt hơn
+cần được xem xét lại. Các baseline này cũng giúp phát hiện trường hợp nhãn bị lệch
+quá mạnh hoặc quy tắc tạo nhãn tạo ra một lớp chiếm ưu thế.
 
-Nhóm mô hình cổ điển chỉ giá gồm Logistic Regression, Random Forest và XGBoost. Chúng
-được huấn luyện trên cùng tập đặc trưng kỹ thuật với dữ liệu được chuẩn hóa trong
-từng cửa sổ. Mục đích không phải chạy thật nhiều thuật toán, mà tạo một mốc kiểm tra
-đủ rõ cho nhánh giá. Nếu mô hình có sentiment không vượt được mốc này, việc thêm một
-kiến trúc sâu hơn chưa chắc giải quyết đúng vấn đề dữ liệu.
+Nhóm mô hình cổ điển gồm Logistic Regression, Random Forest và XGBoost, chỉ nhận các
+đặc trưng giá và chỉ báo kỹ thuật. Logistic Regression cung cấp mốc tuyến tính dễ kiểm
+tra, Random Forest mô hình hóa các ngưỡng và tương tác phi tuyến, còn XGBoost xây dựng
+nhiều cây tuần tự để giảm sai số. Các mô hình này không trực tiếp đọc thứ tự của toàn
+bộ cửa sổ, nhưng có thể tạo tín hiệu mạnh nếu feature engineering đã tóm tắt đủ
+thông tin. Khi đặt chúng cạnh LSTM, việc so sánh giúp phân biệt cải thiện do đặc trưng
+với cải thiện do kiến trúc.
 
 \subsection{LSTM cho phụ thuộc ngắn hạn và dài hạn}
 
-LSTM sử dụng trạng thái ẩn và trạng thái ô nhớ để cập nhật thông tin qua các thời
-điểm. Nhờ các cổng vào, cổng quên và cổng ra, LSTM có thể giữ hoặc loại bỏ một phần
-thông tin trong cửa sổ lịch sử. Trong các pipeline dự báo tài chính gắn với tin tức,
-LSTM thường được dùng như bộ mã hóa chuỗi hoặc bộ dự báo cuối
-\cite{Halder2022_221107392v1,Gu2024_240716150v1}. Các mốc accuracy cao được tài liệu
-nguồn tổng hợp cho dữ liệu Việt Nam phải được đọc thận trọng nếu không có kiểm tra
-leakage, metric theo lớp hoặc metric giao dịch. Vì khác biệt về thị trường, cách tạo
-nhãn và cách chia dữ liệu, các mốc đó chỉ là bối cảnh tham khảo, không phải kết quả của
-đề tài.
+LSTM đọc chuỗi theo thứ tự thời gian và duy trì trạng thái ẩn cùng trạng thái ô nhớ.
+Các cổng vào, cổng quên và cổng ra giúp mô hình quyết định thông tin nào được giữ lại
+hoặc loại bỏ qua nhiều bước. Với cửa sổ giá, LSTM có thể học sự thay đổi của lợi suất,
+khối lượng và chỉ báo qua các ngày liên tiếp. Với cửa sổ sentiment, LSTM có thể học
+ảnh hưởng của một chuỗi tín hiệu được tổng hợp theo ngày. Vì vậy, LSTM thường được
+dùng làm bộ mã hóa chung cho các pipeline kết hợp tin tức và giá
+\cite{Halder2022_221107392v1,Gu2024_240716150v1}.
 
-Ở bình diện quốc tế, các nghiên cứu dự báo chuyển động cũng dùng nhiều biến thể mạng
-hồi quy và thường kết hợp thêm thông tin từ tin tức hoặc quan hệ giữa các mã
-\cite{Halder2022_221107392v1,Chen2021_210708721v1}. Vì mục tiêu của đề tài là đo
-incremental value của sentiment, LSTM chỉ giá và LSTM hai nhánh được giữ cùng cửa sổ,
-chiến lược chia dữ liệu và ngân sách huấn luyện. Đây là điều kiện cần để chênh lệch
-giữa hai mô hình có thể được quy về việc thêm modality, thay vì quy về thay đổi quy mô
-mạng.
+Điểm mạnh của LSTM là cấu trúc tương đối gọn và phù hợp khi dữ liệu không đủ lớn cho
+một Transformer nhiều tham số. Điểm hạn chế là mô hình xử lý tuần tự, khó xem trực
+tiếp quan hệ giữa các thời điểm rất xa, và có thể nhạy với độ dài cửa sổ cũng như cách
+chuẩn hóa. Do đó, LSTM trong đề tài được dùng như mức sàn thực nghiệm chứ không được
+giả định là mô hình tối ưu.
+
+Trong đề tài, LSTM chỉ giá và LSTM hai nhánh phải dùng cùng cửa sổ, cách chia dữ liệu,
+ngân sách huấn luyện và tiêu chí dừng. Mô hình hai nhánh xử lý riêng chuỗi giá và
+chuỗi sentiment trước khi hợp nhất, nhưng số bước quan sát và thông tin được phép
+nhìn thấy phải tương đương với mô hình price-only. Điều kiện này bảo đảm chênh lệch
+giữa hai mô hình chủ yếu phản ánh việc thêm sentiment, không phải do một mô hình được
+cấp lịch sử dài hơn hoặc nhiều cơ hội điều chỉnh hơn.
 
 \subsection{Transformer cho chuỗi thời gian}
 
-Transformer dùng self-attention để tính mức liên hệ giữa các vị trí trong chuỗi. Khác
-với việc chỉ truyền trạng thái tuần tự, attention có thể kết nối trực tiếp các thời
-điểm xa nhau và xử lý nhiều kênh đặc trưng trong cùng một lớp. Trong dự báo cổ phiếu,
-Transformer còn có thể được mở rộng để mô hình hóa phụ thuộc giữa nhiều mã hoặc giữa
-nhiều loại tín hiệu. Boyle và Kalita nghiên cứu hướng spatiotemporal Transformer cho
-dự báo chuyển động, còn Omranpour và cộng sự nghiên cứu Transformer bậc cao cho dữ
-liệu chuỗi thời gian đa phương thức \cite{Boyle2023_230503835v1,
-Omranpour2024_241210540v1}.
+Transformer dùng self-attention để kết nối các vị trí trong chuỗi. So với cách truyền
+trạng thái tuần tự, attention cho phép mô hình xem xét trực tiếp các thời điểm xa nhau
+và nhiều nhóm biến. Đối với dữ liệu giá, đây là khả năng hữu ích khi một biến động hiện
+tại liên quan đến một mẫu xuất hiện trước đó nhiều phiên. Tuy nhiên, attention không
+tự loại bỏ rò rỉ dữ liệu và cũng không tự chứng minh quan hệ nhân quả. Mô hình vẫn cần
+được huấn luyện theo thứ tự thời gian và kiểm tra trong điều kiện ngoài mẫu.
 
-Temporal Fusion Transformer được xem trong đề tài như tầng mở rộng của thang mô hình.
-Ý tưởng chính là kết hợp xử lý chuỗi cục bộ, cơ chế chọn biến, các cổng điều tiết và
-attention để mô hình có thể sử dụng nhiều nhóm biến. Với bài toán hiện tại, TFT phải
-được cấu hình cho phân loại ba lớp, sử dụng đầu ra kích thước 3 và loss phân loại.
-Không được lấy cấu hình hồi quy phân vị mặc định rồi diễn giải kết quả như phân loại.
-Các trọng số attention hoặc variable importance của TFT chỉ là bằng chứng mô tả phụ
-thuộc vào mô hình, không phải bằng chứng nhân quả.
+Boyle và Kalita (2023) nghiên cứu Spatiotemporal Transformer cho dự báo chuyển động
+cổ phiếu \cite{Boyle2023_230503835v1}. Công trình đồng thời mô hình hóa chiều thời gian
+và chiều không gian, trong đó chiều không gian đại diện cho quan hệ giữa nhiều cổ
+phiếu. Phương pháp này phù hợp với giả thuyết rằng một sự kiện hoặc biến động ở một
+mã có thể liên quan đến những mã khác trong cùng ngành hoặc cùng thị trường. Kết quả
+của công trình cho thấy Transformer không gian thời gian có thể khai thác hai loại
+phụ thuộc thay vì xử lý từng mã như một chuỗi độc lập. Hạn chế là cần xác định hoặc
+học quan hệ liên mã, làm tăng yêu cầu về dữ liệu và thiết kế đánh giá. Quan hệ được
+học trên thị trường của bài cũng chưa có bằng chứng trực tiếp trên HOSE, nên đề tài
+chỉ xem đây là hướng tham khảo cho tương lai.
+
+Omranpour, Rabusseau và Rabbany (2024) đề xuất Higher Order Transformers cho dữ liệu
+chuỗi thời gian đa phương thức \cite{Omranpour2024_241210540v1}. Khác với việc chỉ
+ghép hai vector ở cuối mạng, hướng này tìm cách mô hình hóa tương tác bậc cao giữa
+nhiều chuỗi hoặc nhiều phương thức trong cùng bộ Transformer. Về mặt ý tưởng, đây là
+một kiến trúc gần với trường hợp kết hợp chuỗi giá, chỉ báo và chuỗi sentiment. Kết
+quả được công bố cho thấy Higher Order Transformer có thể hỗ trợ bài toán stock
+movement prediction trên dữ liệu đa phương thức. Hạn chế là số tham số, yêu cầu tính
+toán và độ phức tạp của việc kiểm soát quá khớp cao hơn mô hình concat. Vì vậy, mô hình
+này phù hợp với hướng phát triển sau khi mức sàn LSTM hai nhánh đã được đánh giá.
+
+Temporal Fusion Transformer, thường gọi là TFT, là một tầng mở rộng kết hợp xử lý
+chuỗi, lựa chọn biến, các khối có cổng và attention. Cấu trúc này có thể dùng biến
+tĩnh, biến được biết trước và biến quan sát theo thời gian, đồng thời tạo ra các biểu
+diễn phục vụ dự báo. Nếu áp dụng cho đề tài, TFT phải được cấu hình cho phân loại ba
+lớp, có output size bằng 3 và dùng loss phân loại. Variable importance hoặc attention
+chỉ cho biết mô hình sử dụng biến như thế nào trong một điều kiện cụ thể, không đủ để
+suy ra rằng sentiment gây ra biến động giá.
+
+Thai và cộng sự (2026) áp dụng TFT cho các mã VIC, VRE và VHM trên 1.629 phiên giao
+dịch. Dữ liệu đầu vào gồm giá và các chỉ báo RSI, MACD, OBV. Công trình so sánh TFT
+với LSTM và BiLSTM trong bài toán dự báo giá, và báo cáo TFT giảm MAE khoảng 40 đến
+50\% so với hai mô hình hồi quy tuần tự, đồng thời duy trì MAPE dưới 2\% trên ba cổ
+phiếu. Kết quả cho thấy TFT có tiềm năng khi dữ liệu thị trường và chỉ báo được tổ
+chức thành chuỗi phù hợp. Hạn chế rõ ràng là công trình chưa tích hợp tin tức hoặc
+đặc trưng cảm xúc, số mã chỉ là ba cổ phiếu và nhiệm vụ là dự báo giá. Các con số
+MAE và MAPE không thể được chuyển trực tiếp sang bài toán phân loại xu hướng của đề
+tài.
 
 \subsection{Dịch chuyển phân phối và quan hệ giữa các mã}
 
-Một số hướng nghiên cứu quốc tế không chỉ mô hình hóa từng mã độc lập. HIST khai thác
-thông tin chia sẻ giữa mã và khái niệm, REST đưa sự kiện vào quan hệ giữa các cổ phiếu,
-còn DoubleAdapt tập trung vào thích nghi khi phân phối dữ liệu thay đổi
-\cite{Xu2021_211013716v2,Xu2021_210207372v2,Zhao2023_230609862v3}. MTMD, DishFT-GNN
-và S$^{3}$G tiếp tục phát triển các dạng bộ nhớ đa quy mô, đồ thị động hoặc biểu diễn
-trạng thái để xử lý nhiễu và quan hệ liên mã \cite{Wang2022_221208656v2,
-Liu2025_250210776v1,Lu2026_260324236v1}.
+Một nhóm nghiên cứu khác không xem mỗi cổ phiếu là một chuỗi hoàn toàn độc lập. HIST
+của Xu và cộng sự (2021) khai thác thông tin chung giữa các mã thông qua các khái niệm
+được xác định trước và các khái niệm ẩn \cite{Xu2021_211013716v2}. Mô hình kết hợp
+thông tin riêng của từng mã với thông tin chia sẻ, đồng thời cho phép mức liên quan
+giữa mã và khái niệm thay đổi theo thời gian. Dữ liệu được tổ chức theo các chuỗi
+chuyển động của nhiều cổ phiếu và các quan hệ khái niệm. Kết quả công bố cho thấy HIST
+đạt kết quả đầu tư cao hơn các baseline trong bộ dữ liệu của công trình. Hạn chế là
+cần thông tin quan hệ giữa các mã và cách định nghĩa khái niệm, trong khi đề tài hiện
+tập trung vào dữ liệu 10 mã với pipeline độc lập để dễ kiểm soát.
 
-Các công trình này cho thấy bài toán dự báo xu hướng có thể chịu ảnh hưởng của quan
-hệ ngành, khái niệm và concept drift. Tuy nhiên, đưa đồ thị nhiều mã vào graduation
-floor sẽ làm tăng số giả định về quan hệ liên cổ phiếu và độ phức tạp của đánh giá.
-Đề tài trước hết giữ mô hình hai nhánh trên từng mã, dùng nhiều mã trong cùng lịch
-walk-forward để kiểm tra tính ổn định. Quan hệ liên mã và thích nghi online được dành
-cho các hướng phát triển sau khi pipeline cơ sở đã được khóa.
+REST của Xu và cộng sự (2021) tiếp cận dự báo xu hướng theo sự kiện
+\cite{Xu2021_210207372v2}. Tác động của một sự kiện được điều kiện hóa theo trạng thái
+của cổ phiếu, sau đó lan truyền qua đồ thị các mã có liên quan. Cách làm này phù hợp
+với trực giác rằng một tin tức có thể ảnh hưởng đến nhiều doanh nghiệp và mức ảnh
+hưởng phụ thuộc vào bối cảnh từng mã. Kết quả của REST cho thấy việc đưa quan hệ sự
+kiện và quan hệ giữa các mã vào mô hình có thể nâng hiệu quả dự báo trên bộ dữ liệu
+được nghiên cứu. Hạn chế là cần cấu trúc sự kiện, đồ thị và dữ liệu đa mã đủ dày, đồng
+thời khó tách riêng tác động của tin khỏi tác động của quan hệ liên mã.
+
+DoubleAdapt của Zhao, Kong và Shen (2023) tập trung vào concept drift trong dữ liệu
+streaming \cite{Zhao2023_230609862v3}. Phương pháp sử dụng một bộ thích nghi dữ liệu
+để ánh xạ dữ liệu mới về phân phối cục bộ gần ổn định hơn và một bộ thích nghi mô hình
+để khởi tạo tham số phù hợp với giai đoạn mới. Cách học meta-learning này hướng đến
+việc cập nhật mô hình khi quan hệ giữa đặc trưng và xu hướng thay đổi. Kết quả công
+bố cho thấy DoubleAdapt có thể cải thiện dự báo trong bối cảnh phân phối thay đổi so
+với các cách cập nhật thông thường. Hạn chế là thiết kế phức tạp và cần một giao thức
+streaming rõ ràng. Trong phạm vi đề tài, concept drift được ghi nhận như rủi ro cần
+phân tích, chưa phải thành phần bắt buộc của mức sàn.
+
+MTMD của Wang và cộng sự (2022) sử dụng bộ nhớ thời gian đa quy mô và cơ chế giảm
+thiên lệch cho stock trend forecasting \cite{Wang2022_221208656v2}. Mô hình học các
+biểu diễn bộ nhớ ở nhiều thang thời gian, dùng attention để nhận diện điểm tương đồng
+và kết hợp tín hiệu cục bộ với tín hiệu toàn cục thông qua cấu trúc đồ thị. Mục tiêu
+là giữ tính nhất quán theo thời gian và giảm ảnh hưởng của nhiễu. Kết quả của công
+trình cho thấy việc kết hợp bộ nhớ đa quy mô với quan hệ giữa các mã có thể vượt qua
+các baseline trước đó trên dữ liệu gốc. Hạn chế là số thành phần lớn, khó tái lập trong
+một đồ án có dữ liệu hạn chế và khó xác định phần cải thiện đến từ bộ nhớ hay đồ thị.
+
+Liu và cộng sự (2025) đề xuất một mạng đồ thị có nhận biết tương lai dựa trên distillation
+\cite{Liu2025_250210776v1}. Mô hình giáo viên học tương quan giữa sự dịch chuyển của
+phân phối lịch sử và phân phối tương lai, sau đó truyền thông tin cho mô hình học sinh
+để tạo biểu diễn không gian thời gian có tính dự báo hơn. Hướng này nhằm xử lý việc
+phân phối thị trường thay đổi, một vấn đề thường bị bỏ qua khi chỉ huấn luyện trên một
+phân phối cố định. Kết quả được công bố cho thấy distillation future-aware có thể hỗ
+trợ dự báo xu hướng. Hạn chế là cấu trúc giáo viên, học sinh và quan sát tương lai phải
+được thiết kế cẩn thận để không biến thông tin tương lai thành rò rỉ trong huấn luyện.
+
+Lu, Hu và Zhang (2026) giới thiệu S$^{3}$G, một stock state space graph cho dự báo xu
+hướng \cite{Lu2026_260324236v1}. Công trình kết hợp khử nhiễu bằng wavelet, đồ thị
+thay đổi theo thời gian và mô hình state space để theo dõi sự tiến hóa của quan hệ
+giữa các mã. Khác với đồ thị tĩnh, quan hệ trong S$^{3}$G phụ thuộc dữ liệu và được
+cập nhật theo trạng thái thị trường. Kết quả được báo cáo cho thấy hướng này đạt kết
+quả tốt trên các bộ dữ liệu quốc tế mà bài nghiên cứu sử dụng. Hạn chế là phương pháp
+đòi hỏi nhiều dữ liệu liên mã, nhiều bước huấn luyện và không trực tiếp giải quyết
+sentiment tin tức tiếng Việt. Đây là bối cảnh nghiên cứu mới, không phải đối thủ trực
+tiếp của pipeline hai nhánh trong phạm vi đề tài.
+
+Nhìn chung, các nghiên cứu HIST, REST, DoubleAdapt, MTMD, DishFT-GNN và S$^{3}$G cho
+thấy dự báo xu hướng hiện đại đang mở rộng từ chuỗi đơn sang quan hệ liên mã và thích
+nghi phân phối. Mặt khác, càng đưa đồ thị, bộ nhớ và meta-learning vào mô hình thì
+càng khó bảo đảm so sánh công bằng và truy nguyên nguyên nhân của cải thiện. Đề tài
+trước hết chọn mô hình hai nhánh trên từng mã, đặt các mã trên cùng lịch walk-forward
+và dành quan hệ liên mã cùng thích nghi trực tuyến cho hướng phát triển.
 
 \section{Kết hợp tin tức và giá (multimodal)}
 \label{sec:tq-fusion}
 
-Hợp nhất multimodal là quá trình đưa thông tin từ văn bản và chuỗi số vào một bộ dự
-báo chung. Hai nguồn khác nhau ở kích thước, tần suất, độ trễ và mức độ tin cậy, nên
-phép nối đặc trưng đơn giản có thể là một baseline hữu ích nhưng chưa chắc mô hình hóa
-được tương tác giữa chúng. Các nghiên cứu quốc tế cho thấy có thể phân biệt một số
-mức hợp nhất, từ điểm sentiment theo ngày, embedding văn bản, sự kiện chi tiết đến
-LLM và cross-attention \cite{Halder2022_221107392v1,Elahi2024_241101368v1}.
+Hợp nhất đa phương thức là quá trình kết hợp thông tin từ văn bản và chuỗi số trong
+một bộ dự báo. Hai nguồn khác nhau về kích thước, tần suất, thời điểm xuất hiện và
+mức độ tin cậy. Giá được quan sát theo phiên, trong khi tin có thể xuất hiện trước giờ
+mở cửa, trong phiên, sau giờ đóng cửa hoặc vào ngày nghỉ. Vì vậy, cách ghép đặc trưng
+không chỉ là phép nối vector, mà còn là quyết định về cutoff, ngày ánh xạ và cách xử
+lý ngày không có tin. Các hướng nghiên cứu quốc tế có thể được phân thành cách dùng
+điểm sentiment, embedding ngữ cảnh, sự kiện chi tiết hoặc LLM
+\cite{Halder2022_221107392v1,Elahi2024_241101368v1}.
 
 \subsection{Hợp nhất bằng điểm sentiment}
 
-Ở mức đơn giản nhất, mô hình NLP biến mỗi bài thành nhãn hoặc vector xác suất. Các
-vector được gom theo mã và ngày, sau đó nối với vector kỹ thuật trước khi đưa vào
-Logistic Regression, cây quyết định hoặc LSTM. Ưu điểm của cách này là dễ kiểm tra,
-dễ ablation và ít tốn tài nguyên. Nhược điểm là toàn bộ thông tin trong nhiều bài
-được nén vào một số trung bình, làm mất thứ tự bài, sự kiện và quan hệ giữa câu chữ
-với đặc trưng giá.
+Ở cách đơn giản nhất, mỗi bài viết được biến thành nhãn hoặc vector xác suất, sau đó
+các vector được gom theo mã và ngày rồi nối với đặc trưng kỹ thuật. Với bài viết $j$
+của mã $i$ trong ngày $t$, vector xác suất có thể được tổng hợp bằng trung bình, trung
+vị, tổng có trọng số hoặc các thống kê mô tả số lượng tin. Ưu điểm của cách này là
+dễ kiểm tra, dễ thực hiện ablation và phù hợp với dữ liệu không quá lớn. Việc lưu
+vector thay vì chỉ lưu nhãn cũng giữ lại mức độ không chắc chắn của bộ phân loại.
 
-FinBERT-LSTM là mẫu điển hình của cách tiếp cận sentiment rồi chuỗi thời gian
-\cite{Halder2022_221107392v1,Gu2024_240716150v1}. Với đề tài, cách tiếp cận này được
-chuyển sang PhoBERT và dữ liệu tiếng Việt. Tuy nhiên, bản thân việc dùng PhoBERT không
-đủ để tạo đóng góp. Đóng góp cần được chứng minh bằng việc mô hình có sentiment được
-đặt cạnh mô hình price-only dưới cùng protocol, và bằng việc kiểm tra các trường hợp
-không có tin.
+Nhược điểm là nhiều bài viết có thể bị nén vào một số trung bình, làm mất thứ tự bài,
+sự khác nhau về nguồn, độ tin cậy, độ dài và quan hệ giữa sự kiện với trạng thái giá.
+Nếu ngày không có tin được thay bằng vector zero mà không có cờ thiếu dữ liệu, mô hình
+có thể không phân biệt ``không có tin'' với ``có nhiều tin trung tính''. Ngược lại, nếu
+điền giá trị từ tương lai hoặc gom bài sau giờ đóng cửa vào cùng phiên, phép hợp nhất
+có thể tạo rò rỉ.
+
+FinBERT-LSTM của Halder và dòng công trình của Gu là ví dụ điển hình của pipeline
+sentiment rồi chuỗi thời gian \cite{Halder2022_221107392v1,Gu2024_240716150v1}.
+Đề tài kế thừa ý tưởng tách nguồn dữ liệu và dùng PhoBERT thay cho FinBERT để xử lý
+tin tiếng Việt. Tuy nhiên, một mô hình chỉ có ý nghĩa khi được so sánh với price-only
+trên cùng dữ liệu. Việc phân loại sentiment tốt cũng không bảo đảm vector sentiment
+được tổng hợp theo ngày sẽ làm tăng macro-F1 của nhánh dự báo.
 
 \subsection{Hợp nhất bằng embedding ngữ cảnh và sự kiện}
 
-Thay vì chỉ dùng điểm sentiment, một hướng khác giữ lại embedding ngữ cảnh của tiêu
-đề hoặc bài viết. Chen sử dụng contextualized embedding từ BERT cho dự báo movement,
-cho thấy cách biểu diễn này có thể chứa các tín hiệu vượt ra ngoài phân cực ba lớp
-\cite{Chen2021_210708721v1}. Một hướng giàu hơn nữa là trích xuất sự kiện chi tiết,
-chẳng hạn chủ thể, loại sự kiện, hướng tác động và thời gian. Chen và cộng sự nghiên
-cứu việc đưa các sự kiện fine-grained vào dự báo chuyển động, qua đó gợi ý rằng cảm
-xúc chỉ là một phần của thông tin văn bản \cite{Chen2019_191005078v1}.
+Một hướng khác giữ lại embedding của tiêu đề hoặc bài viết thay vì nén văn bản thành
+một điểm phân cực. Chen sử dụng embedding ngữ cảnh từ BERT cho bài toán stock movement
+prediction và cho thấy biểu diễn này có thể chứa thông tin vượt ra ngoài nhãn sentiment
+\cite{Chen2021_210708721v1}. Khi đưa vào mô hình RNN, embedding có thể giúp mô hình
+phân biệt các câu có cùng sắc thái nhưng nói về các loại sự kiện khác nhau. Đổi lại,
+vector có kích thước lớn, cần nhiều bộ nhớ và có thể mang theo thông tin không liên
+quan đến mục tiêu dự báo.
 
-Tuy nhiên, embedding toàn văn có kích thước lớn và có thể chứa thông tin không liên
-quan. Event extraction cũng cần schema, gán nhãn và kiểm tra mapping phức tạp. Vì đề
-tài đặt mục tiêu tốt nghiệp có thể tái lập, graduation floor chọn xác suất sentiment
-được tổng hợp theo ngày. Embedding và event-level signal được xem là phép thử nhạy
-cảm hoặc hướng phát triển, không thay thế baseline chính.
+Hướng giàu hơn là trích xuất sự kiện chi tiết gồm chủ thể, loại sự kiện, hướng tác
+động và thời gian. Chen và cộng sự nghiên cứu việc đưa tín hiệu fine-grained event
+vào dự báo chuyển động \cite{Chen2019_191005078v1}. Cách này có thể giảm mất mát thông
+tin khi một bài chứa nhiều sự kiện, nhưng đòi hỏi schema, bộ gán nhãn và quy tắc ánh
+xạ sự kiện bổ sung. Một lỗi nhỏ trong việc xác định chủ thể, chẳng hạn nhầm công ty
+được mua với công ty đi mua, có thể làm sai cả đặc trưng và nhãn đánh giá.
+
+Do mục tiêu của đề tài là một pipeline có thể tái lập trong điều kiện dữ liệu và thời
+gian có hạn, mức sàn chọn xác suất sentiment được tổng hợp theo mã và ngày. Embedding
+toàn văn và event-level signal được xem như hướng phân tích mở rộng. Sự lựa chọn này
+không phủ nhận khả năng của embedding hoặc sự kiện, mà giúp tách câu hỏi nền tảng về
+giá trị của sentiment khỏi câu hỏi phức tạp hơn về biểu diễn văn bản.
 
 \subsection{Hợp nhất động và LLM}
 
-Các công trình gần đây dùng LLM để kết hợp dữ liệu giá có cấu trúc với tin tức hoặc
-để mô hình hóa cách tin được lan truyền. Elahi và Taghvaei đặt bài toán kết hợp dữ
-liệu tài chính với bài viết qua LLM, còn Liang và cộng sự đưa yếu tố dissemination và
-ngữ cảnh vào FinGPT \cite{Elahi2024_241101368v1,Liang2024_241210823v2}. Những hướng
-này có thể giữ nhiều ngữ cảnh hơn, nhưng phụ thuộc vào kích thước mô hình, chi phí,
-phiên bản checkpoint và khả năng tái lập. Nếu dùng mô hình thương mại, việc xác định
-đúng thời điểm kiến thức và tái tạo cùng đầu ra còn khó hơn.
+Các nghiên cứu dùng LLM cố gắng giữ lại nhiều ngữ cảnh hơn trong quá trình đọc tin.
+Elahi và Taghvaei kết hợp dữ liệu tài chính với bài viết thông qua LLM, qua đó đặt
+bài toán fusion giữa dữ liệu có cấu trúc và văn bản vào cùng một quy trình
+\cite{Elahi2024_241101368v1}. Lợi thế của hướng này là mô hình có thể đọc điều kiện,
+chủ thể và quan hệ giữa các sự kiện thay vì chỉ đếm từ tích cực hoặc tiêu cực. Hạn
+chế là kết quả phụ thuộc vào model checkpoint, prompt, giới hạn ngữ cảnh và thiết kế
+đầu ra. Nếu không khóa phiên bản và prompt, cùng một bộ dữ liệu có thể tạo đặc trưng
+khác nhau ở các lần chạy.
 
-Với bài toán của đề tài, PhoBERT mở được chọn thay cho LLM thương mại vì có thể ghi
-nhận checkpoint, tokenizer, seed và cấu hình. Lựa chọn này không có nghĩa PhoBERT luôn
-tốt hơn LLM, mà giúp phạm vi nghiên cứu có thể kiểm tra trong điều kiện tài nguyên của
-đồ án. Siala và cộng sự cho thấy câu hỏi ``sentiment có thật sự làm tăng chất lượng
-dự báo'' cần được đo riêng, một điểm phù hợp với thiết kế ablation của đề tài
-\cite{Siala2026_260200086v3}.
+Liang và cộng sự đưa yếu tố lan truyền và ngữ cảnh vào FinGPT
+\cite{Liang2024_241210823v2}. Hướng này nhấn mạnh rằng tác động của tin không chỉ phụ
+thuộc nội dung, mà còn phụ thuộc mức độ tin được phân phối và bối cảnh mà nhà đầu tư
+tiếp nhận. Đây là quan điểm phù hợp với thị trường thực tế, nhưng cần metadata về
+thời điểm, nguồn và mức độ phổ biến của tin. Các trường này thường không đầy đủ trong
+corpus tổng hợp từ nhiều website.
+
+Siala và cộng sự đặt trọng tâm vào việc đo tác động thực sự của sentiment do LLM tạo
+ra \cite{Siala2026_260200086v3}. Cách tiếp cận này có ý nghĩa đối với đề tài vì một
+LLM có thể tạo văn bản hoặc nhãn rất thuyết phục nhưng chưa chắc cải thiện dự báo ngoài
+mẫu. Đề tài vì vậy không đặt trước giả định PhoBERT hoặc bất kỳ backbone nào luôn làm
+kết quả tốt hơn. Nếu thí nghiệm cho thấy sentiment không cải thiện, kết quả vẫn có giá
+trị vì giúp xác định giới hạn của tín hiệu trong dữ liệu và protocol đã chọn.
 
 \subsection{Các cơ chế fusion}
 
-Có thể phân loại cơ chế fusion thành ba nhóm:
+Có thể chia cơ chế fusion thành ba nhóm:
 
 \begin{enumerate}[nosep]
-  \item \textbf{Early fusion}: chuẩn hóa hai nhóm đặc trưng rồi nối chúng trước bộ
-    mã hóa. Cách này đơn giản nhưng dễ để nhóm có nhiều chiều lấn át nhóm còn lại.
-  \item \textbf{Late fusion}: mỗi nhánh tạo ra biểu diễn hoặc dự đoán riêng, sau đó
-    một lớp kết hợp các đầu ra. Cách này tách biệt hơn nhưng có thể bỏ lỡ tương tác
-    chi tiết giữa một sự kiện và một trạng thái giá.
-  \item \textbf{Gated hoặc cross-attention fusion}: một nhánh học cách chọn thông tin
-    từ nhánh kia theo thời điểm và ngữ cảnh. Cách này giàu biểu đạt hơn, nhưng cần
-    nhiều dữ liệu và dễ làm tăng phương sai khi số mã chỉ ở mức 10.
+  \item \textbf{Early fusion}: chuẩn hóa rồi nối hai nhóm đặc trưng trước bộ mã hóa.
+    Cách này đơn giản, ít tầng kết hợp và dễ triển khai, nhưng nhóm có nhiều chiều hoặc
+    có thang đo lớn có thể lấn át nhóm còn lại. Nếu nối dữ liệu trước khi căn chỉnh
+    thời gian, lỗi timestamp cũng khó phát hiện.
+  \item \textbf{Late fusion}: mỗi nhánh tạo biểu diễn hoặc dự đoán riêng, sau đó một
+    lớp kết hợp các đầu ra. Cách này tách biệt quy trình xử lý văn bản và giá, thuận
+    lợi cho ablation, nhưng có thể bỏ lỡ tương tác chi tiết giữa một tin cụ thể với
+    một trạng thái giá cụ thể.
+  \item \textbf{Gated hoặc cross-attention fusion}: mô hình học cách chọn thông tin
+    giữa hai nhánh theo thời điểm và ngữ cảnh. Cách này giàu biểu đạt hơn, có thể giảm
+    ảnh hưởng của tín hiệu nhiễu, nhưng cần nhiều dữ liệu hơn và dễ tăng phương sai.
 \end{enumerate}
 
-Đề tài dùng concat sau hai nhánh LSTM làm mức sàn vì đây là phép hợp nhất có thể kiểm
-tra, dễ giữ ngân sách tham số gần với price-only LSTM và phù hợp với ablation. Gated
-cross-attention hoặc dual-stream Transformer được nêu ở Chương~\ref{ch:huong-phat-trien},
-không được mặc định xem là đối thủ bắt buộc của graduation floor. Higher Order
-Transformers là ví dụ cho việc đưa nhiều chuỗi vào một Transformer, nhưng mức phức tạp
-của hướng đó phù hợp hơn với tầng mở rộng sau khi baseline đã ổn định
+Đề tài dùng concat sau hai nhánh LSTM làm mức sàn vì cấu trúc này rõ ràng, dễ kiểm tra
+và phù hợp với phép ablation. Nhánh giá đọc cửa sổ OHLCV cùng chỉ báo kỹ thuật, nhánh
+sentiment đọc các thống kê xác suất được tổng hợp theo cùng lịch ngày, sau đó hai vector
+được nối trước lớp phân loại. Gated cross-attention hoặc dual-stream Transformer được
+để dành cho hướng phát triển. Higher Order Transformers là ví dụ về hướng mở rộng khi
+cần xử lý tương tác giữa nhiều chuỗi trong cùng một Transformer
 \cite{Omranpour2024_241210540v1}.
 
 \subsection{Đánh giá multimodal và nguy cơ diễn giải quá mức}
 
-Một mô hình multimodal có thể đạt điểm cao vì nhiều lý do khác nhau. Tín hiệu sentiment
-có thể phản ánh lại các biến giá đã được dùng trong cùng ngày, tin có thể xuất hiện
-sau thời điểm quyết định, hoặc dữ liệu train và test có thể chứa các bản tin trùng
-lặp. Vì vậy, chỉ so sánh một mô hình fusion với một mô hình price-only khác cấu hình
-không đủ để khẳng định giá trị của văn bản.
+Một mô hình đa phương thức có thể đạt điểm cao vì nhiều nguyên nhân. Sentiment có thể
+phản ánh lại giá đã xuất hiện trong cùng ngày, tin có thể được xếp sai thời điểm, bản
+sao bài viết có thể xuất hiện ở hai tập, hoặc một chỉ báo kỹ thuật đã mã hóa gần như
+toàn bộ tín hiệu mà sentiment được cho là cung cấp. Vì vậy, chỉ so sánh một mô hình
+fusion với một mô hình price-only khác cấu hình chưa đủ để kết luận về giá trị của
+văn bản.
 
 Thiết kế của đề tài yêu cầu bốn điều kiện. Thứ nhất, mapping tin theo timestamp phải
-được audit. Thứ hai, cùng một cửa sổ, seed, preprocessing và holdout phải được dùng
-cho hai nhánh ablation. Thứ ba, chỉ số chính phải tính trên dự đoán ngoài mẫu theo
-thứ tự thời gian. Thứ tư, chênh lệch phải đi kèm độ bất định, chẳng hạn bootstrap theo
-khối ngày. Cách đánh giá giàu hơn như mô phỏng giao dịch có thể bổ sung trong tương
-lai, như tinh thần được minh họa ở các nghiên cứu dùng trading simulation
+được kiểm tra, trong đó tin sau giờ đóng cửa, tin cuối tuần và tin ngày nghỉ được ánh
+xạ sang phiên đầu tiên mà nhà đầu tư có thể quan sát. Thứ hai, hai cấu hình ablation
+dùng cùng cửa sổ, seed, preprocessing, ngân sách huấn luyện và holdout. Thứ ba, metric
+được tính trên dự đoán ngoài mẫu theo thứ tự thời gian. Thứ tư, chênh lệch được báo
+cáo cùng độ bất định, chẳng hạn khoảng tin cậy bootstrap theo khối ngày. Mô phỏng giao
+dịch có thể bổ sung sau, nhưng không thay thế kiểm tra phân loại ngoài mẫu
 \cite{Chen2021_210708721v1,Feng2018_181009936v2}.
 
 \section{Khoảng trống nghiên cứu và định vị đề tài}
@@ -295,21 +641,83 @@ lai, như tinh thần được minh họa ở các nghiên cứu dùng trading s
 
 \subsection{Tổng hợp theo ba trụ}
 
-Từ khảo sát, khoảng trống không được hiểu là chưa từng có ai dùng sentiment, LSTM hay
-Transformer riêng lẻ. Các thành phần cơ bản đã xuất hiện trong nhiều dòng nghiên cứu:
-FinBERT cho sentiment tài chính tiếng Anh \cite{Yang2020_200608097v2}, PhoBERT cho
-tiếng Việt \cite{Nguyen2020_200300744v3}, FinBERT-LSTM cho pipeline tin tức và giá
-\cite{Halder2022_221107392v1,Gu2024_240716150v1}, contextualized embedding cho
-movement \cite{Chen2021_210708721v1}, và Transformer cho chuỗi thời gian đa phương
-thức hoặc spatiotemporal \cite{Omranpour2024_241210540v1,Boyle2023_230503835v1}.
+Khảo sát cho thấy các thành phần riêng lẻ đã được nghiên cứu ở nhiều mức độ khác nhau.
+FinBERT cung cấp backbone cho sentiment tài chính tiếng Anh
+\cite{Yang2020_200608097v2}, PhoBERT cung cấp backbone đơn ngữ tiếng Việt
+\cite{Nguyen2020_200300744v3}, các pipeline FinBERT-LSTM kết hợp tin tức và chuỗi giá
+đã được trình bày bởi Halder và Gu \cite{Halder2022_221107392v1,Gu2024_240716150v1}.
+Embedding ngữ cảnh và sự kiện mở rộng tín hiệu văn bản
+\cite{Chen2021_210708721v1,Chen2019_191005078v1}, trong khi Transformer, đồ thị và
+meta-learning mở rộng cách mô hình hóa chuỗi hoặc quan hệ liên mã
+\cite{Omranpour2024_241210540v1,Boyle2023_230503835v1,
+Xu2021_211013716v2,Zhao2023_230609862v3}.
 
-Khoảng trống nằm ở sự kết hợp và cách kiểm chứng trong bối cảnh cụ thể. Trong phạm vi
-tài liệu được khảo sát cho đề tài, chưa có một pipeline được khóa đầy đủ các thành
-phần sau trên cùng rổ nhiều mã HOSE: backbone PhoBERT mở cho tin tiếng Việt, ánh xạ
-point-in-time theo cutoff, nhánh giá với đặc trưng kỹ thuật, mô hình hai nhánh, ablation
-có và không có sentiment, walk-forward không rò rỉ và báo cáo chênh lệch có khoảng tin
-cậy. Đây là tuyên bố về phạm vi khảo sát và thiết kế của đề tài, không phải tuyên bố
-rằng không tồn tại bất kỳ triển khai nào khác.
+Trong bối cảnh Việt Nam, các công trình của Nguyen Son Tung và cộng sự, Vu và cộng
+sự, Phong và cộng sự, công trình tóm tắt tại SOICT 2025, Luong Nhu Y và cộng sự, Chen
+và cộng sự, cùng Thai và cộng sự đã lần lượt cung cấp bằng chứng về phân loại sentiment,
+phản ứng thị trường, kết hợp tin tức với chỉ báo, hồi quy một mã, fusion hai nguồn và
+TFT cho dữ liệu giá. Tuy nhiên, các công trình có nhiệm vụ, quy mô mã, nguồn dữ liệu,
+đặc trưng và giao thức đánh giá khác nhau. Vì vậy, chưa thể so sánh các con số được
+công bố như thể chúng cùng nằm trên một benchmark.
+
+Từ các công trình đã khảo sát, đề tài xác định năm khoảng trống cần tiếp tục nghiên
+cứu như sau.
+
+\textbf{Thứ nhất, dữ liệu và mô hình phân tích cảm xúc tài chính tiếng Việt còn hạn
+chế về quy mô và phạm vi.} Nghiên cứu của Nguyen Son Tung và cộng sự (2021) cho thấy
+PhoBERT có thể đạt độ chính xác khoảng 93\% trên hơn 1.000 tiêu đề CafeF, nhưng dữ
+liệu chỉ bao quát tiêu đề và chưa phản ánh đầy đủ nội dung bài viết. Tập nhỏ cũng khó
+đại diện cho sự thay đổi ngôn ngữ trong nhiều năm, nhiều ngành và nhiều loại sự kiện.
+Trong khi đó, các nghiên cứu dùng polarity, subjectivity hoặc compound score như Phong
+và cộng sự (2026) không khai thác trực tiếp biểu diễn ngữ cảnh của mô hình ngôn ngữ
+tiền huấn luyện. Khoảng trống này đặt ra nhu cầu xây dựng hoặc hoàn thiện dữ liệu tiếng
+Việt có nhãn, dùng một backbone phù hợp ngôn ngữ và đánh giá riêng chất lượng sentiment
+trước khi đưa đầu ra vào mô hình giá.
+
+\textbf{Thứ hai, những hướng tiếp cận sử dụng mô hình ngôn ngữ thương mại có thể tạo
+ra đặc trưng cảm xúc chi tiết, nhưng làm phát sinh hạn chế về khả năng tái lập, kiểm
+soát phiên bản và chi phí.} Công trình trình bày tại SOICT 2025 sử dụng GPT-4o và
+sentiment theo 33 khía cạnh từ hơn 16.000 tin tức, đạt AUC tối đa 0,67 với XGBoost
+trên phạm vi được nêu trong tóm tắt. Kết quả gợi ý giá trị của phân tích theo khía
+cạnh, nhưng bằng chứng hiện có vẫn cần được đọc trong giới hạn của một bản tóm tắt
+hội nghị. Prompt, phiên bản GPT-4o, chi phí suy luận và khả năng truy cập lại đầu ra
+có thể ảnh hưởng đến kết quả. Vì vậy, cần một pipeline dùng mô hình mở, ghi nhận
+checkpoint, tokenizer, seed và cấu hình để các bước có thể được kiểm tra lại.
+
+\textbf{Thứ ba, những bài toán và phạm vi thực nghiệm hiện có chưa thống nhất.} Nghiên
+cứu của Luong Nhu Y và cộng sự (2023) dự báo giá đóng cửa và chỉ thực nghiệm trên một
+mã ACB. Nghiên cứu của Phong và cộng sự (2026) thực hiện phân loại nhị phân ở cấp
+VN-Index. Nghiên cứu của Thai và cộng sự (2026) dùng TFT trên ba mã VIC, VRE và VHM,
+chỉ với giá cùng các chỉ báo kỹ thuật. Các công trình này trả lời những câu hỏi hữu
+ích nhưng không tạo đủ bằng chứng về khả năng khái quát của mô hình phân loại ba xu
+hướng tăng, giảm và đi ngang trên một tập cổ phiếu Việt Nam có đặc điểm khác nhau.
+Đề tài thu hẹp và làm rõ nhiệm vụ bằng cách dự báo hướng của phiên kế tiếp trên nhiều
+mã, đồng thời duy trì cùng định nghĩa nhãn và protocol để có thể so sánh giữa các mã.
+
+\textbf{Thứ tư, phương pháp đánh giá theo thời gian chưa được áp dụng nhất quán.} Việc
+dùng ten-fold cross-validation cho dữ liệu thị trường có thể trộn lẫn các giai đoạn
+trước và sau nếu các nếp gấp không bảo toàn thứ tự thời gian. Khi đó, các thống kê
+chuẩn hóa, ngưỡng tạo nhãn, lựa chọn đặc trưng hoặc thông tin về phân phối tương lai
+có thể vô tình đi vào quá trình huấn luyện. Bài toán dự báo thực tế cần tách dữ liệu
+theo thời điểm, xác định cutoff cho tin, và fit mọi tham số chỉ trên phần lịch sử mà
+nhà đầu tư có thể quan sát ở thời điểm đó. Quy trình walk-forward được chọn để hạn chế
+rò rỉ và đánh giá sự ổn định qua các cửa sổ thời gian.
+
+\textbf{Thứ năm, đóng góp riêng của tín hiệu cảm xúc chưa được đánh giá đầy đủ trong
+cùng một kiến trúc và cùng điều kiện huấn luyện.} So sánh một mô hình có tin tức,
+dùng XGBoost hoặc LLM, với một mô hình chỉ giá, dùng LSTM hoặc một giao thức khác,
+không đủ để kết luận phần cải thiện đến từ dữ liệu tin tức hay từ năng lực mô hình.
+Do đó, cần thiết kế thí nghiệm loại bỏ đặc trưng, trong đó mô hình có sentiment và mô
+hình không có sentiment được giữ tương đương về cửa sổ dữ liệu, cấu trúc nhánh giá,
+quy trình tiền xử lý, seed, ngân sách huấn luyện và tiêu chí lựa chọn. Chênh lệch
+giữa hai cấu hình mới là căn cứ phù hợp hơn để đo giá trị gia tăng của sentiment.
+
+Trên cơ sở năm khoảng trống trên, đề tài tập trung xây dựng mô hình phân tích cảm xúc
+tin tức tài chính tiếng Việt bằng PhoBERT, tổng hợp xác suất cảm xúc theo từng mã cổ
+phiếu và ngày giao dịch, sau đó hợp nhất với dữ liệu thị trường trong mô hình học sâu
+dành cho chuỗi thời gian. Quy trình được đánh giá bằng walk-forward validation, có mô
+hình đối chứng và thí nghiệm loại bỏ đặc trưng nhằm xác định tín hiệu cảm xúc có tạo
+ra giá trị bổ sung ổn định hay không.
 
 \subsection{So sánh các hướng nghiên cứu}
 
@@ -329,8 +737,8 @@ rằng không tồn tại bất kỳ triển khai nào khác.
     sâu \\
     Transformer movement & Attention cho phụ thuộc thời gian, đa phương thức hoặc
     liên mã \cite{Boyle2023_230503835v1,Omranpour2024_241210540v1} & Phức tạp,
-    chưa có bằng chứng trực tiếp trên HOSE & TFT stretch \\
-    News-price fusion & Nối sentiment, embedding, event hoặc LLM với giá
+    chưa có bằng chứng trực tiếp trên HOSE & TFT mở rộng \\
+    News-price fusion & Nối sentiment, embedding, event hoặc LLM
     \cite{Chen2021_210708721v1,Elahi2024_241101368v1} & Dễ trộn lẫn khác biệt dữ liệu,
     rò rỉ và giả định thị trường & Mẫu kiến trúc \\
     Graph và meta-learning & Khai thác quan hệ liên mã và concept drift
@@ -342,20 +750,22 @@ rằng không tồn tại bất kỳ triển khai nào khác.
 
 \subsection{Định vị và giả thuyết kiểm chứng}
 
-Đề tài được định vị như một nghiên cứu thực nghiệm multimodal tiếng Việt, không phải
-một cuộc thi chọn kiến trúc mới. Mức sàn gồm majority, random, price-only classical,
-price-only LSTM và LSTM hai nhánh với concat. TFT chỉ được chạy sau khi mức sàn có số
-liệu và đã kiểm tra loss phân loại, output kích thước 3 cùng holdout. Cách xếp tầng
-này kế thừa tinh thần xây dựng đối chứng và kiểm tra đặc trưng trước khi tăng độ phức
-tạp, phù hợp với việc các nghiên cứu price-only cho thấy tiền xử lý và lựa chọn đặc
-trưng có thể ảnh hưởng lớn đến kết quả \cite{Feng2018_181009936v2}.
+Đề tài được định vị là một nghiên cứu thực nghiệm đa phương thức cho dữ liệu tiếng
+Việt, không phải cuộc thi tìm kiến trúc mới. Mức sàn gồm majority, random, price-only
+classical, price-only LSTM và LSTM hai nhánh với concat. TFT chỉ được chạy sau khi
+mức sàn đã có số liệu, output được cấu hình cho phân loại và holdout được khóa. Cách
+xếp tầng này giúp tách câu hỏi về chất lượng dữ liệu và đặc trưng khỏi câu hỏi về độ
+phức tạp của mô hình. Adversarial training trong các benchmark chuyển động quốc tế
+cũng cho thấy việc xây dựng baseline và kiểm tra độ bền quan trọng không kém việc
+thêm tầng mô hình \cite{Feng2018_181009936v2}.
 
 Giả thuyết chính là vector xác suất sentiment tổng hợp có thể cung cấp thông tin gia
-tăng cho dự báo xu hướng phiên kế tiếp sau khi đã kiểm soát lịch sử giá. Giả thuyết
-phụ là phần gia tăng, nếu tồn tại, không nhất thiết ổn định ở mọi ngày mà có thể rõ
-hơn quanh ngày có nhiều tin hoặc giai đoạn biến động cao. Đây là giả thuyết mô tả cần
-được kiểm tra bằng phân tầng dữ liệu; không được biến nó thành khẳng định rằng tin
-luôn gây ra biến động.
+tăng sau khi đã kiểm soát lịch sử giá và chỉ báo kỹ thuật. Giả thuyết phụ là phần gia
+tăng, nếu tồn tại, có thể rõ hơn vào ngày có nhiều tin hoặc trong giai đoạn biến động
+cao. Hai giả thuyết này được kiểm tra bằng ablation và phân tầng dữ liệu, không được
+trình bày như khẳng định rằng tin tức luôn gây ra biến động. Việc kiểm tra cũng cần
+phân biệt trường hợp sentiment không có tác động với trường hợp pipeline bị lỗi ánh
+xạ thời gian hoặc nhãn không đáng tin cậy.
 
 \subsection{Tiêu chí để tuyên bố đóng góp}
 
@@ -365,16 +775,17 @@ Một tuyên bố đóng góp chỉ được đưa ra khi thỏa mãn các đi�
   \item dữ liệu và phạm vi mã được mô tả rõ, bao gồm bản ghi thiếu hoặc bị loại;
   \item cutoff, công thức nhãn, phép chia theo thời gian và quy trình fit tham số được
     ghi trong manifest;
-  \item kết quả sentiment và kết quả dự báo được tách thành hai tầng;
-  \item mô hình có sentiment và price-only dùng cùng protocol, seed hoặc tập seed đã
-    định trước;
+  \item kết quả sentiment và kết quả dự báo được trình bày thành hai tầng;
+  \item mô hình có sentiment và price-only dùng cùng protocol, seed hoặc tập seed;
   \item macro-F1, balanced accuracy, macro OvR-AUC và chỉ số theo lớp được báo cáo
     cùng khoảng tin cậy khi có thể;
-  \item các kết luận nêu rõ tính tự báo cáo của tài liệu tham khảo và không suy rộng
-    ngoài 10 mã thuộc VN30 trong giai đoạn nghiên cứu.
+  \item kết luận nêu rõ phạm vi các mã thuộc VN30 được chọn và không suy rộng sang thị
+    trường khác.
 \end{itemize}
 
-Theo đó, đóng góp an toàn nhất của đề tài là một pipeline tái lập để đo lường phần
-đóng góp biên của sentiment tiếng Việt dưới đánh giá walk-forward có kiểm soát. Nếu
-ablation không cho thấy cải thiện, kết quả đó vẫn trả lời được câu hỏi nghiên cứu và
-giúp tránh kết luận quá mức từ một mô hình phức tạp.
+Theo đó, đóng góp an toàn nhất của đề tài là một pipeline có thể tái lập để đo phần
+đóng góp biên của sentiment tiếng Việt bằng đánh giá walk-forward có kiểm soát. Nếu
+ablation không cho thấy cải thiện, kết quả này vẫn trả lời câu hỏi nghiên cứu và giúp
+tránh kết luận quá mức từ một mô hình phức tạp. Ngược lại, nếu có cải thiện, cần báo
+cáo rõ cải thiện xuất hiện ở mã nào, giai đoạn nào, mật độ tin tức nào và có ổn định
+qua các seed hay không.

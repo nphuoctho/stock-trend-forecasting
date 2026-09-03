@@ -1,0 +1,46 @@
+\chapter{KẾT QUẢ THỰC NGHIỆM (ĐANG THỰC HIỆN)}
+\label{ch:ket-qua}
+
+\emph{Tính đến thời điểm báo cáo tiến độ, đồ án chưa có số liệu huấn luyện và đánh giá
+chính thức. Dữ liệu đầu vào đã được chuẩn bị, pipeline đã chạy thử qua các bước chính,
+nhưng mô hình chưa được train chính thức trên GPU. Phần này vì vậy chỉ ghi nhận trạng
+thái hiện tại và cố định cách báo cáo cho giai đoạn tiếp theo.}
+
+\section{Kế hoạch thiết lập thực nghiệm}
+\label{sec:kq-setup}
+
+Thực nghiệm sẽ được chạy trong môi trường ghi nhận phiên bản hệ điều hành, Python,
+PyTorch, Transformers, scikit-learn, vnstock và các thư viện dùng để tính chỉ báo kỹ
+thuật. Bước tinh chỉnh PhoBERT dự kiến thực hiện trên GPU của Google Colab hoặc Kaggle
+vì máy phát triển hiện không có GPU phù hợp. Tên GPU, dung lượng bộ nhớ, thời gian chạy
+và checkpoint sẽ được lưu trong manifest.
+
+Seed sẽ được cố định cho bước chia dữ liệu, lấy mẫu, khởi tạo mô hình và bootstrap. Test
+và holdout không được dùng để chọn siêu tham số. Các quy tắc về cutoff, cách tạo nhãn
+và train-only preprocessing đã được đặt ra trước khi chạy thực nghiệm chính.
+
+\section{Kế hoạch đánh giá và các bảng kết quả sẽ báo cáo}
+\label{sec:kq-plan}
+
+Khi có số liệu, chương này sẽ báo cáo theo thứ tự: thống kê dữ liệu sau các cổng xử lý,
+chất lượng nhãn cảm xúc và độ đồng thuận, chỉ số phân loại của PhoBERT trên tập test,
+sau đó là kết quả dự báo xu hướng theo thang mô hình.
+
+Chỉ số chính là macro-F1, kèm balanced accuracy và precision, recall, F1 theo từng lớp
+UP, FLAT và DOWN. So sánh sẽ đi từ majority, random và XGBoost chỉ giá đến LSTM chỉ
+giá, LSTM hai nhánh có sentiment, rồi TFT nếu dữ liệu và thời gian cho phép. Phần đóng
+góp của cảm xúc được tính bằng hiệu số giữa hai cấu hình trên cùng fold, kèm khoảng tin
+cậy bootstrap khi đủ số fold.
+
+Nguyên tắc trình bày là không điền số liệu chưa đo. Các ô còn thiếu sẽ để trạng thái
+chưa điền, không dùng kết quả của công trình khác để thay thế cho dữ liệu của đề tài.
+Nếu cấu hình có sentiment không cải thiện, kết luận phù hợp là chưa có bằng chứng về
+giá trị gia tăng trong protocol hiện tại.
+
+\section{Dự kiến hoàn thành}
+\label{sec:kq-timeline}
+
+Bước tinh chỉnh PhoBERT và sinh xác suất cảm xúc dự kiến hoàn thành trong tuần đầu
+tháng 9. Bước ghép đặc trưng, chạy baseline và LSTM hai nhánh dự kiến thực hiện trong
+hai tuần tiếp theo, hướng tới hoàn thành trước hạn nộp ngày 23 tháng 9. Các mốc này là
+kế hoạch, không phải kết quả đã đạt được.

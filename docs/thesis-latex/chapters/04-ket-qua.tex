@@ -1,28 +1,29 @@
 \chapter{KẾT QUẢ THỰC NGHIỆM}
 \label{ch:ket-qua}
 
-Chương này mô tả cách tổ chức thực nghiệm, thống kê dữ liệu, kết quả phân loại cảm
-xúc, kết quả dự báo và cấu trúc bàn luận. Các con số trong các bảng là khung để điền
-từ manifest và log chạy thực tế. Việc để trống một ô kết quả là có chủ đích, nhằm
-phân biệt giữa thiết kế thí nghiệm và quan sát đã được đo. Không sử dụng số liệu tham
-chiếu của nghiên cứu khác để thay thế cho kết quả trên HOSE.
+Chương này quy định cách trình bày kết quả thực nghiệm của hệ thống. Vì các mô hình
+chưa được huấn luyện chính thức và chưa có số đo cuối cùng trong thời điểm hoàn thiện
+khung báo cáo, các ô kết quả được giữ ở trạng thái \textit{Chưa điền}. Việc giữ nguyên
+các ô này giúp phân biệt giữa thiết kế thí nghiệm và quan sát thực tế. Không sử dụng
+số liệu tham chiếu của công trình khác để thay thế cho kết quả trên rổ cổ phiếu của
+đề tài.
 
 \section{Thiết lập thực nghiệm}
 \label{sec:kq-setup}
 
 \subsection{Môi trường và cấu hình phần mềm}
 
-Thực nghiệm cần được chạy trong một môi trường có thể ghi nhận phiên bản hệ điều hành,
-Python, PyTorch, Transformers, scikit-learn, vnstock và các thư viện chỉ báo kỹ thuật.
-Việc tinh chỉnh PhoBERT có thể sử dụng GPU trên Colab, Kaggle hoặc máy cục bộ. Tên
-GPU, dung lượng bộ nhớ, thời gian chạy và checkpoint phải được lưu trong manifest.
-Nếu chạy lại trên phần cứng khác, sai khác về tốc độ hoặc kết quả do tính không xác
-định của phép toán phải được ghi rõ.
+Thực nghiệm cần được thực hiện trong môi trường có thể ghi nhận phiên bản hệ điều hành,
+Python, PyTorch, Transformers, scikit-learn, vnstock và các thư viện tính chỉ báo kỹ
+thuật. Bước tinh chỉnh PhoBERT có thể chạy trên GPU của Google Colab, Kaggle hoặc máy
+cục bộ. Tên GPU, dung lượng bộ nhớ, thời gian chạy và checkpoint phải được lưu trong
+manifest. Nếu chạy lại trên phần cứng khác, những sai khác do phép toán không hoàn toàn
+xác định cần được ghi nhận.
 
-Các giá trị seed được cố định cho bước chia dữ liệu, lấy mẫu, khởi tạo mô hình và
-bootstrap. Tên checkpoint, tokenizer, chính sách cắt token, batch size, learning rate,
-optimizer, số epoch, early stopping và dropout phải được ghi cho cả nhánh sentiment
-và nhánh dự báo. Tập test và holdout không được dùng để chọn siêu tham số.
+Seed được cố định cho bước chia dữ liệu, lấy mẫu, khởi tạo mô hình và bootstrap. Tên
+checkpoint, tokenizer, chính sách cắt token, batch size, learning rate, optimizer, số
+epoch, early stopping và dropout phải được ghi cho cả nhánh sentiment và nhánh dự báo.
+Test và holdout không được dùng để chọn siêu tham số.
 
 \begin{table}[H]
   \centering
@@ -45,28 +46,27 @@ và nhánh dự báo. Tập test và holdout không được dùng để chọn 
 
 \subsection{Thiết kế chia dữ liệu}
 
-Dữ liệu được chia theo ngày giao dịch, dùng cùng mốc lịch cho các mã. Các cửa sổ
-walk-forward gồm train, validation và test theo thứ tự thời gian. Sau khi chọn cấu
-hình bằng các cửa sổ phát triển, một holdout cuối được khóa và chỉ dùng để báo cáo.
-Trong mỗi cửa sổ, scaler, imputer, ngưỡng nhãn và các phép chọn đặc trưng được fit
-trên train. Quy tắc này nhằm tránh tình trạng điểm số được cải thiện do thông tin
-của tương lai, một vấn đề có thể xuất hiện ngay cả khi split đã có thứ tự thời gian.
+Dữ liệu được chia theo ngày giao dịch và dùng cùng mốc lịch cho các mã. Mỗi cửa sổ
+walk-forward gồm phần huấn luyện, xác thực và kiểm thử theo thứ tự thời gian. Sau khi
+chọn cấu hình bằng các cửa sổ phát triển, holdout cuối được khóa và chỉ dùng một lần
+để báo cáo. Trong từng cửa sổ, scaler, imputer, ngưỡng tạo nhãn và phép chọn đặc trưng
+chỉ được fit trên phần huấn luyện. Quy tắc này nhằm hạn chế điểm số tăng lên do các
+phép biến đổi đã nhìn thấy dữ liệu tương lai.
 
-Kết quả phải báo cáo số fold, ngày bắt đầu và kết thúc của mỗi fold, số mẫu theo mã,
-phân bố lớp và số mẫu bị loại do thiếu lịch sử hoặc timestamp. Nếu một fold không đủ
-coverage tin, tình trạng đó phải được nêu thay vì tự động thay bằng dữ liệu bổ sung.
+Kết quả cần ghi số fold, ngày bắt đầu và ngày kết thúc của từng fold, số mẫu theo mã,
+phân bố lớp và số mẫu bị loại do thiếu lịch sử hoặc timestamp. Nếu một fold có độ phủ
+tin không đủ, tình trạng này phải được nêu rõ thay vì tự động bổ sung dữ liệu.
 
 \subsection{Cấu hình huấn luyện và tiêu chí chọn mô hình}
 
-PhoBERT được chọn checkpoint theo macro-F1 trên validation sentiment. Mô hình dự báo
-được chọn theo macro-F1 validation, sau đó đánh giá trên test của fold. Cấu hình có và
-không có sentiment sử dụng cùng ngân sách thử nghiệm. Nếu có nhiều seed, báo cáo trung
-bình, độ lệch chuẩn và quy tắc tổng hợp; nếu chỉ có một seed do giới hạn tài nguyên,
-phải ghi rõ đó là giới hạn của kết quả.
+Checkpoint PhoBERT được chọn theo macro-F1 trên validation của tầng sentiment. Mô hình
+dự báo được chọn theo macro-F1 validation rồi mới đánh giá trên test của fold. Hai cấu
+hình có và không có sentiment sử dụng cùng ngân sách thử nghiệm. Nếu có nhiều seed,
+báo cáo cần nêu trung bình, độ lệch chuẩn và quy tắc tổng hợp. Nếu chỉ chạy một seed do
+giới hạn tài nguyên, đây phải được ghi như một giới hạn của kết quả.
 
-Các baseline được chạy trước khi thử TFT. Đây là điều kiện quan trọng vì những nghiên
-cứu về movement thường có sự khác biệt lớn về dữ liệu và metric, nên kết quả của một
-mô hình phức tạp không thể được đọc tách rời khỏi baseline của chính tập dữ liệu
+Các baseline được chạy trước TFT. Cách làm này cần thiết vì kết quả của mô hình phức
+tạp chỉ có ý nghĩa khi được đặt cạnh các mốc trên chính dữ liệu và protocol của đề tài
 \cite{Feng2018_181009936v2,Chen2021_210708721v1}.
 
 \section{Thống kê dữ liệu}
@@ -74,10 +74,10 @@ mô hình phức tạp không thể được đọc tách rời khỏi baseline 
 
 \subsection{Quy mô corpus tin}
 
-Phần này cần báo cáo số bài sau từng cổng xử lý: số bản ghi thô, số bản ghi có mã,
-số bản ghi có timestamp hợp lệ, số bản ghi sau deduplication và số bài được đưa vào
-fine-tune hoặc suy luận. Bảng thống kê nên tách theo nguồn, theo mã và theo năm để
-cho thấy corpus có bị tập trung vào một nguồn hoặc một giai đoạn hay không.
+Phần này cần báo cáo số bản ghi sau từng cổng xử lý: dữ liệu thô, bản ghi có mã, bản
+ghi có timestamp hợp lệ, bản ghi sau deduplication và bài được đưa vào fine-tune hoặc
+suy luận. Thống kê nên tách theo nguồn, theo mã và theo năm để cho thấy corpus có bị
+tập trung vào một nguồn hoặc một giai đoạn hay không.
 
 \begin{table}[H]
   \centering
@@ -98,17 +98,17 @@ cho thấy corpus có bị tập trung vào một nguồn hoặc một giai đo�
   \end{tabular}
 \end{table}
 
-Độ phủ tin cần được đặt cạnh độ phủ giá. Một mã có nhiều phiên nhưng ít tin không
-nhất thiết là dữ liệu xấu, nhưng mô hình phải biết ngày đó không có quan sát văn bản.
-Vì vậy, cột số tin và \texttt{has\_news} cần được thống kê, không gộp ngày không tin
-vào lớp neutral mà không có cờ phân biệt.
+Độ phủ tin cần được đặt cạnh độ phủ giá. Một mã có nhiều phiên nhưng ít tin không nhất
+thiết là dữ liệu không phù hợp, nhưng mô hình phải biết ngày đó không có quan sát văn
+bản. Vì vậy, số tin và biến \texttt{has\_news} cần được thống kê, không gộp ngày không
+có tin vào lớp trung tính mà không có cờ phân biệt.
 
 \subsection{Quy mô dữ liệu giá và phân bố nhãn}
 
 Đối với dữ liệu giá, cần báo cáo số phiên theo mã, ngày đầu, ngày cuối, số ngày thiếu
 và số mẫu còn lại sau khi tạo đủ cửa sổ lịch sử. Nhãn UP, FLAT và DOWN được tính từ
-ngưỡng fit trên train của từng fold. Do đó, phân bố nhãn ở train, validation, test và
-holdout có thể khác nhau. Bảng dưới đây giữ các ô số để điền từ pipeline.
+ngưỡng fit trên train của từng fold. Vì vậy, phân bố nhãn giữa train, validation, test
+và holdout có thể khác nhau.
 
 \begin{table}[H]
   \centering
@@ -126,20 +126,19 @@ holdout có thể khác nhau. Bảng dưới đây giữ các ô số để đi�
   \end{tabular}
 \end{table}
 
-Nếu lớp FLAT chiếm tỷ lệ lớn, accuracy sẽ khó phản ánh khả năng nhận diện UP và DOWN.
-Nếu ngưỡng phân vị tạo tỷ lệ lớp gần cân bằng nhưng các mã riêng lẻ vẫn lệch, kết quả
-phải nêu cả hai mức phân bố. Đây là lý do macro-F1 và balanced accuracy được đặt làm
-chỉ số trung tâm.
+Nếu lớp FLAT chiếm tỷ lệ lớn, accuracy không phản ánh đầy đủ khả năng nhận diện UP và
+DOWN. Ngay cả khi ngưỡng phân vị tạo tỷ lệ lớp gần cân bằng trên toàn bộ mẫu, từng mã
+vẫn có thể lệch. Vì vậy, macro-F1 và balanced accuracy được đặt làm chỉ số trung tâm.
 
 \section{Kết quả phân loại cảm xúc}
 \label{sec:kq-sentiment}
 
 \subsection{Chất lượng nhãn in-domain}
 
-Trước khi phân tích điểm dự báo, cần báo cáo quy trình gán nhãn: số người gán, tiêu
-chí, số mẫu bất đồng, cách giải quyết bất đồng, Cohen's hoặc Fleiss' kappa và phân bố
-ba lớp. Nếu kappa thấp, cần giải thích những trường hợp ngôn ngữ mơ hồ hoặc tin chứa
-nhiều sự kiện, không chỉ chọn lại mẫu có đồng thuận cao.
+Trước khi dùng đầu ra sentiment cho dự báo, cần báo cáo quy trình gán nhãn gồm số người
+gán, tiêu chí, số mẫu bất đồng, cách giải quyết bất đồng, Cohen's hoặc Fleiss' kappa và
+phân bố ba lớp. Nếu kappa thấp, phần thảo luận cần chỉ ra những trường hợp ngôn ngữ
+mơ hồ hoặc bài có nhiều sự kiện, không chỉ giữ lại các mẫu dễ gán.
 
 \begin{table}[H]
   \centering
@@ -161,11 +160,11 @@ nhiều sự kiện, không chỉ chọn lại mẫu có đồng thuận cao.
 
 \subsection{Chỉ số mô hình sentiment}
 
-Mô hình PhoBERT được đánh giá trên tập test sentiment đã khóa. Ngoài accuracy, cần
-báo cáo precision, recall và F1 theo từng lớp vì mô hình có thể nhận diện tốt lớp
-phổ biến nhưng bỏ sót lớp ít. Macro-F1 là số trung bình không phụ thuộc trực tiếp vào
-số lượng của từng lớp. Nếu so sánh head tuyến tính với PhoBERT plus CNN hoặc BiLSTM,
-mọi mô hình phải dùng cùng dữ liệu, cùng split và cùng cách tính metric.
+PhoBERT được đánh giá trên tập test sentiment đã khóa. Ngoài accuracy, cần báo cáo
+precision, recall và F1 theo từng lớp vì mô hình có thể nhận diện tốt lớp phổ biến nhưng
+bỏ sót lớp ít. Macro-F1 là trung bình của F1 ba lớp. Nếu so sánh head tuyến tính với
+PhoBERT plus CNN hoặc BiLSTM, mọi mô hình phải dùng cùng dữ liệu, split và cách tính
+metric.
 
 \begin{table}[H]
   \centering
@@ -181,19 +180,19 @@ mọi mô hình phải dùng cùng dữ liệu, cùng split và cùng cách tín
   \end{tabular}
 \end{table}
 
-Các số liệu sentiment chỉ chứng minh chất lượng của tầng phân loại trên tập test của
-tầng đó. Chúng không tự chứng minh rằng tín hiệu có giá trị dự báo. Một checkpoint có
-macro-F1 cao vẫn có thể tạo tín hiệu yếu nếu tin bị trễ, không được ánh xạ đúng mã,
-hoặc nội dung đã được thị trường biết trước. Vì vậy, đầu ra dùng cho nhánh dự báo phải
-được sinh đúng theo cutoff và fold tương ứng.
+Các số liệu ở tầng sentiment chỉ cho biết chất lượng phân loại trên tập test của tầng
+đó. Chúng không tự chứng minh tín hiệu có giá trị dự báo. Một checkpoint có macro-F1
+cao vẫn có thể tạo tín hiệu yếu nếu tin bị trễ, ánh xạ sai mã hoặc nội dung đã được thị
+trường biết trước. Vì vậy, đầu ra đưa sang nhánh dự báo phải được sinh đúng cutoff và
+fold tương ứng.
 
 \section{Kết quả dự báo xu hướng và ablation}
 \label{sec:kq-forecast}
 
-Bảng~\ref{tab:ket-qua} giữ cấu trúc thang mô hình đã đặt ra trong Chương~\ref{ch:phuong-phap}.
-Các số được để trống để điền sau khi chạy đủ baseline và holdout. Cần ghi rõ metric
-là trung bình trên các fold, kết quả holdout hay một giá trị gộp từ toàn bộ dự đoán
-ngoài mẫu.
+Bảng~\ref{tab:ket-qua} giữ cấu trúc thang mô hình trong Chương~\ref{ch:phuong-phap}.
+Các ô kết quả được để trống cho đến khi baseline và holdout được chạy đầy đủ. Khi điền
+số, cần ghi rõ đó là trung bình trên các fold, kết quả holdout hay giá trị gộp từ toàn
+bộ dự đoán ngoài mẫu.
 
 \begin{table}[H]
   \centering
@@ -215,18 +214,18 @@ ngoài mẫu.
 
 \subsection{Báo cáo chỉ số theo lớp}
 
-Bên cạnh bảng tổng hợp, cần có ma trận nhầm lẫn và precision, recall, F1 của UP, FLAT
-và DOWN. Phần này cho biết mô hình có dự đoán được lớp ít hay chỉ nghiêng về lớp
-trung tính. Nếu các mã có phân bố khác nhau, nên báo cáo cả kết quả gộp theo ngày và
-phân bố theo mã. Không thay thế metric theo lớp bằng một accuracy duy nhất.
+Bên cạnh bảng tổng hợp, cần báo cáo ma trận nhầm lẫn và precision, recall, F1 của UP,
+FLAT và DOWN. Phần này cho biết mô hình có nhận diện được các lớp ít hay chỉ nghiêng
+về lớp trung tính. Nếu các mã có phân bố khác nhau, nên báo cáo cả kết quả gộp theo
+ngày và kết quả theo mã. Không thay metric theo lớp bằng một accuracy duy nhất.
 
 \subsection{Đo phần đóng góp của sentiment}
 
 Đóng góp biên được tính bằng hiệu giữa cấu hình có sentiment và price-only trên cùng
-fold. Bảng báo cáo nên có $\Delta$ macro-F1, $\Delta$ balanced accuracy và $\Delta$
-OvR-AUC, cùng khoảng tin cậy bootstrap. Cần chỉ rõ khoảng tin cậy được tính theo
-ngày, theo mã hay theo block thời gian. Nếu khoảng tin cậy rộng hoặc chênh lệch thay
-đổi dấu giữa các fold, kết luận phải dùng ngôn ngữ thận trọng như ``chưa ổn định''.
+fold. Bảng báo cáo cần có $\Delta$ macro-F1, $\Delta$ balanced accuracy và $\Delta$
+OvR-AUC, cùng khoảng tin cậy bootstrap. Cần chỉ rõ khoảng tin cậy được tính theo ngày,
+theo mã hay theo block thời gian. Nếu khoảng tin cậy rộng hoặc chênh lệch đổi dấu giữa
+các fold, kết luận phù hợp là tín hiệu chưa ổn định.
 
 \begin{table}[H]
   \centering
@@ -243,10 +242,10 @@ ngày, theo mã hay theo block thời gian. Nếu khoảng tin cậy rộng ho�
 
 \subsection{Kết quả TFT nếu được thực hiện}
 
-TFT chỉ được đưa vào bảng khi mô hình đã được cấu hình cho phân loại ba lớp và chạy
-trên đúng holdout. Nếu không có số liệu đáng tin cậy, hàng TFT cần được đánh dấu chưa
-thực hiện thay vì điền bằng kết quả dự kiến. Variable importance và attention, nếu
-được báo cáo, phải kèm số mẫu, cửa sổ và caveat rằng đó là diễn giải phụ thuộc mô hình.
+TFT chỉ được đưa vào bảng khi đã được cấu hình cho phân loại ba lớp và chạy trên đúng
+holdout. Nếu chưa có số liệu đáng tin cậy, hàng TFT phải được đánh dấu chưa thực hiện,
+không điền bằng kết quả dự kiến. Variable importance và attention, nếu được báo cáo,
+phải kèm số mẫu, cửa sổ và lưu ý rằng đây là diễn giải phụ thuộc mô hình.
 
 \section{Bàn luận}
 \label{sec:kq-ban-luan}
@@ -254,22 +253,21 @@ thực hiện thay vì điền bằng kết quả dự kiến. Variable importan
 \subsection{Bàn luận theo câu hỏi nghiên cứu}
 
 Câu hỏi thứ nhất được trả lời bằng chất lượng nhãn, bảng sentiment và phân tích lỗi.
-Nếu PhoBERT đạt F1 thấp ở lớp nào, cần xem xét các nguyên nhân như lớp thiếu mẫu,
-tiêu đề mơ hồ, tên thực thể hoặc sự kiện hai chiều. Không được dùng kết quả sentiment
-của một corpus khác để lấp khoảng trống cho tập hiện tại.
+Nếu PhoBERT có F1 thấp ở một lớp, cần xem xét lớp thiếu mẫu, tiêu đề mơ hồ, tên thực
+thể hoặc bài có sự kiện hai chiều. Không dùng kết quả của corpus khác để lấp khoảng
+trống cho tập hiện tại.
 
-Câu hỏi thứ hai được trả lời bằng bảng thang mô hình và ablation. Nếu LSTM hai nhánh
+Câu hỏi thứ hai được trả lời bằng thang mô hình và bảng ablation. Nếu LSTM hai nhánh
 vượt price-only trên nhiều fold với khoảng tin cậy phù hợp, có thể nói sentiment cung
-cấp dấu hiệu gia tăng trong protocol đã chọn. Nếu cải thiện chỉ xuất hiện ở một số
-fold, cần báo cáo sự phụ thuộc vào thời kỳ. Nếu không cải thiện, kết luận hợp lệ là
-chưa có bằng chứng rằng sentiment cải thiện dự báo dưới protocol này.
+cấp tín hiệu gia tăng trong protocol đã chọn. Nếu cải thiện chỉ xuất hiện ở một số
+fold, cần nêu sự phụ thuộc vào thời kỳ. Nếu không cải thiện, kết luận hợp lệ là chưa có
+bằng chứng rằng sentiment cải thiện dự báo trong protocol này.
 
-Câu hỏi thứ ba yêu cầu phân tầng theo coverage tin, volatility hoặc ngày sự kiện. Đây
-là phân tích bổ sung, không được dùng để chọn một nhóm thuận lợi rồi trình bày như kết
-quả chung. Các nghiên cứu về sự kiện, quan hệ liên mã và sentiment cho thấy điều kiện
-thị trường có thể làm thay đổi giá trị của tín hiệu, nhưng các quan sát đó không thay
-thế cho kiểm tra trên rổ HOSE của đề tài \cite{Chen2019_191005078v1,
-Xu2021_210207372v2,Siala2026_260200086v3}.
+Câu hỏi thứ ba yêu cầu phân tầng theo độ phủ tin, volatility hoặc ngày sự kiện. Đây là
+phân tích bổ sung, không được chọn một nhóm thuận lợi rồi trình bày như kết quả chung.
+Các nghiên cứu về sự kiện, quan hệ liên mã và sentiment cho thấy điều kiện thị trường
+có thể làm thay đổi giá trị của tín hiệu, nhưng không thay thế cho kiểm tra trên rổ
+HOSE của đề tài \cite{Chen2019_191005078v1,Xu2021_210207372v2,Siala2026_260200086v3}.
 
 \subsection{Kiểm tra tính hợp lệ và độ ổn định}
 
@@ -279,25 +277,23 @@ Phần bàn luận cần kiểm tra các điểm sau:
   \item số fold và số ngày test có đủ để kết luận hay chỉ phù hợp cho mô tả thăm dò;
   \item chênh lệch có giữ dấu khi đổi seed hoặc cửa sổ hay không;
   \item ngày không có tin có được xử lý bằng prior và cờ \texttt{has\_news} hay không;
-  \item scaler, threshold, imputer và sentiment checkpoint có fit ngoài train không;
-  \item mô hình có sentiment có sử dụng nhiều tham số hơn đáng kể hay không;
-  \item dữ liệu bị loại, mã ít tin và các phiên thiếu có làm lệch kết quả hay không.
+  \item scaler, threshold, imputer và checkpoint sentiment có fit ngoài train không;
+  \item mô hình có sentiment có dùng nhiều tham số hơn đáng kể hay không;
+  \item dữ liệu bị loại, mã ít tin và phiên thiếu có làm lệch kết quả hay không.
 \end{itemize}
 
-Nếu một kiểm tra cho thấy rò rỉ hoặc mapping sai, bảng điểm tương ứng không được dùng
-để kết luận. Cần sửa pipeline trong phạm vi cho phép, chạy lại đúng protocol và ghi
-nhận thay đổi. Không sửa holdout, đổi metric hoặc lặp nhiều cấu hình mà không log số
-lần thử.
+Nếu phát hiện rò rỉ hoặc mapping sai, bảng điểm tương ứng không được dùng để kết luận.
+Cần sửa pipeline trong phạm vi cho phép, chạy lại đúng protocol và ghi nhận thay đổi.
+Không sửa holdout, đổi metric hoặc lặp nhiều cấu hình mà không log số lần thử.
 
 \subsection{Giới hạn của thực nghiệm}
 
-Giới hạn thứ nhất là rổ chỉ gồm 10 mã và dữ liệu chỉ thuộc HOSE, nên khả năng tổng quát
-cho HNX, UPCOM hoặc nhóm vốn hóa nhỏ chưa được kiểm tra. Giới hạn thứ hai là timestamp
-và mapping tin phụ thuộc vào nguồn thu thập; một bản tin thiếu thời điểm có thể phải
-bị loại. Giới hạn thứ ba là nhãn sentiment chịu ảnh hưởng của hướng dẫn và người gán.
-Giới hạn thứ tư là dự báo phiên kế tiếp có thể quá ngắn để phản ánh tác động dài hạn
-của tin.
+Thứ nhất, rổ nghiên cứu chỉ gồm 10 mã và dữ liệu chỉ thuộc HOSE, nên khả năng tổng quát
+cho HNX, UPCOM hoặc nhóm vốn hóa nhỏ chưa được kiểm tra. Thứ hai, timestamp và mapping
+tin phụ thuộc vào nguồn thu thập; bản tin thiếu thời gian có thể phải bị loại. Thứ ba,
+nhãn sentiment chịu ảnh hưởng của hướng dẫn và người gán. Thứ tư, dự báo phiên kế tiếp
+có thể quá ngắn để phản ánh tác động dài hạn của tin.
 
 Ngoài ra, điểm số phân loại không cho biết trực tiếp giá trị kinh tế sau phí giao dịch,
-trượt giá và giới hạn thanh khoản. Do đó, kết quả của chương này không phải khuyến nghị
+trượt giá và giới hạn thanh khoản. Vì vậy, kết quả của chương này không phải khuyến nghị
 đầu tư và không được gọi là bằng chứng của một chiến lược giao dịch có lợi nhuận.

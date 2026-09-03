@@ -1,0 +1,123 @@
+---
+config:
+  flowchart:
+    curve: linear
+    nodeSpacing: 32
+    rankSpacing: 48
+---
+%% Tổng quan kiến trúc và pipeline của đồ án tốt nghiệp.
+%% Bản chi tiết về protocol, cổng chất lượng và cổng chống rò rỉ:
+%% thesis-end-to-end-flow.mmd
+flowchart TB
+  start([Bắt đầu]) --> protocol[Khóa protocol nghiên cứu<br/>10 mã HOSE/VN30 · 2020–03/2026<br/>next-session · 3 lớp · cutoff 15:00 · seed]
+
+  subgraph S0[1. Thu thập và kiểm tra dữ liệu]
+    direction LR
+    sources[Nguồn dữ liệu<br/>Tin Vietstock: title, body, timestamp phút<br/>Giá OHLCV điều chỉnh: vnstock/VCI<br/>Lịch phiên HOSE, mã và provenance]
+    quality{Quality gate<br/>đủ dữ liệu và mapping?}
+    quality_fix[Sửa nguồn / mapping<br/>hoặc báo coverage]
+    sources --> quality
+    quality -->|Không| quality_fix --> quality
+  end
+
+  subgraph S1[2. Hai nhánh tạo đặc trưng]
+    direction LR
+    subgraph SENT[Nhánh cảm xúc — PhoBERT]
+      direction LR
+      annotate[Seed CafeF<br/>+ gán nhãn in-domain]
+      agreement[Cohen/Fleiss κ<br/>kiểm tra phân bố lớp]
+      sent_split[Tách theo thời gian<br/>fine-tune / val / test]
+      phobert[PhoBERT-base<br/>vinai/phobert-base<br/>fine-tune 3 lớp]
+      infer[Linear head chính<br/>BiLSTM head so sánh<br/>→ xác suất NEG / NEU / POS]
+      annotate --> agreement --> sent_split --> phobert --> infer
+    end
+    subgraph MARKET[Nhánh giá — chuỗi thời gian]
+      direction LR
+      technical[Lợi suất, khối lượng<br/>MA · RSI · MACD · OBV · volatility]
+      price_features[Đặc trưng thị trường<br/>theo mã-ngày]
+      technical --> price_features
+    end
+  end
+
+  subgraph S2[3. Căn chỉnh, ghép đặc trưng và gán nhãn]
+    direction LR
+    cutoff[Cutoff 15:00<br/>tin sau giờ / cuối tuần<br/>→ phiên kế]
+    daily[Tổng hợp sentiment mã-ngày<br/>count · tỷ lệ lớp · mean probability<br/>pos−neg · std · window 1/3/5 · has_news]
+    panel[Bảng panel mã × ngày<br/>sentiment + market features]
+    target[Target<br/>lợi suất phiên kế]
+    label[Nhãn UP / FLAT / DOWN<br/>threshold fit trên train từng cửa sổ]
+    cutoff --> daily --> panel --> label
+    target --> label
+  end
+
+  subgraph S3[4. Chia dữ liệu và chống rò rỉ]
+    direction LR
+    split[Walk-forward / expanding windows<br/>+ locked holdout]
+    leak_gate{Leakage gate<br/>as-of đúng và không dùng tương lai?}
+    leak_fix[Audit cutoff, scaler,<br/>imputer và label threshold]
+    split --> leak_gate
+    leak_gate -->|Không| leak_fix --> split
+  end
+
+  subgraph S4[5. Thang mô hình dự báo — dùng chung walk-forward harness]
+    direction LR
+    model_input[Train / validation / test<br/>preprocessing fit train-only]
+    majority[Majority + random<br/>baseline tối thiểu]
+    classical[Price-only classical<br/>LogReg · Random Forest · XGBoost]
+    price_lstm[LSTM một nhánh<br/>chỉ giá · deep baseline]
+    fusion_lstm[LSTM hai nhánh + concat<br/>giá + sentiment<br/>SÀN TỐT NGHIỆP]
+    tft[TFT classification<br/>stretch nếu còn thời gian<br/>output bắt buộc 3 lớp]
+    cross_attention[Gated cross-attention<br/>HƯỚNG PHÁT TRIỂN · không code]
+    model_input --> majority --> classical --> price_lstm --> fusion_lstm
+    fusion_lstm -.Nếu còn thời gian.-> tft
+    tft -.Tương lai.-> cross_attention
+  end
+
+  subgraph S5[6. Đánh giá, báo cáo và demo]
+    direction LR
+    metrics[So sánh cùng protocol<br/>macro-F1 · balanced accuracy · OvR-AUC]
+    ablation[Ablation lõi<br/>có sentiment vs không sentiment]
+    ci[Bootstrap confidence interval<br/>delta giữa các cấu hình]
+    robustness[Phân tích theo mã / regime / event-day]
+    report[Bảng kết quả + giới hạn<br/>điền vào luận văn]
+    artifacts[Manifest · seed · config · data hash<br/>MLflow / W&B logs]
+    demo[Streamlit demo tối giản<br/>forecast visualization]
+    metrics --> ablation --> ci --> robustness --> report
+    report --> artifacts
+    report --> demo
+  end
+
+  protocol --> sources
+  quality -->|Có| annotate
+  quality -->|Có| technical
+  quality -->|Có| cutoff
+  infer --> daily
+  price_features --> panel
+  price_features --> target
+  panel --> split
+  label --> split
+  leak_gate -->|Có| model_input
+  majority --> metrics
+  classical --> metrics
+  price_lstm --> metrics
+  fusion_lstm --> metrics
+  tft --> metrics
+  cross_attention -.Viết hướng phát triển.-> report
+
+  legend[Chú thích: xanh lá = sàn bắt buộc · xanh dương = pipeline/model chính · tím nét đứt = stretch hoặc tương lai · cam = cổng kiểm]
+
+  classDef data fill:#ecfeff,stroke:#0891b2,color:#164e63;
+  classDef model fill:#eff6ff,stroke:#2563eb,stroke-width:2px,color:#1e3a8a;
+  classDef floor fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d;
+  classDef stretch fill:#faf5ff,stroke:#7c3aed,stroke-dasharray:5 5,color:#4c1d95;
+  classDef proc fill:#fff7ed,stroke:#c2410c,color:#7c2d12;
+  classDef note fill:#f8fafc,stroke:#64748b,color:#334155;
+
+  class start,protocol,sources data;
+  class daily,panel,target,model_input,artifacts data;
+  class phobert,infer,technical,price_features,majority,classical,price_lstm,metrics,ablation,ci,robustness,report,demo model;
+  class fusion_lstm floor;
+  class tft,cross_attention stretch;
+  class annotate,agreement,sent_split,cutoff,label,split,leak_fix proc;
+  class quality,leak_gate proc;
+  class legend note;
