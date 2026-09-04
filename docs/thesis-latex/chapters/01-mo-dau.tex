@@ -200,24 +200,24 @@ mà là hình thành một quy trình có thể kiểm tra từ dữ liệu đ�
 Để trả lời các câu hỏi nghiên cứu, đồ án đặt ra bốn mục tiêu cụ thể có thể kiểm chứng:
 
 \begin{enumerate}[nosep]
-  \item \textbf{Thứ nhất,} xây dựng quy trình thu thập, làm sạch, loại bỏ trùng lặp,
+  \item Thứ nhất, xây dựng quy trình thu thập, làm sạch, loại bỏ trùng lặp,
     chuẩn hóa và đồng bộ tin tức tài chính tiếng Việt với dữ liệu giá cổ phiếu theo ngày
     giao dịch; xây dựng hoặc hoàn thiện bộ dữ liệu có nhãn cảm xúc gồm ba lớp tích cực,
     trung tính và tiêu cực với tiêu chí gán nhãn rõ ràng; tinh chỉnh PhoBERT, so sánh head
     tuyến tính với ít nhất một kiến trúc kết hợp như PhoBERT với CNN hoặc PhoBERT với
     BiLSTM, rồi đánh giá khả năng phân biệt ba lớp trên cùng dữ liệu.
-  \item \textbf{Thứ hai,} xây dựng tập đặc trưng cảm xúc theo từng mã cổ phiếu và ngày
+  \item Thứ hai, xây dựng tập đặc trưng cảm xúc theo từng mã cổ phiếu và ngày
     giao dịch từ phân phối xác suất dự đoán thay vì chỉ sử dụng nhãn có xác suất cao nhất;
     xây dựng mô hình dự báo xu hướng phiên kế tiếp bằng các mô hình chỉ sử dụng giá, LSTM
     và Transformer hoặc Temporal Fusion Transformer khi đủ điều kiện; thiết kế cơ chế hợp
     nhất hai nhóm đặc trưng và so sánh mô hình kết hợp với majority, random cùng các mô
     hình chỉ sử dụng dữ liệu giá và chỉ báo kỹ thuật.
-  \item \textbf{Thứ ba,} thiết lập quy trình đánh giá theo thứ tự thời gian bằng walk-forward
+  \item Thứ ba, thiết lập quy trình đánh giá theo thứ tự thời gian bằng walk-forward
     validation, kiểm soát rò rỉ trong chuẩn hóa, xử lý giá trị thiếu, xác định ngưỡng nhãn,
     lựa chọn đặc trưng và điều chỉnh tham số, rồi phân tích xem tín hiệu cảm xúc có ổn định
     khác nhau giữa các giai đoạn thị trường, ngày có nhiều tin và ngày ít tin, hoặc ngày gắn
     với sự kiện hay không.
-  \item \textbf{Thứ tư,} xây dựng hệ thống thử nghiệm có khả năng tái lập để trực quan hóa
+  \item Thứ tư, xây dựng hệ thống thử nghiệm có khả năng tái lập để trực quan hóa
     kết quả và sử dụng cơ chế lựa chọn biến, attention hoặc các phương pháp giải thích phù
     hợp nhằm nhận diện vai trò cũng như giới hạn của đặc trưng cảm xúc trong quyết định dự
     báo.
@@ -324,9 +324,9 @@ các bản ghi này phải được đánh dấu, loại khỏi phân tích chí
 Bài toán dự báo được xây dựng dưới dạng phân loại ba lớp:
 
 \begin{itemize}[nosep]
-  \item \textbf{UP}: lợi suất của phiên kế tiếp lớn hơn ngưỡng tăng;
-  \item \textbf{FLAT}: lợi suất nằm trong vùng trung tính;
-  \item \textbf{DOWN}: lợi suất của phiên kế tiếp nhỏ hơn ngưỡng giảm.
+  \item UP: lợi suất của phiên kế tiếp lớn hơn ngưỡng tăng;
+  \item FLAT: lợi suất nằm trong vùng trung tính;
+  \item DOWN: lợi suất của phiên kế tiếp nhỏ hơn ngưỡng giảm.
 \end{itemize}
 
 Ngưỡng được ước lượng trong tập huấn luyện của từng cửa sổ, không lấy phân vị của toàn

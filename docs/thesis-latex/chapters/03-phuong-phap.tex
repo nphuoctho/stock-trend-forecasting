@@ -197,13 +197,13 @@ thời gian cho phép.
         fill=violet!6, inner sep=4pt},
       arr/.style={-{Stealth[length=2.5mm]}, thick, black!65},
     ]
-    \node[stage] (g1) {\textbf{1. Thu thập dữ liệu}\\ Giá OHLCV 10 mã VN30 + tin tức Vietstock (2020--2026)};
-    \node[model, below=of g1] (g2) {\textbf{2. Phân tích cảm xúc}\\ PhoBERT tinh chỉnh $\rightarrow$ xác suất 3 lớp: Tích cực / Trung tính / Tiêu cực};
-    \node[stage, below=of g2] (g3) {\textbf{3. Đặc trưng giá}\\ Lợi suất + chỉ báo kỹ thuật (MA, RSI, MACD, biến động)};
-    \node[stage, below=of g3] (g4) {\textbf{4. Căn chỉnh và gán nhãn}\\ Gộp cảm xúc + giá theo mã-ngày, cutoff 15:00, nhãn UP / FLAT / DOWN};
-    \node[floor, below=of g4] (g5) {\textbf{5. Mô hình dự báo}\\ Baseline $\rightarrow$ LSTM một nhánh $\rightarrow$ \textbf{LSTM hai nhánh (sàn tốt nghiệp)}};
-    \node[ext, below=of g5] (g6) {\textbf{Mở rộng:} Temporal Fusion Transformer (TFT), gated cross-attention};
-    \node[stage, below=of g6] (g7) {\textbf{6. Đánh giá}\\ Walk-forward + ablation có/không cảm xúc, macro-F1, bootstrap CI};
+    \node[stage] (g1) {1. Thu thập dữ liệu\\ Giá OHLCV 10 mã VN30 + tin tức Vietstock (2020--2026)};
+    \node[model, below=of g1] (g2) {2. Phân tích cảm xúc\\ PhoBERT tinh chỉnh $\rightarrow$ xác suất 3 lớp: Tích cực / Trung tính / Tiêu cực};
+    \node[stage, below=of g2] (g3) {3. Đặc trưng giá\\ Lợi suất + chỉ báo kỹ thuật (MA, RSI, MACD, biến động)};
+    \node[stage, below=of g3] (g4) {4. Căn chỉnh và gán nhãn\\ Gộp cảm xúc + giá theo mã-ngày, cutoff 15:00, nhãn UP / FLAT / DOWN};
+    \node[floor, below=of g4] (g5) {5. Mô hình dự báo\\ Baseline $\rightarrow$ LSTM một nhánh $\rightarrow$ LSTM hai nhánh (sàn tốt nghiệp)};
+    \node[ext, below=of g5] (g6) {Mở rộng: Temporal Fusion Transformer (TFT), gated cross-attention};
+    \node[stage, below=of g6] (g7) {6. Đánh giá\\ Walk-forward + ablation có/không cảm xúc, macro-F1, bootstrap CI};
 
     \draw[arr] (g1) -- (g2);
     \draw[arr] (g2) -- (g3);
@@ -582,8 +582,8 @@ metadata của bài viết ngoài các đặc trưng đã được quy định. 
 hai cấu hình:
 
 \begin{enumerate}[nosep]
-  \item \textbf{Price-only}: chỉ sử dụng $X^p$;
-  \item \textbf{Price plus sentiment}: sử dụng cả $X^p$ và $X^s$.
+  \item Price-only: chỉ sử dụng $X^p$;
+  \item Price plus sentiment: sử dụng cả $X^p$ và $X^s$.
 \end{enumerate}
 
 Hai cấu hình phải có cùng ngày train, validation, test, cùng cách fit preprocessing,
@@ -723,7 +723,7 @@ Bảng~\ref{tab:cau-hinh} tóm tắt các quyết định thiết kế chính c�
   \label{tab:cau-hinh}
   \begin{tabular}{p{4cm} p{9cm}}
     \toprule
-    \textbf{Thành phần} & \textbf{Lựa chọn} \\
+    Thành phần & Lựa chọn \\
     \midrule
     Mô hình cảm xúc & PhoBERT-base fine-tune, ba lớp và đầu ra xác suất \\
     Mô hình chuỗi thời gian & LSTM hai nhánh là mức sàn, TFT là tầng mở rộng \\
