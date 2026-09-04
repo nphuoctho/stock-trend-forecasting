@@ -1,4 +1,4 @@
-\chapter{TỔNG QUAN}
+\chapter{CƠ SỞ LÝ THUYẾT VÀ MÔ HÌNH NGHIÊN CỨU}
 \label{ch:tong-quan}
 
 Chương này khảo sát các công trình liên quan đến bài toán sử dụng tin tức tài chính để
@@ -36,7 +36,7 @@ thể hiện rõ hướng tác động.
 \subsection{Từ mô hình ngôn ngữ tổng quát đến mô hình miền tài chính}
 
 BERT đặt nền tảng cho hướng tiền huấn luyện một mô hình ngôn ngữ trên lượng văn bản
-lớn trước khi tinh chỉnh cho một nhiệm vụ cụ thể. Nhờ cơ chế Transformer và self-
+lớn trước khi tinh chỉnh cho một nhiệm vụ cụ thể \cite{Devlin2019_bert}. Nhờ cơ chế Transformer và self-
 attention, mô hình có thể tạo biểu diễn phụ thuộc vào ngữ cảnh thay vì gán một ý nghĩa
 cố định cho từng từ. Khi được tinh chỉnh trên dữ liệu có nhãn, biểu diễn này có thể
 phục vụ phân loại văn bản, nhận dạng thực thể hoặc trích xuất thông tin. Tuy nhiên,
@@ -374,7 +374,8 @@ với cải thiện do kiến trúc.
 
 \subsection{LSTM cho phụ thuộc ngắn hạn và dài hạn}
 
-LSTM đọc chuỗi theo thứ tự thời gian và duy trì trạng thái ẩn cùng trạng thái ô nhớ.
+LSTM đọc chuỗi theo thứ tự thời gian và duy trì trạng thái ẩn cùng trạng thái ô nhớ
+\cite{Hochreiter1997_lstm}.
 Các cổng vào, cổng quên và cổng ra giúp mô hình quyết định thông tin nào được giữ lại
 hoặc loại bỏ qua nhiều bước. Với cửa sổ giá, LSTM có thể học sự thay đổi của lợi suất,
 khối lượng và chỉ báo qua các ngày liên tiếp. Với cửa sổ sentiment, LSTM có thể học
@@ -397,7 +398,8 @@ cấp lịch sử dài hơn hoặc nhiều cơ hội điều chỉnh hơn.
 
 \subsection{Transformer cho chuỗi thời gian}
 
-Transformer dùng self-attention để kết nối các vị trí trong chuỗi. So với cách truyền
+Transformer dùng self-attention để kết nối các vị trí trong chuỗi
+\cite{Vaswani2017_attention}. So với cách truyền
 trạng thái tuần tự, attention cho phép mô hình xem xét trực tiếp các thời điểm xa nhau
 và nhiều nhóm biến. Đối với dữ liệu giá, đây là khả năng hữu ích khi một biến động hiện
 tại liên quan đến một mẫu xuất hiện trước đó nhiều phiên. Tuy nhiên, attention không
@@ -431,10 +433,11 @@ tĩnh, biến được biết trước và biến quan sát theo thời gian, đ
 diễn phục vụ dự báo. Nếu áp dụng cho đề tài, TFT phải được cấu hình cho phân loại ba
 lớp, có output size bằng 3 và dùng loss phân loại. Variable importance hoặc attention
 chỉ cho biết mô hình sử dụng biến như thế nào trong một điều kiện cụ thể, không đủ để
-suy ra rằng sentiment gây ra biến động giá.
+suy ra rằng sentiment gây ra biến động giá \cite{Lim2021_tft}.
 
 Thai và cộng sự (2026) áp dụng TFT cho các mã VIC, VRE và VHM trên 1.629 phiên giao
-dịch. Dữ liệu đầu vào gồm giá và các chỉ báo RSI, MACD, OBV. Công trình so sánh TFT
+dịch. Dữ liệu đầu vào gồm giá và các chỉ báo RSI, MACD, OBV
+\cite{Wilder1978_rsi,Appel2005_macd}. Công trình so sánh TFT
 với LSTM và BiLSTM trong bài toán dự báo giá, và báo cáo TFT giảm MAE khoảng 40 đến
 50\% so với hai mô hình hồi quy tuần tự, đồng thời duy trì MAPE dưới 2\% trên ba cổ
 phiếu. Kết quả cho thấy TFT có tiềm năng khi dữ liệu thị trường và chỉ báo được tổ
