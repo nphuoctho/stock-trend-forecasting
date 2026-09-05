@@ -1,4 +1,4 @@
-\chapter{TỔNG QUAN}
+\chapter{CƠ SỞ LÝ THUYẾT VÀ MÔ HÌNH NGHIÊN CỨU}
 \label{ch:tong-quan}
 
 Chương này khảo sát các công trình liên quan đến bài toán sử dụng tin tức tài chính để
@@ -36,7 +36,7 @@ thể hiện rõ hướng tác động.
 \subsection{Từ mô hình ngôn ngữ tổng quát đến mô hình miền tài chính}
 
 BERT đặt nền tảng cho hướng tiền huấn luyện một mô hình ngôn ngữ trên lượng văn bản
-lớn trước khi tinh chỉnh cho một nhiệm vụ cụ thể. Nhờ cơ chế Transformer và self-
+lớn trước khi tinh chỉnh cho một nhiệm vụ cụ thể \cite{Devlin2019_bert}. Nhờ cơ chế Transformer và self-
 attention, mô hình có thể tạo biểu diễn phụ thuộc vào ngữ cảnh thay vì gán một ý nghĩa
 cố định cho từng từ. Khi được tinh chỉnh trên dữ liệu có nhãn, biểu diễn này có thể
 phục vụ phân loại văn bản, nhận dạng thực thể hoặc trích xuất thông tin. Tuy nhiên,
@@ -374,7 +374,8 @@ với cải thiện do kiến trúc.
 
 \subsection{LSTM cho phụ thuộc ngắn hạn và dài hạn}
 
-LSTM đọc chuỗi theo thứ tự thời gian và duy trì trạng thái ẩn cùng trạng thái ô nhớ.
+LSTM đọc chuỗi theo thứ tự thời gian và duy trì trạng thái ẩn cùng trạng thái ô nhớ
+\cite{Hochreiter1997_lstm}.
 Các cổng vào, cổng quên và cổng ra giúp mô hình quyết định thông tin nào được giữ lại
 hoặc loại bỏ qua nhiều bước. Với cửa sổ giá, LSTM có thể học sự thay đổi của lợi suất,
 khối lượng và chỉ báo qua các ngày liên tiếp. Với cửa sổ sentiment, LSTM có thể học
@@ -397,7 +398,8 @@ cấp lịch sử dài hơn hoặc nhiều cơ hội điều chỉnh hơn.
 
 \subsection{Transformer cho chuỗi thời gian}
 
-Transformer dùng self-attention để kết nối các vị trí trong chuỗi. So với cách truyền
+Transformer dùng self-attention để kết nối các vị trí trong chuỗi
+\cite{Vaswani2017_attention}. So với cách truyền
 trạng thái tuần tự, attention cho phép mô hình xem xét trực tiếp các thời điểm xa nhau
 và nhiều nhóm biến. Đối với dữ liệu giá, đây là khả năng hữu ích khi một biến động hiện
 tại liên quan đến một mẫu xuất hiện trước đó nhiều phiên. Tuy nhiên, attention không
@@ -431,10 +433,11 @@ tĩnh, biến được biết trước và biến quan sát theo thời gian, đ
 diễn phục vụ dự báo. Nếu áp dụng cho đề tài, TFT phải được cấu hình cho phân loại ba
 lớp, có output size bằng 3 và dùng loss phân loại. Variable importance hoặc attention
 chỉ cho biết mô hình sử dụng biến như thế nào trong một điều kiện cụ thể, không đủ để
-suy ra rằng sentiment gây ra biến động giá.
+suy ra rằng sentiment gây ra biến động giá \cite{Lim2021_tft}.
 
 Thai và cộng sự (2026) áp dụng TFT cho các mã VIC, VRE và VHM trên 1.629 phiên giao
-dịch. Dữ liệu đầu vào gồm giá và các chỉ báo RSI, MACD, OBV. Công trình so sánh TFT
+dịch. Dữ liệu đầu vào gồm giá và các chỉ báo RSI, MACD, OBV
+\cite{Wilder1978_rsi,Appel2005_macd}. Công trình so sánh TFT
 với LSTM và BiLSTM trong bài toán dự báo giá, và báo cáo TFT giảm MAE khoảng 40 đến
 50\% so với hai mô hình hồi quy tuần tự, đồng thời duy trì MAPE dưới 2\% trên ba cổ
 phiếu. Kết quả cho thấy TFT có tiềm năng khi dữ liệu thị trường và chỉ báo được tổ
@@ -597,15 +600,15 @@ trị vì giúp xác định giới hạn của tín hiệu trong dữ liệu v�
 Có thể chia cơ chế fusion thành ba nhóm:
 
 \begin{enumerate}[nosep]
-  \item \textbf{Early fusion}: chuẩn hóa rồi nối hai nhóm đặc trưng trước bộ mã hóa.
+  \item Early fusion: chuẩn hóa rồi nối hai nhóm đặc trưng trước bộ mã hóa.
     Cách này đơn giản, ít tầng kết hợp và dễ triển khai, nhưng nhóm có nhiều chiều hoặc
     có thang đo lớn có thể lấn át nhóm còn lại. Nếu nối dữ liệu trước khi căn chỉnh
     thời gian, lỗi timestamp cũng khó phát hiện.
-  \item \textbf{Late fusion}: mỗi nhánh tạo biểu diễn hoặc dự đoán riêng, sau đó một
+  \item Late fusion: mỗi nhánh tạo biểu diễn hoặc dự đoán riêng, sau đó một
     lớp kết hợp các đầu ra. Cách này tách biệt quy trình xử lý văn bản và giá, thuận
     lợi cho ablation, nhưng có thể bỏ lỡ tương tác chi tiết giữa một tin cụ thể với
     một trạng thái giá cụ thể.
-  \item \textbf{Gated hoặc cross-attention fusion}: mô hình học cách chọn thông tin
+  \item Gated hoặc cross-attention fusion: mô hình học cách chọn thông tin
     giữa hai nhánh theo thời điểm và ngữ cảnh. Cách này giàu biểu đạt hơn, có thể giảm
     ảnh hưởng của tín hiệu nhiễu, nhưng cần nhiều dữ liệu hơn và dễ tăng phương sai.
 \end{enumerate}
@@ -663,8 +666,8 @@ công bố như thể chúng cùng nằm trên một benchmark.
 Từ các công trình đã khảo sát, đề tài xác định năm khoảng trống cần tiếp tục nghiên
 cứu như sau.
 
-\textbf{Thứ nhất, dữ liệu và mô hình phân tích cảm xúc tài chính tiếng Việt còn hạn
-chế về quy mô và phạm vi.} Nghiên cứu của Nguyen Son Tung và cộng sự (2021) cho thấy
+Thứ nhất, dữ liệu và mô hình phân tích cảm xúc tài chính tiếng Việt còn hạn
+chế về quy mô và phạm vi. Nghiên cứu của Nguyen Son Tung và cộng sự (2021) cho thấy
 PhoBERT có thể đạt độ chính xác khoảng 93\% trên hơn 1.000 tiêu đề CafeF, nhưng dữ
 liệu chỉ bao quát tiêu đề và chưa phản ánh đầy đủ nội dung bài viết. Tập nhỏ cũng khó
 đại diện cho sự thay đổi ngôn ngữ trong nhiều năm, nhiều ngành và nhiều loại sự kiện.
@@ -674,9 +677,9 @@ tiền huấn luyện. Khoảng trống này đặt ra nhu cầu xây dựng ho�
 Việt có nhãn, dùng một backbone phù hợp ngôn ngữ và đánh giá riêng chất lượng sentiment
 trước khi đưa đầu ra vào mô hình giá.
 
-\textbf{Thứ hai, những hướng tiếp cận sử dụng mô hình ngôn ngữ thương mại có thể tạo
+Thứ hai, những hướng tiếp cận sử dụng mô hình ngôn ngữ thương mại có thể tạo
 ra đặc trưng cảm xúc chi tiết, nhưng làm phát sinh hạn chế về khả năng tái lập, kiểm
-soát phiên bản và chi phí.} Công trình trình bày tại SOICT 2025 sử dụng GPT-4o và
+soát phiên bản và chi phí. Công trình trình bày tại SOICT 2025 sử dụng GPT-4o và
 sentiment theo 33 khía cạnh từ hơn 16.000 tin tức, đạt AUC tối đa 0,67 với XGBoost
 trên phạm vi được nêu trong tóm tắt. Kết quả gợi ý giá trị của phân tích theo khía
 cạnh, nhưng bằng chứng hiện có vẫn cần được đọc trong giới hạn của một bản tóm tắt
@@ -684,7 +687,7 @@ hội nghị. Prompt, phiên bản GPT-4o, chi phí suy luận và khả năng t
 có thể ảnh hưởng đến kết quả. Vì vậy, cần một pipeline dùng mô hình mở, ghi nhận
 checkpoint, tokenizer, seed và cấu hình để các bước có thể được kiểm tra lại.
 
-\textbf{Thứ ba, những bài toán và phạm vi thực nghiệm hiện có chưa thống nhất.} Nghiên
+Thứ ba, những bài toán và phạm vi thực nghiệm hiện có chưa thống nhất. Nghiên
 cứu của Luong Nhu Y và cộng sự (2023) dự báo giá đóng cửa và chỉ thực nghiệm trên một
 mã ACB. Nghiên cứu của Phong và cộng sự (2026) thực hiện phân loại nhị phân ở cấp
 VN-Index. Nghiên cứu của Thai và cộng sự (2026) dùng TFT trên ba mã VIC, VRE và VHM,
@@ -694,7 +697,7 @@ hướng tăng, giảm và đi ngang trên một tập cổ phiếu Việt Nam c
 Đề tài thu hẹp và làm rõ nhiệm vụ bằng cách dự báo hướng của phiên kế tiếp trên nhiều
 mã, đồng thời duy trì cùng định nghĩa nhãn và protocol để có thể so sánh giữa các mã.
 
-\textbf{Thứ tư, phương pháp đánh giá theo thời gian chưa được áp dụng nhất quán.} Việc
+Thứ tư, phương pháp đánh giá theo thời gian chưa được áp dụng nhất quán. Việc
 dùng ten-fold cross-validation cho dữ liệu thị trường có thể trộn lẫn các giai đoạn
 trước và sau nếu các nếp gấp không bảo toàn thứ tự thời gian. Khi đó, các thống kê
 chuẩn hóa, ngưỡng tạo nhãn, lựa chọn đặc trưng hoặc thông tin về phân phối tương lai
@@ -703,8 +706,8 @@ theo thời điểm, xác định cutoff cho tin, và fit mọi tham số chỉ 
 nhà đầu tư có thể quan sát ở thời điểm đó. Quy trình walk-forward được chọn để hạn chế
 rò rỉ và đánh giá sự ổn định qua các cửa sổ thời gian.
 
-\textbf{Thứ năm, đóng góp riêng của tín hiệu cảm xúc chưa được đánh giá đầy đủ trong
-cùng một kiến trúc và cùng điều kiện huấn luyện.} So sánh một mô hình có tin tức,
+Thứ năm, đóng góp riêng của tín hiệu cảm xúc chưa được đánh giá đầy đủ trong
+cùng một kiến trúc và cùng điều kiện huấn luyện. So sánh một mô hình có tin tức,
 dùng XGBoost hoặc LLM, với một mô hình chỉ giá, dùng LSTM hoặc một giao thức khác,
 không đủ để kết luận phần cải thiện đến từ dữ liệu tin tức hay từ năng lực mô hình.
 Do đó, cần thiết kế thí nghiệm loại bỏ đặc trưng, trong đó mô hình có sentiment và mô
@@ -727,7 +730,7 @@ ra giá trị bổ sung ổn định hay không.
   \label{tab:tq-so-sanh}
   \begin{tabular}{p{3.0cm} p{4.1cm} p{4.1cm} p{2.6cm}}
     \toprule
-    \textbf{Nhóm} & \textbf{Đặc điểm chính} & \textbf{Hạn chế khi áp dụng cho đề tài} & \textbf{Vai trò} \\
+    Nhóm & Đặc điểm chính & Hạn chế khi áp dụng cho đề tài & Vai trò \\
     \midrule
     Sentiment tài chính & FinBERT và PhoBERT tạo nhãn hoặc xác suất cảm xúc cho văn bản
     \cite{Yang2020_200608097v2,Nguyen2020_200300744v3} & Khác ngôn ngữ, miền,
