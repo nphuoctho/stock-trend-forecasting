@@ -17,9 +17,11 @@
   \setmainfont{Liberation Serif}  % metric-compatible substitute for Times New Roman
 }
 
-% --- 13pt body: base class caps at 12pt, so scale with anyfontsize ---
+% report.cls ignores the 13pt option, so set the body size explicitly.
 \usepackage{anyfontsize}
 \usepackage{setspace}
+\AtBeginDocument{\fontsize{13}{19.5}\selectfont}
+\setlength{\emergencystretch}{3em}
 
 % --- Margins: top 3cm, bottom 3.5cm, left 3.5cm, right 2cm ---
 \usepackage[
@@ -102,3 +104,11 @@
 \newcommand{\advisor}{TS. Đặng Văn Thìn}
 \newcommand{\major}{Trí tuệ nhân tạo}
 \newcommand{\thesisyear}{2026}
+% Keep the PDF metadata limited to the academic report identity.
+\AtBeginDocument{%
+  \hypersetup{
+    pdftitle={\thesistitle},
+    pdfauthor={\authorname},
+    pdfsubject={Đồ án tốt nghiệp ngành Trí tuệ nhân tạo}
+  }%
+}

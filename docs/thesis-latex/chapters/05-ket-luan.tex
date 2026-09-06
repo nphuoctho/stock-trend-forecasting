@@ -3,65 +3,65 @@
 
 \section{Tóm tắt nội dung thực hiện}
 
-Đồ án đã xác định một pipeline dự báo xu hướng biến động giá cổ phiếu trên sàn HOSE,
-trong đó tin tức tài chính tiếng Việt được xử lý bằng PhoBERT, còn dữ liệu giá được
-biểu diễn bằng lợi suất và các đặc trưng kỹ thuật. Hai nhánh dữ liệu được căn chỉnh
-theo mã cổ phiếu, ngày giao dịch và mốc cutoff, sau đó được đưa vào thang mô hình từ
-baseline đến LSTM hai nhánh có fusion. Temporal Fusion Transformer được đặt ở vị trí
-mở rộng để không làm thay đổi mức sàn của đồ án.
+Đồ án đã xác định quy trình dự báo xu hướng biến động giá cổ phiếu trên sàn HOSE. Trong
+quy trình này, tin tức tài chính tiếng Việt được xử lý bằng PhoBERT, còn dữ liệu giá được
+biểu diễn bằng lợi suất và các đặc trưng kỹ thuật. Hai nhánh dữ liệu được căn chỉnh theo
+mã cổ phiếu, ngày giao dịch và mốc cắt thông tin, sau đó được đưa vào thang mô hình từ
+đối chứng cơ sở đến LSTM hai nhánh có cơ chế hợp nhất. Temporal Fusion Transformer được
+đặt ở vị trí mở rộng để không làm thay đổi cấu hình cơ sở của đồ án.
 
-Quy trình gồm thu thập dữ liệu, kiểm tra provenance và trùng lặp, gán nhãn sentiment,
-sinh xác suất ba lớp, tổng hợp đặc trưng theo mã và ngày, tạo nhãn UP, FLAT và DOWN,
-huấn luyện, đánh giá walk-forward và phân tích ablation. Trong đó, train-only
-preprocessing, cutoff 15 giờ và holdout cuối được khóa là các điều kiện cần để kết quả
-có thể được diễn giải như dự báo ngoài mẫu.
+Quy trình gồm thu thập dữ liệu, kiểm tra thông tin truy nguyên và bản ghi trùng, gán nhãn
+cảm xúc, sinh xác suất của ba lớp, tổng hợp đặc trưng theo mã và ngày, tạo nhãn UP, FLAT
+và DOWN, huấn luyện, đánh giá cuốn chiếu theo thời gian và phân tích loại bỏ đặc trưng.
+Trong đó, tiền xử lý chỉ học từ tập huấn luyện, mốc cắt thông tin 15 giờ và tập giữ lại
+cuối cùng được khóa là các điều kiện cần để kết quả có thể được diễn giải như dự báo
+ngoài mẫu.
 
 \section{Đối chiếu với mục tiêu và câu hỏi nghiên cứu}
 
 Mục tiêu thứ nhất là tạo bộ dữ liệu có thể truy nguyên. Mức độ hoàn thành mục tiêu này
-không chỉ tính bằng số bản ghi, mà còn bằng tỷ lệ có mã, timestamp, nội dung, lịch giá
-và nguồn dữ liệu. Bản ghi không thể xác minh phải được loại khỏi phân tích chính hoặc
-báo cáo riêng để người đọc biết phạm vi quan sát thực tế.
+không chỉ được đánh giá bằng số bản ghi, mà còn bằng tỷ lệ bản ghi có mã, thời điểm,
+nội dung, lịch giá và nguồn dữ liệu. Bản ghi không thể xác minh phải được loại khỏi phân
+tích chính hoặc báo cáo riêng để xác định phạm vi quan sát thực tế.
 
-Mục tiêu thứ hai là đánh giá PhoBERT ở tầng sentiment. Kết luận về tầng này phải dựa
-trên accuracy, macro-F1, F1 theo lớp và độ đồng thuận của tập nhãn in-domain. Chất
-lượng phân loại sentiment không đồng nghĩa với giá trị dự báo, vì một mô hình phân loại
-tốt vẫn có thể tạo ra tín hiệu ít liên quan đến lợi suất phiên kế tiếp. Dùng backbone
-tiếng Việt mở là lựa chọn phù hợp với dữ liệu, tương tự việc FinBERT được thích nghi
-cho ngữ liệu tài chính tiếng Anh, nhưng không phải bằng chứng rằng hai mô hình có hiệu
-năng tương đương \cite{Nguyen2020_200300744v3,Yang2020_200608097v2}.
+Mục tiêu thứ hai là đánh giá PhoBERT ở tầng cảm xúc. Kết luận về tầng này phải dựa trên
+độ chính xác, macro-F1, F1 theo lớp và độ đồng thuận của tập nhãn trong miền. Chất lượng
+phân loại cảm xúc không đồng nghĩa với giá trị dự báo, vì một mô hình phân loại tốt vẫn
+có thể tạo ra tín hiệu ít liên quan đến lợi suất của phiên kế tiếp. PhoBERT được lựa chọn
+do phù hợp với ngôn ngữ của dữ liệu; việc lựa chọn này không thay thế cho kết quả đánh
+giá trên tập dữ liệu của đề tài \cite{Nguyen2020_200300744v3,Yang2020_200608097v2}.
 
 Mục tiêu thứ ba và thứ tư là kết hợp hai nguồn dữ liệu và huấn luyện mô hình dự báo.
-LSTM hai nhánh là cấu hình sàn có thể kiểm tra trực tiếp. Cấu hình này kế thừa ý tưởng
-kết hợp sentiment với LSTM trong các nghiên cứu quốc tế, nhưng thay đổi ngôn ngữ, thị
-trường, mục tiêu ba lớp và protocol thời gian \cite{Halder2022_221107392v1,
-Gu2024_240716150v1}. Vì các điều kiện khác nhau, kết luận phải được rút ra từ bảng
-điểm trên chính dữ liệu HOSE.
+LSTM hai nhánh là cấu hình cơ sở có thể kiểm tra trực tiếp. Cấu hình này kế thừa ý tưởng
+kết hợp tín hiệu cảm xúc với LSTM trong các nghiên cứu quốc tế, nhưng được đặt trong
+bối cảnh ngôn ngữ, thị trường, mục tiêu ba lớp và giao thức thời gian khác
+\cite{Halder2022_221107392v1,Gu2024_240716150v1}. Vì các điều kiện không đồng nhất,
+kết luận phải được rút ra từ bảng điểm trên chính dữ liệu HOSE.
 
-Mục tiêu thứ năm là đo phần đóng góp riêng của sentiment. Phép đo phù hợp là chênh lệch
-giữa mô hình có sentiment và mô hình chỉ giá trên cùng cửa sổ, seed hoặc tập seed,
-preprocessing và holdout. Nếu chênh lệch nhỏ, không ổn định hoặc chưa khác biệt rõ,
-kết quả vẫn trả lời được câu hỏi nghiên cứu. Khi đó, kết luận đúng là chưa có bằng chứng
-đủ mạnh về giá trị gia tăng trong protocol hiện tại, không phải phủ định khả năng
-sentiment hữu ích ở thời điểm hoặc thị trường khác.
+Mục tiêu thứ năm là đo phần đóng góp riêng của tín hiệu cảm xúc. Phép đo phù hợp là
+chênh lệch giữa mô hình có cảm xúc và mô hình chỉ dùng giá trên cùng cửa sổ, hạt giống
+ngẫu nhiên hoặc tập hạt giống, quy trình tiền xử lý và tập giữ lại cuối cùng. Nếu chênh
+lệch nhỏ, không ổn định hoặc chưa khác biệt rõ, kết quả vẫn trả lời được câu hỏi nghiên
+cứu. Khi đó, kết luận phù hợp là chưa có bằng chứng đủ mạnh về giá trị gia tăng trong
+quy trình hiện tại, không phải phủ định khả năng tín hiệu cảm xúc hữu ích ở bối cảnh khác.
 
 \section{Đóng góp và ý nghĩa}
 
 Đóng góp chính của đồ án là một quy trình thực nghiệm đa phương thức cho dữ liệu tiếng
-Việt được mô tả tường minh. Quy trình nối backbone NLP mở với nhánh chuỗi giá, đồng
-thời đặt ablation và kiểm soát point-in-time ở vị trí trung tâm. Điều này cần thiết vì
-các hướng fusion dùng embedding, sự kiện hoặc LLM có năng lực biểu đạt cao hơn nhưng
-cũng đòi hỏi nhiều dữ liệu, chi phí và điều kiện tái lập hơn
-\cite{Chen2021_210708721v1,Elahi2024_241101368v1,Liang2024_241210823v2}.
+Việt được mô tả tường minh. Quy trình nối mô hình ngôn ngữ mở với nhánh chuỗi giá, đồng
+thời đặt phép loại bỏ đặc trưng và kiểm soát tại thời điểm quan sát ở vị trí trung tâm.
+Điều này cần thiết vì các hướng hợp nhất dùng biểu diễn ngữ cảnh, sự kiện hoặc mô hình
+ngôn ngữ lớn có năng lực biểu đạt cao hơn nhưng cũng đòi hỏi nhiều dữ liệu, chi phí và
+điều kiện tái lập hơn \cite{Chen2021_210708721v1,Elahi2024_241101368v1,Liang2024_241210823v2}.
 
-Về phương pháp, đồ án phân biệt ba loại kết luận. Loại thứ nhất là chất lượng sentiment
-trên tập được gán nhãn. Loại thứ hai là khả năng dự báo ngoài mẫu của từng mô hình.
-Loại thứ ba là phần đóng góp biên của sentiment qua ablation. Ba loại kết luận này có
-liên quan nhưng không thể thay thế cho nhau.
+Về phương pháp, đồ án phân biệt ba loại kết luận. Loại thứ nhất là chất lượng phân loại
+cảm xúc trên tập được gán nhãn. Loại thứ hai là khả năng dự báo ngoài mẫu của từng mô
+hình. Loại thứ ba là phần đóng góp biên của tín hiệu cảm xúc qua phép loại bỏ đặc trưng.
+Ba loại kết luận này có liên quan nhưng không thể thay thế cho nhau.
 
-Về thực tiễn, pipeline có thể làm nền cho công cụ thăm dò dữ liệu, giúp người nghiên
-cứu xem phân bố tin, xác suất sentiment, trạng thái kỹ thuật và lớp dự báo theo ngày.
-Tuy nhiên, pipeline chưa phải hệ thống giao dịch và không cung cấp khuyến nghị đầu tư.
+Về thực tiễn, quy trình có thể làm nền cho công cụ thăm dò dữ liệu, giúp người nghiên cứu
+quan sát phân bố tin, xác suất cảm xúc, trạng thái kỹ thuật và lớp dự báo theo ngày. Tuy
+nhiên, quy trình chưa phải là hệ thống giao dịch và không cung cấp khuyến nghị đầu tư.
 Giá trị kinh tế sau phí giao dịch, trượt giá và giới hạn thanh khoản cần được đánh giá
 trong một nghiên cứu riêng.
 
@@ -72,34 +72,31 @@ Thứ nhất, phạm vi chỉ gồm 10 mã VN30 trên HOSE trong giai đoạn 20
 nên chưa đủ cơ sở để suy rộng sang cổ phiếu vốn hóa nhỏ, HNX, UPCOM hoặc thị trường
 quốc tế.
 
-Thứ hai, dữ liệu tin phụ thuộc vào nguồn, chính sách truy cập và chất lượng timestamp.
-Bài viết bị thiếu thời gian hoặc được cập nhật nhiều lần có thể làm thay đổi cách ánh
-xạ. Cutoff bảo thủ giúp giảm nguy cơ dùng tin tương lai, nhưng cũng có thể làm trễ một
-phần tín hiệu được thị trường nhìn thấy trước phiên kế tiếp.
+Thứ hai, dữ liệu tin phụ thuộc vào nguồn, chính sách truy cập và chất lượng thời điểm.
+Bài viết bị thiếu thời gian hoặc được cập nhật nhiều lần có thể làm thay đổi cách ánh xạ.
+Mốc cắt thông tin bảo thủ giúp giảm nguy cơ sử dụng dữ liệu tương lai, nhưng cũng có thể
+làm trễ một phần tín hiệu được thị trường nhìn thấy trước phiên kế tiếp.
 
-Thứ ba, nhãn sentiment phụ thuộc vào hướng dẫn và người gán. Một bài có nhiều sự kiện
-có thể vừa tích cực vừa tiêu cực, trong khi nhãn ba lớp phải nén các sắc thái đó. Độ
-đồng thuận, phân bố lớp và các mẫu bất đồng cần được công bố để người đọc đánh giá giới
-hạn này.
+Thứ ba, nhãn cảm xúc phụ thuộc vào hướng dẫn và người gán. Một bài có nhiều sự kiện có
+thể vừa tích cực vừa tiêu cực, trong khi nhãn ba lớp phải nén các sắc thái đó. Độ đồng
+thuận, phân bố lớp và các mẫu bất đồng cần được công bố để người đọc đánh giá giới hạn này.
 
-Thứ tư, dự báo phiên kế tiếp chỉ quan sát một horizon ngắn. Tin về kế hoạch dài hạn,
-chất lượng quản trị hoặc thay đổi ngành có thể chưa thể hiện trong lợi suất của phiên
-sau. Ngoài ra, metric phân loại không phản ánh trực tiếp khả năng sinh lợi. Các nghiên
-cứu dùng mô phỏng giao dịch hoặc mô hình quan hệ liên mã cho thấy cần thêm nhiều góc
-nhìn, nhưng những mở rộng đó nằm ngoài mức sàn \cite{Chen2021_210708721v1,
-Xu2021_211013716v2}.
+Thứ tư, dự báo phiên kế tiếp chỉ quan sát một khoảng thời gian ngắn. Tin về kế hoạch dài
+hạn, chất lượng quản trị hoặc thay đổi ngành có thể chưa thể hiện trong lợi suất của phiên
+sau. Ngoài ra, chỉ số phân loại không phản ánh trực tiếp khả năng sinh lợi. Các nghiên cứu
+dùng mô phỏng giao dịch hoặc mô hình quan hệ liên mã cho thấy cần thêm nhiều góc nhìn,
+nhưng những mở rộng đó nằm ngoài cấu hình cơ sở
+\cite{Chen2021_210708721v1,Xu2021_211013716v2}.
 
 \section{Kết luận cuối cùng}
 
 Đề tài đưa ra một cách tiếp cận có kiểm soát để kiểm tra việc bổ sung cảm xúc tin tức
-tiếng Việt vào dự báo xu hướng giá cổ phiếu. PhoBERT phù hợp làm backbone ngôn ngữ,
-LSTM hai nhánh phù hợp làm mức sàn để so sánh price-only và có sentiment, còn TFT là
-hướng mở rộng sau khi mức sàn được xác minh. Giá trị của đồ án không nằm ở giả định
-sentiment chắc chắn cải thiện điểm số, mà ở việc xây dựng phép đo có thể phân biệt tín
-hiệu thực với lợi thế do rò rỉ hoặc thay đổi protocol.
+tiếng Việt vào dự báo xu hướng giá cổ phiếu. PhoBERT được lựa chọn làm mô hình ngôn ngữ,
+LSTM hai nhánh được lựa chọn làm cấu hình cơ sở để so sánh mô hình chỉ dùng giá với mô
+hình có cảm xúc, còn TFT được giữ ở vị trí mở rộng sau khi cấu hình cơ sở được xác minh.
 
-Kết luận định lượng phải được điền từ bảng kết quả và manifest thực nghiệm ở
-Chương~\ref{ch:ket-qua}. Dù chênh lệch cuối cùng dương, bằng không hay âm, kết luận
-phải giữ đúng phạm vi mã, giai đoạn và điều kiện đánh giá. Cách trình bày này giúp đồ
-án có giá trị như một nghiên cứu có thể kiểm tra lại, thay vì đưa ra lời hứa hiệu năng
-không có cơ sở ngoài dữ liệu.
+Do chưa có kết quả huấn luyện và đánh giá chính thức, đồ án chưa đưa ra kết luận định
+lượng về hiệu quả của tín hiệu cảm xúc. Kết luận định lượng phải được bổ sung từ bảng
+kết quả và bản kiểm kê thực nghiệm ở Chương~\ref{ch:ket-qua}. Khi có số liệu, diễn giải
+phải giữ đúng phạm vi mã, giai đoạn và điều kiện đánh giá, không suy rộng thành lời hứa
+hiệu năng ngoài dữ liệu.

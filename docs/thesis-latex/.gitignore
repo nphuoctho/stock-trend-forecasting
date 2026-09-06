@@ -1,4 +1,7 @@
 # LaTeX build artifacts
+build/
+
+# Legacy artifacts created before the build directory was configured
 *.aux
 *.log
 *.out

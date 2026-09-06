@@ -1,4 +1,4 @@
-\chapter{PHƯƠNG PHÁP}
+\chapter{CƠ SỞ LÝ THUYẾT VÀ PHƯƠNG PHÁP NGHIÊN CỨU}
 \label{ch:phuong-phap}
 
 Chương này trình bày cơ sở lý thuyết, dữ liệu, kiến trúc hệ thống và giao thức đánh giá
@@ -47,7 +47,8 @@ phân tích chính hay chỉ ghi ở phần bổ sung.
 \subsection{Cơ sở lý thuyết của Transformer và self-attention}
 
 Transformer biểu diễn chuỗi token bằng các vector và dùng attention để xác định mức độ
-liên quan giữa các vị trí. Với ma trận truy vấn $Q$, khóa $K$ và giá trị $V$, scaled
+liên quan giữa các vị trí \cite{Vaswani2017_attention}. Với ma trận truy vấn $Q$, khóa
+$K$ và giá trị $V$, scaled
 dot-product attention được viết như sau:
 
 \begin{equation}
@@ -63,7 +64,7 @@ kiểu quan hệ khác nhau giữa các token. Trong mô hình ngôn ngữ, mỗ
 theo ngữ cảnh của toàn bộ câu. Điều này đặc biệt hữu ích với tin tài chính, vì ý nghĩa
 của một con số hoặc một động từ thường phụ thuộc vào doanh nghiệp, chủ thể và câu đứng
 trước hoặc sau nó. FinBERT và PhoBERT là hai ví dụ về việc dùng backbone thuộc họ BERT
-cho miền tài chính hoặc tiếng Việt \cite{Yang2020_200608097v2,
+cho miền tài chính hoặc tiếng Việt \cite{Devlin2019_bert,Yang2020_200608097v2,
 Nguyen2020_200300744v3}.
 
 Một encoder Transformer thường gồm multi-head attention, mạng feed-forward theo từng
@@ -101,8 +102,8 @@ lượng khác nhau.
 \subsection{Cơ sở lý thuyết của LSTM}
 
 LSTM đọc chuỗi theo thứ tự thời gian và duy trì trạng thái ẩn $\mathbf{h}_t$ cùng trạng
-thái ô nhớ $\mathbf{c}_t$. Với đầu vào $\mathbf{x}_t$, một bước cập nhật được mô tả
-bằng:
+thái ô nhớ $\mathbf{c}_t$ \cite{Hochreiter1997_lstm}. Với đầu vào $\mathbf{x}_t$, một
+bước cập nhật được mô tả như sau:
 
 \begin{align}
   \mathbf{i}_t &= \sigma(W_i\mathbf{x}_t+U_i\mathbf{h}_{t-1}+\mathbf{b}_i),\\
@@ -129,7 +130,7 @@ huấn luyện cũng cần được ghi lại khi phân tích chênh lệch.
 
 \subsection{Cơ sở lý thuyết của Temporal Fusion Transformer}
 
-TFT được đưa vào như mô hình mở rộng cho chuỗi nhiều biến. Mô hình kết hợp bộ mã hóa
+TFT được đưa vào như mô hình mở rộng cho chuỗi nhiều biến \cite{Lim2021_tft}. Mô hình kết hợp bộ mã hóa
 chuỗi với cơ chế chọn biến, các khối có cổng và attention. Vì vậy, một biến có thể có
 mức quan trọng khác nhau tùy thời điểm và trạng thái dự báo. Trong bài toán này, động
 lượng, volatility, tỷ lệ sentiment và cờ có tin là những nhóm biến cần được phân biệt.
@@ -161,17 +162,14 @@ Luồng xử lý của hệ thống gồm các bước:
 \end{enumerate}
 
 \ifShowDiagram
-Hình~\ref{fig:kien-truc} minh họa các bước chính của pipeline. Các khối TFT và gated
-cross-attention được đánh dấu là mở rộng, còn mô hình hai nhánh LSTM được xem là mức
-sàn. Cách phân biệt này giúp người đọc nhận biết phần bắt buộc với phần chỉ được chạy
-khi dữ liệu và thời gian cho phép.
+Hình~\ref{fig:kien-truc} minh họa các bước chính của quy trình xử lý. Các khối TFT và
+gated cross-attention được đánh dấu là mở rộng, còn mô hình hai nhánh LSTM được xem là
+cấu hình cơ sở. Cách phân biệt này giúp người đọc nhận biết phần bắt buộc với phần chỉ
+được thực hiện khi dữ liệu và thời gian cho phép.
 \else
-Luồng xử lý gồm các bước chính của pipeline. Các khối TFT và gated cross-attention
-được đánh dấu là mở rộng, còn mô hình hai nhánh LSTM được xem là mức sàn. Cách phân
-biệt này giúp người đọc nhận biết phần bắt buộc với phần chỉ được chạy khi dữ liệu và
-thời gian cho phép.
+Các bước chính của quy trình xử lý được mô tả trong phần này; sơ đồ minh họa được lược
+bỏ ở biến thể báo cáo không kèm hình.
 \fi
-
 \ifShowDiagram
 \begin{figure}[H]
   \centering
@@ -196,13 +194,13 @@ thời gian cho phép.
         fill=violet!6, inner sep=4pt},
       arr/.style={-{Stealth[length=2.5mm]}, thick, black!65},
     ]
-    \node[stage] (g1) {\textbf{1. Thu thập dữ liệu}\\ Giá OHLCV 10 mã VN30 + tin tức Vietstock (2020--2026)};
-    \node[model, below=of g1] (g2) {\textbf{2. Phân tích cảm xúc}\\ PhoBERT tinh chỉnh $\rightarrow$ xác suất 3 lớp: Tích cực / Trung tính / Tiêu cực};
-    \node[stage, below=of g2] (g3) {\textbf{3. Đặc trưng giá}\\ Lợi suất + chỉ báo kỹ thuật (MA, RSI, MACD, biến động)};
-    \node[stage, below=of g3] (g4) {\textbf{4. Căn chỉnh và gán nhãn}\\ Gộp cảm xúc + giá theo mã-ngày, cutoff 15:00, nhãn UP / FLAT / DOWN};
-    \node[floor, below=of g4] (g5) {\textbf{5. Mô hình dự báo}\\ Baseline $\rightarrow$ LSTM một nhánh $\rightarrow$ \textbf{LSTM hai nhánh (sàn tốt nghiệp)}};
-    \node[ext, below=of g5] (g6) {\textbf{Mở rộng:} Temporal Fusion Transformer (TFT), gated cross-attention};
-    \node[stage, below=of g6] (g7) {\textbf{6. Đánh giá}\\ Walk-forward + ablation có/không cảm xúc, macro-F1, bootstrap CI};
+    \node[stage] (g1) {1. Thu thập dữ liệu\\ Giá OHLCV của 10 mã VN30 và tin tức Vietstock trong giai đoạn 2020 đến 2026};
+    \node[model, below=of g1] (g2) {2. Phân tích cảm xúc\\ PhoBERT được tinh chỉnh để sinh xác suất của 3 lớp: Tích cực, Trung tính và Tiêu cực};
+    \node[stage, below=of g2] (g3) {3. Đặc trưng giá\\ Lợi suất và các chỉ báo kỹ thuật gồm MA, RSI, MACD và biến động};
+    \node[stage, below=of g3] (g4) {4. Căn chỉnh và gán nhãn\\ Gộp cảm xúc và giá theo mã và ngày, cutoff 15:00, nhãn UP, FLAT và DOWN};
+    \node[floor, below=of g4] (g5) {5. Mô hình dự báo\\ Baseline, sau đó là LSTM một nhánh và LSTM hai nhánh ở mức sàn tốt nghiệp};
+    \node[ext, below=of g5] (g6) {Mở rộng: Temporal Fusion Transformer (TFT), gated cross-attention};
+    \node[stage, below=of g6] (g7) {6. Đánh giá\\ Walk-forward + ablation có/không cảm xúc, macro-F1, bootstrap CI};
 
     \draw[arr] (g1) -- (g2);
     \draw[arr] (g2) -- (g3);
@@ -214,6 +212,7 @@ thời gian cho phép.
   \caption{Kiến trúc tổng thể của pipeline dự báo xu hướng giá. Khối xanh dương là mô
   hình cảm xúc PhoBERT, khối xanh lá là mức sàn tốt nghiệp, khối nét đứt là phần mở rộng.}
   \label{fig:kien-truc}
+\noindent\textit{Nguồn: Tác giả xây dựng.}
 \end{figure}
 \fi
 
@@ -454,8 +453,8 @@ Từ adjusted OHLCV, hệ thống tạo các nhóm đặc trưng sau:
 \begin{itemize}[nosep]
   \item lợi suất ngày và lợi suất log trong các cửa sổ ngắn;
   \item tỷ lệ giữa giá đóng cửa với moving average ở một số độ dài;
-  \item RSI để mô tả động lượng tương đối;
-  \item MACD và chênh lệch giữa các đường trung bình;
+  \item RSI để mô tả động lượng tương đối \cite{Wilder1978_rsi};
+  \item MACD và chênh lệch giữa các đường trung bình \cite{Appel2005_macd};
   \item thay đổi khối lượng, OBV hoặc đại lượng tỷ lệ với khối lượng;
   \item độ lệch chuẩn lợi suất trong cửa sổ để mô tả volatility.
 \end{itemize}
@@ -581,8 +580,8 @@ metadata của bài viết ngoài các đặc trưng đã được quy định. 
 hai cấu hình:
 
 \begin{enumerate}[nosep]
-  \item \textbf{Price-only}: chỉ sử dụng $X^p$;
-  \item \textbf{Price plus sentiment}: sử dụng cả $X^p$ và $X^s$.
+  \item Price-only: chỉ sử dụng $X^p$;
+  \item Price plus sentiment: sử dụng cả $X^p$ và $X^s$.
 \end{enumerate}
 
 Hai cấu hình phải có cùng ngày train, validation, test, cùng cách fit preprocessing,
@@ -722,7 +721,7 @@ Bảng~\ref{tab:cau-hinh} tóm tắt các quyết định thiết kế chính c�
   \label{tab:cau-hinh}
   \begin{tabular}{p{4cm} p{9cm}}
     \toprule
-    \textbf{Thành phần} & \textbf{Lựa chọn} \\
+    Thành phần & Lựa chọn \\
     \midrule
     Mô hình cảm xúc & PhoBERT-base fine-tune, ba lớp và đầu ra xác suất \\
     Mô hình chuỗi thời gian & LSTM hai nhánh là mức sàn, TFT là tầng mở rộng \\
@@ -733,4 +732,5 @@ Bảng~\ref{tab:cau-hinh} tóm tắt các quyết định thiết kế chính c�
     Đánh giá & Walk-forward, holdout khóa cuối, macro-F1 là chỉ số chính \\
     \bottomrule
   \end{tabular}
+\noindent\textit{Nguồn: Tác giả xây dựng.}
 \end{table}

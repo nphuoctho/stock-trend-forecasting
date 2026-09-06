@@ -1,4 +1,4 @@
-\chapter{KẾT QUẢ THỰC NGHIỆM}
+\chapter{TRÌNH BÀY, ĐÁNH GIÁ VÀ BÀN LUẬN KẾT QUẢ}
 \label{ch:ket-qua}
 
 Chương này quy định cách trình bày kết quả thực nghiệm của hệ thống. Vì các mô hình
@@ -7,6 +7,42 @@ khung báo cáo, các ô kết quả được giữ ở trạng thái \textit{Ch
 các ô này giúp phân biệt giữa thiết kế thí nghiệm và quan sát thực tế. Không sử dụng
 số liệu tham chiếu của công trình khác để thay thế cho kết quả trên rổ cổ phiếu của
 đề tài.
+
+\section{Kiểm kê dữ liệu đầu vào}
+\label{sec:kq-snapshot}
+
+Trước khi huấn luyện, dữ liệu đầu vào được kiểm kê độc lập để tách số liệu quan sát
+được khỏi kết quả mô hình. Snapshot hiện tại gồm kho tin Vietstock, bảng liên kết tin
+với mã cổ phiếu, chuỗi giá của 10 mã HOSE và tập hạt giống dùng cho bước gán nhãn.
+Các con số trong Bảng~\ref{tab:kq-snapshot} là số liệu của bước chuẩn bị dữ liệu, không
+được diễn giải thành kết quả dự báo.
+
+\begin{table}[H]
+  \centering
+  \caption{Tổng hợp số liệu đầu vào đã kiểm kê.}
+  \label{tab:kq-snapshot}
+  \begin{tabular}{p{8.8cm} c}
+    \toprule
+    Hạng mục & Số lượng \\
+    \midrule
+    Bản ghi tin thô có URL duy nhất & 10.695 \\
+    Liên kết tin tức và mã trong bảng listings & 12.624 \\
+    Mã cổ phiếu được bao phủ & 10 \\
+    Ngày có ít nhất một tin hợp lệ & 1.833 \\
+    Dòng dữ liệu giá OHLCV của 10 mã & 15.744 \\
+    Mẫu trong tập hạt giống CafeF & 999 \\
+    Mẫu in-domain đã chọn để gán nhãn & 49 \\
+    \bottomrule
+  \end{tabular}
+\noindent\textit{Nguồn: Tác giả tổng hợp từ snapshot dữ liệu của đề tài.}
+\end{table}
+
+Kho tin hiện có thời điểm đăng và nội dung cho các bản ghi được lưu. Bước nối tin với
+mã cổ phiếu dựa trên bảng listings tạo ra các liên kết theo mã, vì vậy số liên kết có
+thể lớn hơn số URL tin duy nhất. Phần thống kê sau deduplication theo nội dung, phân bố
+nhãn và số mẫu cuối cùng của từng fold chỉ được khóa sau khi pipeline xử lý hoàn tất.
+Các chỉ số của PhoBERT và mô hình dự báo được trình bày ở các mục sau khi có manifest
+huấn luyện tương ứng.
 
 \section{Thiết lập thực nghiệm}
 \label{sec:kq-setup}
@@ -31,7 +67,7 @@ Test và holdout không được dùng để chọn siêu tham số.
   \label{tab:kq-setup}
   \begin{tabular}{p{4.2cm} p{8.8cm}}
     \toprule
-    \textbf{Hạng mục} & \textbf{Giá trị cần điền} \\
+    Hạng mục & Giá trị cần điền \\
     \midrule
     Hệ điều hành và Python & \textit{Chưa điền} \\
     GPU và bộ nhớ & \textit{Chưa điền} \\
@@ -42,6 +78,7 @@ Test và holdout không được dùng để chọn siêu tham số.
     Hash dữ liệu và mã nguồn & \textit{Chưa điền} \\
     \bottomrule
   \end{tabular}
+\noindent\textit{Nguồn: Tác giả xây dựng.}
 \end{table}
 
 \subsection{Thiết kế chia dữ liệu}
@@ -85,7 +122,7 @@ tập trung vào một nguồn hoặc một giai đoạn hay không.
   \label{tab:kq-news-stats}
   \begin{tabular}{p{6.2cm} c}
     \toprule
-    \textbf{Chỉ tiêu} & \textbf{Số lượng hoặc tỷ lệ} \\
+    Chỉ tiêu & Số lượng hoặc tỷ lệ \\
     \midrule
     Bản ghi thô & \textit{Chưa điền} \\
     Bản ghi có mã cổ phiếu & \textit{Chưa điền} \\
@@ -96,6 +133,7 @@ tập trung vào một nguồn hoặc một giai đoạn hay không.
     Tỷ lệ ngày không có tin & \textit{Chưa điền} \\
     \bottomrule
   \end{tabular}
+\noindent\textit{Nguồn: Tác giả xây dựng.}
 \end{table}
 
 Độ phủ tin cần được đặt cạnh độ phủ giá. Một mã có nhiều phiên nhưng ít tin không nhất
@@ -116,7 +154,7 @@ và holdout có thể khác nhau.
   \label{tab:kq-price-stats}
   \begin{tabular}{p{4.5cm} c c c c}
     \toprule
-    \textbf{Chỉ tiêu} & \textbf{UP} & \textbf{FLAT} & \textbf{DOWN} & \textbf{Tổng} \\
+    Chỉ tiêu & UP & FLAT & DOWN & Tổng \\
     \midrule
     Train & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} \\
     Validation & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} \\
@@ -124,6 +162,7 @@ và holdout có thể khác nhau.
     Holdout cuối & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} \\
     \bottomrule
   \end{tabular}
+\noindent\textit{Nguồn: Tác giả xây dựng.}
 \end{table}
 
 Nếu lớp FLAT chiếm tỷ lệ lớn, accuracy không phản ánh đầy đủ khả năng nhận diện UP và
@@ -146,7 +185,7 @@ mơ hồ hoặc bài có nhiều sự kiện, không chỉ giữ lại các mẫ
   \label{tab:kq-annotation}
   \begin{tabular}{p{6.2cm} c}
     \toprule
-    \textbf{Chỉ tiêu} & \textbf{Giá trị} \\
+    Chỉ tiêu & Giá trị \\
     \midrule
     Số người gán nhãn & \textit{Chưa điền} \\
     Số mẫu được gán & \textit{Chưa điền} \\
@@ -156,6 +195,7 @@ mơ hồ hoặc bài có nhiều sự kiện, không chỉ giữ lại các mẫ
     Cohen's hoặc Fleiss' kappa & \textit{Chưa điền} \\
     \bottomrule
   \end{tabular}
+\noindent\textit{Nguồn: Tác giả xây dựng.}
 \end{table}
 
 \subsection{Chỉ số mô hình sentiment}
@@ -172,12 +212,13 @@ metric.
   \label{tab:kq-sentiment}
   \begin{tabular}{l c c c c}
     \toprule
-    \textbf{Mô hình} & \textbf{Accuracy} & \textbf{Macro-F1} & \textbf{F1 NEG} & \textbf{F1 POS} \\
+    Mô hình & Accuracy & Macro-F1 & F1 NEG & F1 POS \\
     \midrule
     PhoBERT plus head tuyến tính & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} \\
     PhoBERT plus CNN hoặc BiLSTM & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} \\
     \bottomrule
   \end{tabular}
+\noindent\textit{Nguồn: Tác giả xây dựng.}
 \end{table}
 
 Các số liệu ở tầng sentiment chỉ cho biết chất lượng phân loại trên tập test của tầng
@@ -200,7 +241,7 @@ bộ dự đoán ngoài mẫu.
   \label{tab:ket-qua}
   \begin{tabular}{l c c c}
     \toprule
-    \textbf{Mô hình} & \textbf{Macro-F1} & \textbf{Balanced Acc.} & \textbf{OvR-AUC} \\
+    Mô hình & Macro-F1 & Balanced Acc. & OvR-AUC \\
     \midrule
     Majority & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} \\
     Random & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} \\
@@ -210,6 +251,7 @@ bộ dự đoán ngoài mẫu.
     TFT, mở rộng & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} \\
     \bottomrule
   \end{tabular}
+\noindent\textit{Nguồn: Tác giả xây dựng.}
 \end{table}
 
 \subsection{Báo cáo chỉ số theo lớp}
@@ -231,13 +273,14 @@ các fold, kết luận phù hợp là tín hiệu chưa ổn định.
   \centering
   \caption{Ablation có và không có sentiment, số liệu để điền sau.}
   \label{tab:kq-ablation}
-  \begin{tabular}{l c c c c}
+  \begin{tabular}{p{3.6cm} p{2.1cm} p{2.5cm} p{2.1cm} p{2.6cm}}
     \toprule
-    \textbf{So sánh} & \textbf{$\Delta$ Macro-F1} & \textbf{$\Delta$ Balanced Acc.} & \textbf{$\Delta$ OvR-AUC} & \textbf{Khoảng tin cậy} \\
+    So sánh & $\Delta$ Macro-F1 & $\Delta$ Balanced Acc. & $\Delta$ OvR-AUC & Khoảng tin cậy \\
     \midrule
     Có sentiment trừ chỉ giá & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} & \textit{Chưa điền} \\
     \bottomrule
   \end{tabular}
+\noindent\textit{Nguồn: Tác giả xây dựng.}
 \end{table}
 
 \subsection{Kết quả TFT nếu được thực hiện}

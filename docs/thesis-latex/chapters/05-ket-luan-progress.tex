@@ -16,16 +16,17 @@ Tính đến thời điểm này, đồ án đã hoàn thành phần nền tản
         giá theo thời gian có kiểm soát rò rỉ (Chương~\ref{ch:phuong-phap}).
   \item Thu thập và kiểm tra dữ liệu: giá của 10 mã VN30 trong giai đoạn 2020 đến quý I
         năm 2026, cùng 10.695 bài tin tức Vietstock có mốc thời gian đến phút và nội dung bài.
-  \item Xây dựng và chạy thử pipeline tinh chỉnh PhoBERT cho phân loại cảm xúc ba lớp.
+  \item Xây dựng và chạy thử quy trình tinh chỉnh PhoBERT cho bài toán phân loại cảm xúc ba lớp.
 \end{itemize}
 
 \section{Đối chiếu với mục tiêu nghiên cứu}
 
 Xét theo các mục tiêu đặt ra ở Chương~\ref{ch:mo-dau}, mục tiêu về xây dựng bộ dữ liệu
-có thể truy nguyên đã cơ bản đạt được, do dữ liệu giá và tin tức đều có nguồn, mốc thời
-gian và độ phủ rõ ràng. Các mục tiêu còn lại, gồm đánh giá PhoBERT ở tầng cảm xúc, kết
-hợp hai nguồn dữ liệu, huấn luyện mô hình dự báo và đo phần đóng góp của cảm xúc, đang
-trong giai đoạn thực hiện và sẽ được trả lời bằng số liệu ở Chương~\ref{ch:ket-qua}.
+có thể truy nguyên đã đạt được ở mức chuẩn bị hiện tại, do dữ liệu giá và tin tức đều có
+nguồn, mốc thời gian và độ phủ được ghi nhận. Các mục tiêu còn lại, gồm đánh giá PhoBERT
+ở tầng cảm xúc, kết hợp hai nguồn dữ liệu, huấn luyện mô hình dự báo và đo phần đóng góp
+của cảm xúc, vẫn đang trong giai đoạn thực hiện. Chưa có số liệu để đưa ra kết luận
+định lượng cho các mục tiêu này.
 
 Việc chọn PhoBERT làm mô hình ngôn ngữ nền phù hợp với dữ liệu tiếng Việt, tương tự cách
 FinBERT được thích nghi cho ngữ liệu tài chính tiếng Anh
@@ -39,9 +40,9 @@ ngôn ngữ, thị trường và mục tiêu phân loại ba lớp
 Các bước còn lại để hoàn thành đồ án gồm:
 
 \begin{enumerate}[nosep]
-  \item Tinh chỉnh PhoBERT trên GPU, sinh xác suất cảm xúc cho toàn bộ corpus tin tức.
+  \item Tinh chỉnh PhoBERT trên GPU và sinh xác suất cảm xúc cho toàn bộ tập dữ liệu tin tức.
         Dự kiến hoàn thành trong tuần đầu tháng 9.
-  \item Tổng hợp cảm xúc theo mã và ngày giao dịch, ghép với đặc trưng giá, tạo nhãn ba lớp.
+  \item Tổng hợp cảm xúc theo mã và ngày giao dịch, ghép với đặc trưng giá và tạo nhãn ba lớp.
   \item Chạy các mô hình đối chứng và LSTM hai nhánh, thực hiện thí nghiệm loại bỏ đặc
         trưng có và không có cảm xúc, kèm khoảng tin cậy. Dự kiến hoàn thành trong hai tuần kế tiếp.
   \item Điền kết quả vào Chương~\ref{ch:ket-qua}, hoàn thiện kết luận định lượng và nộp

@@ -1,0 +1,4 @@
+# Keep intermediate files in build/ while leaving final PDFs beside sources.
+$out_dir = '.';
+$aux_dir = 'build';
+$emulate_aux = 1;
