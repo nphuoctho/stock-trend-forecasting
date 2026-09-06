@@ -1,4 +1,4 @@
-\chapter{TỔNG QUAN NGHIÊN CỨU}
+\chapter{MỞ ĐẦU}
 \label{ch:mo-dau}
 
 \section{Tính cấp thiết của đề tài}
@@ -15,19 +15,18 @@ Những thông tin về kết quả kinh doanh, kế hoạch đầu tư, thay đ
 sách quản lý, hoạt động mua bán và sáp nhập, rủi ro pháp lý hoặc biến động bất thường
 của thị trường đều có thể làm thay đổi tâm lý nhà đầu tư trong thời gian ngắn. Vì vậy,
 việc nghiên cứu và xây dựng phương pháp phân tích tác động của tin tức tài chính đến
-biến động giá cổ phiếu có ý nghĩa đồng thời đối với xử lý ngôn ngữ tự nhiên và phân
-tích chuỗi thời gian.
+biến động giá cổ phiếu có ý nghĩa đồng thời đối với xử lý ngôn ngữ tự nhiên và phân tích
+chuỗi thời gian \cite{Chen2019_191005078v1,Chen2021_210708721v1}.
+
 
 Xuất phát từ bối cảnh đó, đề tài được lựa chọn vì các lý do sau.
 
 Thứ nhất, lượng thông tin tài chính được công bố mỗi ngày ngày càng lớn và phân tán
-trên nhiều nguồn khác nhau. Đối với thị trường chứng khoán Việt Nam, nhà đầu tư thường
-tiếp cận thông tin qua báo điện tử, chuyên trang tài chính, công bố của doanh nghiệp và
-các nền tảng dữ liệu thị trường. Mỗi nguồn có cách trình bày, thời điểm đăng tải và mức
-độ chi tiết khác nhau. Việc theo dõi toàn bộ các nguồn bằng phương pháp thủ công đòi
-hỏi nhiều thời gian, trong khi phản ứng của thị trường đối với một số loại tin có thể
-diễn ra rất nhanh. Một quy trình tự động thu thập, làm sạch, gắn tin với mã cổ phiếu,
-kiểm tra thời điểm và tổng hợp nội dung là cần thiết để hỗ trợ phân tích ở quy mô lớn.
+trên nhiều nguồn khác nhau. Đối với phạm vi của đồ án, các nguồn tin có thể khác nhau
+về cách trình bày, thời điểm đăng tải và mức độ chi tiết. Vì vậy, một quy trình tự động
+thu thập, làm sạch, gắn tin với mã cổ phiếu, kiểm tra thời điểm và tổng hợp nội dung
+được sử dụng để bảo đảm tính nhất quán của dữ liệu và hỗ trợ phân tích ở quy mô lớn.
+
 
 Thứ hai, dữ liệu giá lịch sử chỉ phản ánh kết quả giao dịch đã xảy ra, nhưng không thể
 hiện đầy đủ nội dung thông tin dẫn đến sự thay đổi trong kỳ vọng của nhà đầu tư. Hai
@@ -36,17 +35,17 @@ nếu bối cảnh tin tức khác nhau. Tin về lợi nhuận, dự án mới,
 ro pháp lý có thể tạo ra những hướng phản ứng khác nhau, ngay cả khi các chỉ báo giá ở
 thời điểm trước đó gần giống nhau. Bổ sung tín hiệu cảm xúc từ tin tức tài chính có thể
 cung cấp thêm một lớp thông tin về mức độ tích cực, trung tính hoặc tiêu cực của các sự
-kiện liên quan đến doanh nghiệp và thị trường. Tuy nhiên, tín hiệu này cần được đo bằng
-thực nghiệm thay vì được xem là hữu ích một cách mặc nhiên.
+kiện liên quan đến doanh nghiệp và thị trường. Tuy nhiên, giá trị của tín hiệu này được
+xem là một giả thuyết cần kiểm chứng bằng thực nghiệm, không phải một kết luận được đặt
+trước \cite{Jiang2023_230602136v3,Siala2026_260200086v3}.
 
-Đối với Việt Nam, phần lớn tin tức tài chính được công bố bằng tiếng Việt. Ngôn ngữ này
-có những đặc điểm cần được xử lý phù hợp, chẳng hạn từ ghép, quy tắc tách từ, dấu thanh,
-tên doanh nghiệp, mã cổ phiếu và cách biểu đạt số liệu. Cùng một doanh nghiệp có thể
-được gọi bằng tên đầy đủ, tên viết tắt hoặc mã giao dịch; một bài viết cũng có thể đề
-cập đồng thời đến nhiều doanh nghiệp. Nếu những đặc điểm này không được xử lý, bước
-gắn tin với mã cổ phiếu có thể tạo ra nhiễu trước cả khi mô hình được huấn luyện.
-Sử dụng trực tiếp một mô hình chủ yếu được huấn luyện trên tiếng Anh vì vậy không phải
-là lựa chọn hiển nhiên.
+Đối với Việt Nam, dữ liệu tin tức tài chính được xử lý bằng tiếng Việt. Ngôn ngữ này
+có những đặc điểm cần được xem xét, chẳng hạn từ ghép, quy tắc tách từ, dấu thanh, tên
+doanh nghiệp, mã cổ phiếu và cách biểu đạt số liệu. Cùng một doanh nghiệp có thể được
+gọi bằng tên đầy đủ, tên viết tắt hoặc mã giao dịch; một bài viết cũng có thể đề cập
+đồng thời đến nhiều doanh nghiệp. Nếu những đặc điểm này không được xử lý phù hợp, bước
+gắn tin với mã cổ phiếu có thể tạo ra nhiễu trước khi mô hình được huấn luyện
+\cite{Nguyen2020_200300744v3}.
 
 PhoBERT được xây dựng như một mô hình ngôn ngữ tiền huấn luyện cho tiếng Việt, nên phù
 hợp để làm backbone cho bước phân loại văn bản trong đề tài \cite{Nguyen2020_200300744v3}.
@@ -58,13 +57,11 @@ sử dụng đầu ra cho dự báo. Việc chọn PhoBERT không có nghĩa là
 đúng mọi thuật ngữ tài chính. Các trường hợp tên riêng, số liệu, câu phủ định và bài có
 nhiều sự kiện vẫn cần được kiểm tra bằng dữ liệu gán nhãn và phân tích lỗi.
 
-HOSE và nhóm cổ phiếu VN30 được chọn vì có lịch sử giao dịch tương đối dày, thanh khoản
-cao hơn mặt bằng chung và thường được đề cập trên các nguồn tin tài chính. Đây là điều
-kiện thuận lợi để tổ chức dữ liệu theo ngày giao dịch và kiểm tra pipeline trên nhiều mã
-thay vì chỉ nghiên cứu một trường hợp. Theo thiết kế đề cương, số lượng mã cuối cùng
-được xác định sau khi khảo sát độ đầy đủ của chuỗi giá, mật độ tin và khả năng đồng bộ;
-phạm vi dự kiến nằm trong khoảng 10 đến 30 mã. Trong cấu hình mức sàn hiện tại, danh
-sách mã và ngày bắt đầu sử dụng phải được ghi trong manifest.
+HOSE và nhóm cổ phiếu VN30 được lựa chọn làm phạm vi khảo sát của đồ án vì cho phép
+tổ chức dữ liệu theo một danh sách mã xác định và một lịch giao dịch thống nhất. Đây là
+quyết định nhằm kiểm soát phạm vi thu thập, đồng bộ và đánh giá dữ liệu, không phải
+khẳng định rằng mẫu nghiên cứu đại diện cho toàn bộ thị trường. Danh sách mã và ngày bắt
+đầu sử dụng phải được ghi trong manifest.
 
 Phạm vi này không đại diện cho toàn bộ thị trường Việt Nam. Đặc điểm ngành, thanh khoản,
 mức độ phản ứng với tin và mật độ bài viết của từng mã có thể khác nhau. Thành phần rổ
@@ -78,8 +75,8 @@ hiện trước khi phản ứng đó thể hiện đầy đủ trên giá. Hai 
 năng bổ sung cho nhau, nhưng khác nhau về dạng biểu diễn, tần suất, độ dài và thời điểm
 xuất hiện. Một ngày có thể có nhiều bài viết, một ngày khác không có bài nào, trong khi
 giá vẫn được ghi nhận ở cả hai ngày. Tin có thể xuất hiện trước giờ mở cửa, trong phiên,
-sau giờ đóng cửa hoặc vào ngày nghỉ; do đó việc ghép theo ngày lịch đơn thuần có thể
-không phản ánh thời điểm thông tin thực sự có thể được sử dụng.
+sau giờ đóng cửa hoặc vào ngày nghỉ. Trong đồ án, quy tắc ánh xạ theo thời điểm công bố
+được sử dụng để hạn chế việc đưa thông tin chưa xuất hiện vào thời điểm dự báo.
 
 Mô hình chỉ dùng giá có thể bỏ qua thông tin về sự kiện và kỳ vọng, còn mô hình chỉ dùng
 cảm xúc có thể không nắm được xu hướng, biến động, thanh khoản và trạng thái kỹ thuật
@@ -160,16 +157,13 @@ biến động, chỉ báo kỹ thuật và thông tin tin tức có thể cùng
 phiên giao dịch kế tiếp. Việc đặt mô hình chuỗi thời gian cạnh mô hình văn bản cũng
 cho phép tách câu hỏi về chất lượng dữ liệu khỏi câu hỏi về độ phức tạp của kiến trúc.
 
-Thứ năm, các nghiên cứu về kết hợp tin tức tài chính tiếng Việt với dữ liệu giá cổ phiếu
-vẫn còn hạn chế về quy mô dữ liệu, số lượng mã cổ phiếu, phương pháp đánh giá và khả
-năng tái lập. Một số công trình chỉ thực nghiệm trên một mã cổ phiếu hoặc một chỉ số
-thị trường. Một số công trình khác dùng các mô hình khác nhau cho hai cấu hình nên chưa
-thể xác định phần cải thiện thực sự đến từ tín hiệu cảm xúc hay từ năng lực của mô hình.
-Ngoài ra, nếu tin tức không được đồng bộ theo thời điểm công bố, hoặc dữ liệu được chia
-ngẫu nhiên thay vì theo trình tự thời gian, kết quả có thể lạc quan hơn điều kiện dự báo
-thực tế. Vì vậy, cần một nghiên cứu tổ chức theo quy trình rõ ràng, trong đó dữ liệu
-được kiểm tra nguồn gốc, ánh xạ đúng phiên, mô hình được đánh giá theo thời gian và ảnh
-hưởng của từng nhóm đặc trưng được kiểm tra riêng biệt.
+Thứ năm, các tài liệu đã được xác minh cho thấy những hướng kết hợp tin tức với dữ liệu
+giá thường khác nhau về ngôn ngữ, quy mô dữ liệu, số lượng mã cổ phiếu, nhiệm vụ dự báo
+và giao thức đánh giá \cite{Halder2022_221107392v1,Gu2024_240716150v1,
+Chen2021_210708721v1,Omranpour2024_241210540v1}. Vì vậy, việc so sánh trực tiếp các
+kết quả công bố không cho phép kết luận ngay về hiệu quả của một tín hiệu riêng lẻ.
+Đồ án lựa chọn kiểm soát các điều kiện dữ liệu và đánh giá để xác định liệu đặc trưng
+cảm xúc có tạo ra giá trị bổ sung trong phạm vi nghiên cứu hay không.
 
 Từ năm lý do trên, đề tài lựa chọn xây dựng hệ thống dự báo xu hướng biến động giá cổ
 phiếu bằng cách kết hợp dữ liệu giá lịch sử với đặc trưng cảm xúc được trích xuất từ
@@ -414,34 +408,36 @@ giả định trước \cite{Jiang2023_230602136v3,Siala2026_260200086v3}.
 Phần còn lại của đồ án được tổ chức theo trình tự từ đặt vấn đề, khảo sát nghiên cứu,
 thiết kế phương pháp đến đánh giá và giới hạn.
 
-\subsection{Chương 1, Tổng quan nghiên cứu}
+\subsection{Chương 1, Mở đầu}
 
 Chương 1 trình bày tính cấp thiết, mục tiêu, câu hỏi, đối tượng, phạm vi, phương pháp và đóng góp của nghiên cứu.
 
-\subsection{Chương 2, Cơ sở lý thuyết và mô hình nghiên cứu}
+\subsection{Chương 2, Tổng quan}
 
 Chương~\ref{ch:tong-quan} tổng hợp cơ sở lý thuyết và các công trình về phân tích cảm xúc
 tài chính, mô hình chuỗi thời gian, Transformer, hợp nhất tin tức với giá, cùng khoảng
 trống và định vị của đề tài.
 
-\subsection{Chương 3, Phương pháp nghiên cứu}
+\subsection{Chương 3, Cơ sở lý thuyết và phương pháp nghiên cứu}
 
 Chương~\ref{ch:phuong-phap} trình bày cơ sở lý thuyết của Transformer, self-attention,
 PhoBERT, LSTM và TFT, cùng kiến trúc hai nhánh, dữ liệu, tiền xử lý, gán nhãn, tạo đặc
 trưng, thang mô hình và protocol đánh giá chống rò rỉ.
 
-\subsection{Chương 4, Kết quả thực nghiệm}
+\ifProgressReport
+\else
+\subsection{Chương 4, Trình bày, đánh giá và bàn luận kết quả}
 
-Chương 4 trình bày thiết lập thực nghiệm, thống kê dữ liệu, chất lượng mô
-hình sentiment, kết quả dự báo, bảng ablation và phần bàn luận theo các câu hỏi nghiên cứu,
-trong đó các ô chưa có số đo được điền từ manifest.
+Chương~\ref{ch:ket-qua} trình bày thiết lập thực nghiệm, thống kê dữ liệu, chất lượng mô
+hình sentiment, kết quả dự báo, bảng ablation và phần bàn luận theo các câu hỏi nghiên cứu.
 
 \subsection{Chương 5, Kết luận}
 
-Chương 5 tổng hợp các kết luận trong phạm vi protocol, phân biệt kết quả đã đo với mục tiêu thiết kế và nêu các giới hạn của nghiên cứu.
+Chương~\ref{ch:ket-luan} tổng hợp các kết luận trong phạm vi protocol, phân biệt kết quả
+đã đo với mục tiêu thiết kế và nêu các giới hạn của nghiên cứu.
 
-\subsection{Chương 6, Hướng phát triển và hạn chế của nghiên cứu}
+\fi
+\subsection{Chương 6, Hướng phát triển}
 
-Chương 6 trình bày các hạn chế của nghiên cứu và đề xuất hướng mở
-rộng về đánh giá giá trị kinh tế, ngữ liệu, số mã, cơ chế fusion, concept drift và khả năng
-giải thích.
+Chương~\ref{ch:huong-phat-trien} trình bày các hướng mở rộng về đánh giá giá trị kinh tế,
+ngữ liệu, số mã, cơ chế fusion, concept drift và khả năng giải thích.

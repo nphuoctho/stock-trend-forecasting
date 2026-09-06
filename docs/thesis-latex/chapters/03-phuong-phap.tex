@@ -1,4 +1,4 @@
-\chapter{PHƯƠNG PHÁP NGHIÊN CỨU}
+\chapter{CƠ SỞ LÝ THUYẾT VÀ PHƯƠNG PHÁP NGHIÊN CỨU}
 \label{ch:phuong-phap}
 
 Chương này trình bày cơ sở lý thuyết, dữ liệu, kiến trúc hệ thống và giao thức đánh giá
@@ -162,17 +162,14 @@ Luồng xử lý của hệ thống gồm các bước:
 \end{enumerate}
 
 \ifShowDiagram
-Hình~\ref{fig:kien-truc} minh họa các bước chính của pipeline. Các khối TFT và gated
-cross-attention được đánh dấu là mở rộng, còn mô hình hai nhánh LSTM được xem là mức
-sàn. Cách phân biệt này giúp người đọc nhận biết phần bắt buộc với phần chỉ được chạy
-khi dữ liệu và thời gian cho phép.
+Hình~\ref{fig:kien-truc} minh họa các bước chính của quy trình xử lý. Các khối TFT và
+gated cross-attention được đánh dấu là mở rộng, còn mô hình hai nhánh LSTM được xem là
+cấu hình cơ sở. Cách phân biệt này giúp người đọc nhận biết phần bắt buộc với phần chỉ
+được thực hiện khi dữ liệu và thời gian cho phép.
 \else
-Luồng xử lý gồm các bước chính của pipeline. Các khối TFT và gated cross-attention
-được đánh dấu là mở rộng, còn mô hình hai nhánh LSTM được xem là mức sàn. Cách phân
-biệt này giúp người đọc nhận biết phần bắt buộc với phần chỉ được chạy khi dữ liệu và
-thời gian cho phép.
+Các bước chính của quy trình xử lý được mô tả trong phần này; sơ đồ minh họa được lược
+bỏ ở biến thể báo cáo không kèm hình.
 \fi
-
 \ifShowDiagram
 \begin{figure}[H]
   \centering
@@ -197,11 +194,11 @@ thời gian cho phép.
         fill=violet!6, inner sep=4pt},
       arr/.style={-{Stealth[length=2.5mm]}, thick, black!65},
     ]
-    \node[stage] (g1) {1. Thu thập dữ liệu\\ Giá OHLCV 10 mã VN30 + tin tức Vietstock (2020--2026)};
-    \node[model, below=of g1] (g2) {2. Phân tích cảm xúc\\ PhoBERT tinh chỉnh $\rightarrow$ xác suất 3 lớp: Tích cực / Trung tính / Tiêu cực};
-    \node[stage, below=of g2] (g3) {3. Đặc trưng giá\\ Lợi suất + chỉ báo kỹ thuật (MA, RSI, MACD, biến động)};
-    \node[stage, below=of g3] (g4) {4. Căn chỉnh và gán nhãn\\ Gộp cảm xúc + giá theo mã-ngày, cutoff 15:00, nhãn UP / FLAT / DOWN};
-    \node[floor, below=of g4] (g5) {5. Mô hình dự báo\\ Baseline $\rightarrow$ LSTM một nhánh $\rightarrow$ LSTM hai nhánh (sàn tốt nghiệp)};
+    \node[stage] (g1) {1. Thu thập dữ liệu\\ Giá OHLCV của 10 mã VN30 và tin tức Vietstock trong giai đoạn 2020 đến 2026};
+    \node[model, below=of g1] (g2) {2. Phân tích cảm xúc\\ PhoBERT được tinh chỉnh để sinh xác suất của 3 lớp: Tích cực, Trung tính và Tiêu cực};
+    \node[stage, below=of g2] (g3) {3. Đặc trưng giá\\ Lợi suất và các chỉ báo kỹ thuật gồm MA, RSI, MACD và biến động};
+    \node[stage, below=of g3] (g4) {4. Căn chỉnh và gán nhãn\\ Gộp cảm xúc và giá theo mã và ngày, cutoff 15:00, nhãn UP, FLAT và DOWN};
+    \node[floor, below=of g4] (g5) {5. Mô hình dự báo\\ Baseline, sau đó là LSTM một nhánh và LSTM hai nhánh ở mức sàn tốt nghiệp};
     \node[ext, below=of g5] (g6) {Mở rộng: Temporal Fusion Transformer (TFT), gated cross-attention};
     \node[stage, below=of g6] (g7) {6. Đánh giá\\ Walk-forward + ablation có/không cảm xúc, macro-F1, bootstrap CI};
 
@@ -215,6 +212,7 @@ thời gian cho phép.
   \caption{Kiến trúc tổng thể của pipeline dự báo xu hướng giá. Khối xanh dương là mô
   hình cảm xúc PhoBERT, khối xanh lá là mức sàn tốt nghiệp, khối nét đứt là phần mở rộng.}
   \label{fig:kien-truc}
+\noindent\textit{Nguồn: Tác giả xây dựng.}
 \end{figure}
 \fi
 
@@ -734,4 +732,5 @@ Bảng~\ref{tab:cau-hinh} tóm tắt các quyết định thiết kế chính c�
     Đánh giá & Walk-forward, holdout khóa cuối, macro-F1 là chỉ số chính \\
     \bottomrule
   \end{tabular}
+\noindent\textit{Nguồn: Tác giả xây dựng.}
 \end{table}

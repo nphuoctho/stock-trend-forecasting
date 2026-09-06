@@ -7,35 +7,60 @@ tài liệu tham khảo IEEE.
 ## Cấu trúc
 
 ```
-main.tex              file chính (thứ tự bắt buộc: bìa -> ... -> phụ lục)
-preamble.tex          cấu hình font/lề/spacing theo quy định trường
-frontmatter/          bìa chính, bìa phụ, hội đồng, lời cảm ơn, danh mục, tóm tắt
-chapters/             6 chương: mở đầu, tổng quan, phương pháp, kết quả,
-                      kết luận, hướng phát triển + phụ lục
-references.bib        tài liệu tham khảo (IEEE, biber)
+BaoCaoDATN_full.tex             bản đầy đủ, có sơ đồ
+BaoCaoDATN_progress.tex         bản báo cáo tiến độ
+preamble.tex                    cấu hình font/lề/spacing theo quy định trường
+frontmatter/                    bìa chính, bìa phụ, hội đồng, lời cảm ơn, danh mục, tóm tắt
+chapters/                       các chương của báo cáo
+references.bib                  tài liệu tham khảo (IEEE, biber)
+build/                          các file trung gian khi biên dịch
+BaoCaoDATN_*.pdf                PDF đầu ra, nằm cạnh các file .tex
 ```
 
 ## Biên dịch
 
-Cần XeLaTeX (font Unicode + tiếng Việt). Cách 1 - latexmk:
+Cần XeLaTeX (font Unicode + tiếng Việt). `latexmkrc` đã cấu hình để các file
+trung gian nằm trong `build/`, còn PDF cuối cùng nằm cạnh file `.tex`.
+
+Chạy từ thư mục `docs/thesis-latex/`:
 
 ```bash
-latexmk -xelatex main.tex
+latexmk -xelatex BaoCaoDATN_full.tex
 ```
 
-Cách 2 - thủ công:
+Chỉ có bản báo cáo tiến độ ngoài bản đầy đủ:
 
 ```bash
-xelatex main && biber main && xelatex main && xelatex main
+latexmk -xelatex BaoCaoDATN_progress.tex
+```
+
+PDF sẽ nằm cạnh file nguồn, còn các file phụ sẽ nằm trong `build/`. Dọn toàn
+bộ output khi cần:
+
+```bash
+latexmk -C BaoCaoDATN_full.tex
+```
+
+Cách thủ công (không dùng latexmk):
+
+```bash
+mkdir -p build
+xelatex -output-directory=build BaoCaoDATN_full.tex
+biber --output-directory=build build/BaoCaoDATN_full
+xelatex -output-directory=build BaoCaoDATN_full.tex
+xelatex -output-directory=build BaoCaoDATN_full.tex
+mv build/BaoCaoDATN_full.pdf .
 ```
 
 Cách 3 - tectonic (tự tải package):
 
 ```bash
-tectonic -X compile main.tex   # hoặc: tectonic main.tex
+tectonic --outdir build BaoCaoDATN_full.tex
+mv build/BaoCaoDATN_full.pdf .
 ```
 
 Cách 4 - Overleaf: upload cả thư mục, chọn compiler XeLaTeX.
+
 
 ## Lưu ý
 

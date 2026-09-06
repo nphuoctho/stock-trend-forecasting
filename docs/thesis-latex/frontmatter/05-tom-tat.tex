@@ -24,32 +24,39 @@ Nhánh thứ hai sử dụng dữ liệu OHLCV điều chỉnh cùng các đặc
 trưng dự kiến gồm lợi suất, lợi suất log, tỷ lệ giữa giá đóng cửa và đường trung bình
 động, RSI, MACD, OBV, thay đổi khối lượng và độ biến động. Hai nhánh được căn chỉnh
 theo mã và ngày sau khi áp dụng quy tắc thời điểm. Tin được chuyển về múi giờ Việt Nam;
-tin sau giờ cutoff, tin cuối tuần hoặc tin vào ngày nghỉ được ánh xạ sang phiên giao
-dịch kế tiếp. Tại ngày quan sát $t$, hệ thống chỉ sử dụng thông tin có thể biết đến
+tin sau mốc cắt thông tin, tin cuối tuần hoặc tin vào ngày nghỉ được ánh xạ sang phiên
+giao dịch kế tiếp. Tại ngày quan sát $t$, hệ thống chỉ sử dụng thông tin có thể biết đến
 ngày đó, còn giá của phiên kế tiếp chỉ dùng để tạo nhãn mục tiêu.
 
 Về kiến trúc, các mô hình được xếp theo từng tầng để tách câu hỏi về dữ liệu khỏi câu
 hỏi về độ phức tạp. Tầng đầu gồm mô hình luôn chọn lớp phổ biến nhất và mô hình ngẫu
 nhiên theo phân bố lớp. Tầng tiếp theo gồm các mô hình cổ điển và LSTM chỉ sử dụng giá.
-Mức sàn chính là LSTM hai nhánh, trong đó nhánh thị trường và nhánh cảm xúc được xử lý
+Cấu hình cơ sở là LSTM hai nhánh, trong đó nhánh thị trường và nhánh cảm xúc được xử lý
 riêng trước khi ghép biểu diễn và phân loại. Temporal Fusion Transformer được xem là
-phương án mở rộng khi dữ liệu, tài nguyên và kết quả của mức sàn cho phép.
+phương án mở rộng khi dữ liệu, tài nguyên và kết quả của cấu hình cơ sở cho phép.
 
-Về phương pháp, đồ án xây dựng pipeline từ khảo sát tài liệu, thu thập và làm sạch dữ
-liệu, loại bỏ bản ghi trùng, lưu provenance, gắn tin với mã cổ phiếu, đồng bộ theo
-phiên, tinh chỉnh mô hình sentiment, tạo đặc trưng, huấn luyện và đánh giá. Bộ dữ liệu
-tin tức gồm tiêu đề, nội dung khi có thể thu thập, nguồn, URL, thời điểm công bố và
+Về phương pháp, đồ án xây dựng quy trình xử lý từ khảo sát tài liệu, thu thập và làm sạch
+dữ liệu, loại bỏ bản ghi trùng, lưu thông tin truy nguyên, gắn tin với mã cổ phiếu, đồng
+bộ theo phiên, tinh chỉnh mô hình cảm xúc, tạo đặc trưng, huấn luyện và đánh giá. Bộ dữ
+liệu tin tức gồm tiêu đề, nội dung khi có thể thu thập, nguồn, URL, thời điểm công bố và
 mã liên quan. Những bài đề cập nhiều mã được lưu theo quan hệ nhiều mã; những bản ghi
 thiếu thời điểm hoặc không xác định được mã được đánh dấu và không đưa trực tiếp vào
 bảng đặc trưng chính.
 
-Dữ liệu được chia theo thứ tự thời gian bằng walk-forward validation, có tập kiểm tra
-cuối được khóa sau khi lựa chọn cấu hình. Scaler, imputer, ngưỡng tạo nhãn, lựa chọn
-đặc trưng và các tham số khác chỉ được học từ phần huấn luyện của từng cửa sổ. Mô hình
-có cảm xúc được so sánh với mô hình chỉ dùng giá trên cùng ngày train, validation và
-test, cùng cách tiền xử lý, seed hoặc tập seed và tiêu chí dừng. Thiết kế này nhằm hạn
-chế rò rỉ dữ liệu, đồng thời tách phần đóng góp của tín hiệu cảm xúc khỏi ảnh hưởng của
-kiến trúc hoặc cách chia mẫu.
+Dữ liệu được chia theo thứ tự thời gian bằng kiểm định cuốn chiếu (walk-forward), có tập
+kiểm tra cuối được khóa sau khi lựa chọn cấu hình. Bộ chuẩn hóa, bộ điền khuyết, ngưỡng
+tạo nhãn, lựa chọn đặc trưng và các tham số khác chỉ được học từ phần huấn luyện của
+từng cửa sổ. Mô hình có cảm xúc được so sánh với mô hình chỉ dùng giá trên cùng ngày
+huấn luyện, xác thực và kiểm thử, cùng cách tiền xử lý, hạt giống ngẫu nhiên hoặc tập
+hạt giống và tiêu chí dừng. Thiết kế này nhằm hạn chế rò rỉ dữ liệu, đồng thời tách phần
+đóng góp của tín hiệu cảm xúc khỏi ảnh hưởng của kiến trúc hoặc cách chia mẫu.
+
+Ở thời điểm khóa dữ liệu hiện tại, kho tin đã lưu 10.695 bản ghi có URL, thời điểm
+đăng và nội dung, kết hợp với 12.624 liên kết tin tức và mã cổ phiếu thuộc 10 mã
+VN30. Các tệp giá hiện có gồm 15.744 dòng dữ liệu OHLCV, còn tập hạt giống CafeF
+gồm 999 mẫu. Đây là kết quả của giai đoạn chuẩn bị dữ liệu; các chỉ số đánh giá
+PhoBERT và mô hình dự báo chỉ được công bố sau khi hoàn thành huấn luyện theo đúng
+giao thức.
 
 Kết quả được tổ chức thành hai tầng. Tầng thứ nhất báo cáo chất lượng phân loại cảm xúc
 bằng accuracy, precision, recall, F1 theo lớp, macro-F1 và ma trận nhầm lẫn. Tầng thứ

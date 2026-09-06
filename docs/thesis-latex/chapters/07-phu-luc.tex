@@ -2,13 +2,120 @@
 \label{ch:phu-luc}
 
 \section{Hướng dẫn gán nhãn cảm xúc in-domain}
-Trích hướng dẫn gán nhãn ba lớp (NEGATIVE/NEUTRAL/POSITIVE) theo tác động kỳ vọng lên
-giá, dùng cho tập in-domain và báo cáo kappa.
+
+Tập in-domain được gán theo ba lớp NEGATIVE, NEUTRAL và POSITIVE. Nhãn phản ánh tác
+động kỳ vọng của nội dung đối với doanh nghiệp hoặc mã cổ phiếu liên quan, không chỉ
+phản ánh sắc thái của một câu riêng lẻ. Người gán nhãn phải đọc tiêu đề và phần nội
+dung có sẵn, ghi nhận trường hợp có nhiều sự kiện hoặc hướng tác động không rõ ràng,
+đồng thời không suy luận nhãn từ biến động giá xảy ra sau thời điểm bài viết được
+đăng.
+
+Các mẫu bất đồng được giữ lại để kiểm tra ranh giới khó. Báo cáo cuối phải ghi số
+người gán nhãn, số mẫu hợp lệ, phân bố ba lớp, cách giải quyết bất đồng và Cohen's
+kappa hoặc Fleiss' kappa. Không được loại bỏ mẫu bất đồng chỉ vì mẫu đó làm giảm điểm
+đánh giá.
+
+\section{Hồ sơ thiết kế hệ thống}
+
+\subsection{Tác nhân và chức năng}
+
+Hệ thống có một tác nhân chính là người nghiên cứu. Người nghiên cứu cung cấp dữ liệu,
+khóa cấu hình và kiểm tra các báo cáo sinh ra từ pipeline. Các chức năng chính gồm:
+
+\begin{itemize}[nosep]
+  \item thu thập và kiểm tra dữ liệu tin tức, dữ liệu giá;
+  \item chuẩn hóa văn bản, loại bản ghi trùng và lưu provenance;
+  \item gán tin với mã cổ phiếu và phiên giao dịch theo cutoff;
+  \item suy luận xác suất ba lớp cảm xúc bằng PhoBERT;
+  \item tạo đặc trưng theo mã và ngày, huấn luyện mô hình dự báo;
+  \item đánh giá theo thứ tự thời gian và xuất manifest, metric, biểu đồ.
+\end{itemize}
+
+\subsection{Sơ đồ luồng xử lý}
+
+Sơ đồ dưới đây mô tả luồng xử lý của hệ thống. Khối đánh giá chỉ nhận dữ liệu dự báo
+ngoài mẫu và manifest của cùng một lần chạy; không dùng dữ liệu holdout để điều chỉnh
+ngược cấu hình.
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+      node distance=5mm,
+      block/.style={
+        rectangle, rounded corners=2pt, draw=black!60, thick,
+        text width=10cm, minimum height=9mm, align=center,
+        fill=gray!8, inner sep=4pt},
+      decision/.style={
+        rectangle, rounded corners=2pt, draw=blue!65, very thick,
+        text width=10cm, minimum height=9mm, align=center,
+        fill=blue!8, inner sep=4pt},
+      arr/.style={-{Stealth[length=2.5mm]}, thick, black!65}
+    ]
+    \node[block] (input) {Tin tức và dữ liệu giá};
+    \node[block, below=of input] (quality) {Kiểm tra schema, timestamp, mã và bản ghi trùng};
+    \node[decision, below=of quality] (features) {Tạo đặc trưng sentiment và đặc trưng thị trường theo mã, ngày};
+    \node[decision, below=of features] (models) {Huấn luyện baseline, mô hình chỉ giá và LSTM hai nhánh};
+    \node[block, below=of models] (evaluation) {Walk-forward, holdout, ablation và phân tích sai số};
+    \node[block, below=of evaluation] (report) {Metric, biểu đồ, manifest và báo cáo tái lập};
+    \draw[arr] (input) -- (quality);
+    \draw[arr] (quality) -- (features);
+    \draw[arr] (features) -- (models);
+    \draw[arr] (models) -- (evaluation);
+    \draw[arr] (evaluation) -- (report);
+  \end{tikzpicture}
+  \caption{Sơ đồ luồng xử lý và báo cáo kết quả của hệ thống.}
+  \label{fig:phu-luc-luong-xu-ly}
+\end{figure}
+\noindent\textit{Nguồn: Tác giả xây dựng.}
+
+\subsection{Các module chính}
+
+\begin{description}[style=nextline, nosep]
+  \item[\texttt{stf.data.news}] Đọc và chuẩn hóa dữ liệu tin, xử lý timestamp, tiêu đề,
+  nội dung và URL.
+  \item[\texttt{stf.data.prices}] Đọc chuỗi giá OHLCV theo mã cổ phiếu và kiểm tra độ
+  phủ lịch giao dịch.
+  \item[\texttt{stf.sentiment.dataset}] Đọc tập nhãn, chuẩn hóa nhãn về ba lớp và tạo
+  các tập train, validation, test theo thời gian khi có cột ngày.
+  \item[\texttt{stf.sentiment.model}] Tinh chỉnh PhoBERT, lưu checkpoint và sinh xác
+  suất cho ba lớp cảm xúc.
+  \item[\texttt{stf.sentiment.metrics}] Tính macro-F1, chỉ số theo lớp và độ đồng thuận
+  của tập nhãn.
+\end{description}
 
 \section{Cấu hình tái lập}
-Liệt kê seed, phiên bản thư viện, và manifest kết quả để tái lập thực nghiệm.
+
+Snapshot dữ liệu đầu vào gồm \texttt{data/raw/news/articles.parquet} cho tin tức,
+\texttt{data/raw/news/listings.parquet} cho liên kết tin với mã, các tệp giá theo mã
+trong \texttt{data/raw/prices/}, cùng dữ liệu nhãn trong \texttt{data/labeled/}.
+Mỗi lần chạy cần lưu phiên bản mã nguồn, phiên bản thư viện, seed, checkpoint, cutoff,
+phạm vi ngày, danh sách mã, hash dữ liệu và các tham số huấn luyện. Manifest là nguồn
+đối chiếu chính cho mọi con số xuất hiện trong phần kết quả thực nghiệm.
+
+Tiền xử lý chỉ được fit trên phần train của từng cửa sổ. Holdout cuối chỉ được đọc ở
+bước báo cáo. Nếu thay đổi nguồn dữ liệu, cutoff, ngưỡng tạo nhãn hoặc cách chia tập,
+phải tạo manifest mới và không gộp kết quả giữa hai cấu hình.
+
+\section{Cài đặt và chạy hệ thống}
+
+Môi trường được quản lý bằng \texttt{uv} và yêu cầu Python từ 3.12. Các lệnh kiểm tra
+offline tối thiểu:
+
+\begin{verbatim}
+uv sync
+uv run python -m stf.cli verify
+uv run python -m stf.cli sentiment-smoke --n 60
+\end{verbatim}
+
+Huấn luyện PhoBERT cần một tệp nhãn đã hoàn tất với cột \texttt{text} và
+\texttt{label}, nên chỉ được chạy sau khi khóa hướng dẫn gán nhãn và lưu manifest
+tương ứng. Bước huấn luyện chính thức nên thực hiện trên GPU; tên GPU, thời gian chạy
+và checkpoint phải được lưu cùng kết quả.
 
 \section{Mã nguồn}
-Mã nguồn hệ thống được tổ chức trong package \texttt{stf} (repository
-\texttt{stock-trend-forecasting}), gồm các module thu thập dữ liệu, tinh chỉnh cảm xúc
-và đánh giá.
+
+Mã nguồn hệ thống được tổ chức trong package \texttt{stf} của repository đề tài.
+Các module thu thập dữ liệu, xử lý sentiment, đánh giá và CLI được đặt trong thư mục
+\texttt{src/stf/}. Notebook huấn luyện GPU và hướng dẫn chạy được lưu trong thư mục
+\texttt{notebooks/}. Phụ lục này mô tả giao diện và luồng xử lý; kết quả định lượng
+chỉ được xác nhận bởi các artifact sinh từ một lần chạy có manifest.
