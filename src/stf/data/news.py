@@ -181,7 +181,7 @@ def get(
     return None
 
 
-# --- Phase 1: listing (news -> ticker mapping) ----------------------------
+# News listings
 
 
 def list_ticker_year(code: str, year: int, *, to_date: str) -> list[tuple[str, str]]:
@@ -260,7 +260,7 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
     return df
 
 
-# --- Phase 2: article content (timestamp + title + body) ------------------
+# Article content
 
 
 def _parse_article_html(html: str) -> _ArticleParser:

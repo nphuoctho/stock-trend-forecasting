@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-# --- Study scope ----------------------------------------------------------
+# Study scope
 
 # Symbols in the current study scope.
 TICKERS: tuple[str, ...] = (
@@ -28,7 +28,7 @@ DATE_END = "2026-03-31"
 SESSION_CUTOFF = "15:00"
 TIMEZONE = "Asia/Ho_Chi_Minh"
 
-# --- Paths ----------------------------------------------------------------
+# Repository paths
 
 # Repo root = the dir holding pyproject.toml (src/stf/config.py -> parents[2]).
 ROOT = Path(__file__).resolve().parents[2]
