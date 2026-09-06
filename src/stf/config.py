@@ -1,17 +1,12 @@
-"""Central config for the whole pipeline.
-
-Every shared constant (ticker list, date window, data paths) lives here so one
-edit propagates to every module. Keeps scripts from drifting apart the way they
-did during the spike.
-"""
+"""Shared study settings and filesystem paths."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-# --- Study scope ----------------------------------------------------------
+# Study scope
 
-# 10 high-liquidity VN30 tickers with enough news coverage
+# Symbols in the current study scope.
 TICKERS: tuple[str, ...] = (
     "FPT",
     "GAS",
@@ -33,7 +28,7 @@ DATE_END = "2026-03-31"
 SESSION_CUTOFF = "15:00"
 TIMEZONE = "Asia/Ho_Chi_Minh"
 
-# --- Paths ----------------------------------------------------------------
+# Repository paths
 
 # Repo root = the dir holding pyproject.toml (src/stf/config.py -> parents[2]).
 ROOT = Path(__file__).resolve().parents[2]

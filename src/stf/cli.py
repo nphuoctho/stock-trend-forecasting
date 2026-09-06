@@ -22,7 +22,7 @@ def cmd_prices(args: argparse.Namespace) -> int:
 
     result = prices.collect(limit=args.limit)
     prices.summary(result)
-    return 0 if any(v > 0 for v in result.values()) else 1
+    return 0 if result and all(value > 0 for value in result.values()) else 1
 
 
 def cmd_news(args: argparse.Namespace) -> int:
@@ -36,46 +36,72 @@ def cmd_news(args: argparse.Namespace) -> int:
 
 
 def cmd_verify(_args: argparse.Namespace) -> int:
-    """Read saved data and print a coverage report. No network access."""
+    """Read saved data and print a coverage report without using the network."""
     print("Data coverage report (offline)\n")
     ok = True
 
-    # --- Prices ---
-    price_files = sorted(config.PRICES_DIR.glob("*.parquet"))
-    if not price_files:
+    required_price_cols = {"time", "open", "high", "low", "close", "volume"}
+    price_files = {
+        path.stem: path for path in config.PRICES_DIR.glob("*.parquet")
+    }
+    missing_tickers = sorted(set(config.TICKERS) - price_files.keys())
+    if missing_tickers:
+        print(f"[prices] missing tickers: {', '.join(missing_tickers)}")
+        ok = False
+    total_prices = 0
+    for ticker, path in sorted(price_files.items()):
+        df = pd.read_parquet(path)
+        missing_cols = required_price_cols - set(df.columns)
+        if missing_cols or df.empty:
+            print(f"[prices] {ticker}: invalid or empty file")
+            ok = False
+            continue
+        if "ticker" not in df.columns:
+            print(f"[prices] {ticker}: legacy file without ticker column")
+        total_prices += len(df)
+    if price_files:
+        print(f"[prices] {len(price_files)} files, {total_prices} sessions total")
+    else:
         print("[prices] no price data")
         ok = False
-    else:
-        total = 0
-        for f in price_files:
-            df = pd.read_parquet(f)
-            total += len(df)
-        print(f"[prices] {len(price_files)} tickers, {total} sessions total")
 
-    # --- News ---
     if not config.ARTICLES_PQ.exists():
         print("[news] articles.parquet missing")
         ok = False
     else:
-        a = pd.read_parquet(config.ARTICLES_PQ)
-        with_ts = a["published_at"].notna().sum() if "published_at" in a else 0
-        with_body = a["body"].notna().sum() if "body" in a else 0
-        print(
-            f"[news] {len(a)} articles | {with_ts} with timestamp | {with_body} with body"
-        )
-        if "published_at" in a:
-            pa = pd.to_datetime(a["published_at"], errors="coerce", utc=True)
-            if pa.notna().any():
-                print(f"      range: {str(pa.min())[:10]} -> {str(pa.max())[:10]}")
+        articles = pd.read_parquet(config.ARTICLES_PQ)
+        required = {"url", "published_at", "title", "body"}
+        if not required.issubset(articles.columns) or articles.empty:
+            print("[news] articles.parquet has an invalid schema or no rows")
+            ok = False
+        else:
+            with_ts = pd.to_datetime(
+                articles["published_at"], errors="coerce", utc=True
+            ).notna().sum()
+            with_body = (
+                articles["body"].fillna("").astype("string").str.strip().ne("").sum()
+            )
+            print(
+                f"[news] {len(articles)} articles | {with_ts} with timestamp | "
+                f"{with_body} with body"
+            )
 
     if config.LISTINGS_PQ.exists():
         listings = pd.read_parquet(config.LISTINGS_PQ)
-        print(
-            f"[map] {len(listings)} listings, {listings['ticker'].nunique()} tickers "
-            f"(news->ticker)"
-        )
+        required = {"ticker", "url", "list_date"}
+        if not required.issubset(listings.columns):
+            print("[map] listings.parquet has an invalid schema")
+            ok = False
+        else:
+            print(
+                f"[map] {len(listings)} listings, {listings['ticker'].nunique()} tickers "
+                "(news to ticker)"
+            )
+    else:
+        print("[map] listings.parquet missing")
+        ok = False
 
-    print("\nResult:", "OK" if ok else "MISSING DATA")
+    print("\nResult:", "OK" if ok else "MISSING OR INVALID DATA")
     return 0 if ok else 1
 
 

@@ -36,10 +36,18 @@ def prepare() -> pd.DataFrame:
         )
     df = pd.read_excel(RAW_XLSX)
     df = df.rename(columns={"title": "text"})
-    df["label"] = df["label"].map(_RAW2LABEL)
+    if "text" not in df.columns or "label" not in df.columns:
+        raise ValueError("CafeF source must contain title/text and label columns.")
+
+    raw_labels = pd.to_numeric(df["label"], errors="coerce")
+    df["label"] = raw_labels.map(_RAW2LABEL)
     if df["label"].isna().any():
         raise ValueError("Found source labels outside {1,2,3}; check raw_data.xlsx")
-    df = df.dropna(subset=["text"]).drop_duplicates(subset=["text"]).reset_index(drop=True)
+
+    df["text"] = df["text"].astype("string").str.strip()
+    df = df.dropna(subset=["text"])
+    df = df[df["text"].ne("")]
+    df = df.drop_duplicates(subset=["text"]).reset_index(drop=True)
     df = df[["text", "label"]]
 
     SEED_DIR.mkdir(parents=True, exist_ok=True)

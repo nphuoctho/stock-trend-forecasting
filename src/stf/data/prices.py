@@ -39,15 +39,24 @@ def fetch_one(symbol: str, start: str, end: str) -> pd.DataFrame | None:
 
 
 def _normalize(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
-    """Normalize columns to the _EXPECTED_COLS schema and add a ticker column."""
+    """Normalize the vendor response and enforce the stored schema."""
     df = df.copy()
-    # vnstock returns a "time" column; rename the first column to "time" just in case.
+    df.columns = [str(column).strip().lower() for column in df.columns]
     if "time" not in df.columns:
+        if len(df.columns) == 0:
+            raise ValueError(f"{symbol}: price response has no columns")
         df = df.rename(columns={df.columns[0]: "time"})
-    df["time"] = pd.to_datetime(df["time"])
+
+    missing = [column for column in _EXPECTED_COLS if column not in df.columns]
+    if missing:
+        raise ValueError(f"{symbol}: price response missing columns {missing}")
+
+    df["time"] = pd.to_datetime(df["time"], errors="raise")
     df["ticker"] = symbol
-    keep = [c for c in _EXPECTED_COLS if c in df.columns] + ["ticker"]
-    return df[keep].sort_values("time").reset_index(drop=True)
+    result = df[[*_EXPECTED_COLS, "ticker"]].sort_values("time")
+    if result["time"].duplicated().any():
+        raise ValueError(f"{symbol}: price response contains duplicate dates")
+    return result.reset_index(drop=True)
 
 
 def collect(
@@ -62,8 +71,10 @@ def collect(
     limit: take only the first `limit` tickers (for a quick check, not a full pull).
     """
     config.ensure_dirs()
-    tickers = tickers or config.TICKERS
+    tickers = config.TICKERS if tickers is None else tickers
     if limit is not None:
+        if limit < 0:
+            raise ValueError("limit must be non-negative.")
         tickers = tickers[:limit]
 
     result: dict[str, int] = {}

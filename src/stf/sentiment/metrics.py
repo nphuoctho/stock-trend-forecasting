@@ -10,7 +10,7 @@ import numpy as np
 
 
 def classification_metrics(y_true, y_pred) -> dict:
-    """Return a dict of classification metrics. macro-F1 is under the 'macro_f1' key."""
+    """Return classification metrics for the fixed three-class label set."""
     from sklearn.metrics import (
         accuracy_score,
         balanced_accuracy_score,
@@ -20,6 +20,13 @@ def classification_metrics(y_true, y_pred) -> dict:
 
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
+    if y_true.ndim != 1 or y_pred.ndim != 1 or len(y_true) != len(y_pred):
+        raise ValueError("y_true and y_pred must be one-dimensional arrays of equal length.")
+    if len(y_true) == 0:
+        raise ValueError("Cannot calculate metrics for an empty set.")
+    if not np.isin(y_true, [0, 1, 2]).all() or not np.isin(y_pred, [0, 1, 2]).all():
+        raise ValueError("Labels must use the fixed ids 0, 1 and 2.")
+
     p, r, f1, support = precision_recall_fscore_support(
         y_true, y_pred, labels=[0, 1, 2], zero_division=0
     )
@@ -34,23 +41,23 @@ def classification_metrics(y_true, y_pred) -> dict:
     }
 
 
-def cohen_kappa(rater_a, rater_b) -> float:
-    """Cohen's κ for TWO annotators (acceptance report #6)."""
-    from sklearn.metrics import cohen_kappa_score
-
-    return float(cohen_kappa_score(rater_a, rater_b))
-
-
 def fleiss_kappa(table: np.ndarray) -> float:
-    """Fleiss' κ for THREE OR MORE annotators.
-
-    table: an (n_items, n_categories) matrix; each cell = how many raters put the item in that class.
-    Implemented here (sklearn has none) from the Fleiss 1971 formula.
-    """
+    """Calculate Fleiss' kappa from an item-by-class count table."""
     table = np.asarray(table, dtype=float)
-    n_items, _ = table.shape
-    n_raters = table.sum(axis=1)[0]  # assumes every item has the same rater count
-    p_j = table.sum(axis=0) / (n_items * n_raters)  # proportion per class
+    if table.ndim != 2 or table.shape[0] == 0 or table.shape[1] < 2:
+        raise ValueError("table must be a non-empty two-dimensional count matrix.")
+    if not np.isfinite(table).all() or (table < 0).any():
+        raise ValueError("table counts must be finite and non-negative.")
+
+    rater_counts = table.sum(axis=1)
+    if not np.allclose(rater_counts, rater_counts[0]):
+        raise ValueError("Every item must have the same number of ratings.")
+    n_raters = rater_counts[0]
+    if n_raters < 2 or not n_raters.is_integer():
+        raise ValueError("Each item needs at least two ratings.")
+
+    n_items = table.shape[0]
+    p_j = table.sum(axis=0) / (n_items * n_raters)
     P_i = (np.square(table).sum(axis=1) - n_raters) / (n_raters * (n_raters - 1))
     P_bar = P_i.mean()
     P_e = np.square(p_j).sum()
