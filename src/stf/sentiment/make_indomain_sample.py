@@ -60,14 +60,21 @@ của mã liên quan, theo góc nhìn nhà đầu tư ngắn hạn.
 
 
 def make_sample(n: int, seed: int, raters: int) -> pd.DataFrame:
+    if n < 1:
+        raise ValueError("n must be at least 1.")
+    if raters < 1:
+        raise ValueError("raters must be at least 1.")
     if not config.ARTICLES_PQ.exists():
         raise FileNotFoundError(
             f"{config.ARTICLES_PQ} not found. Run the news crawl first."
         )
+    if not config.LISTINGS_PQ.exists():
+        raise FileNotFoundError(
+            f"{config.LISTINGS_PQ} not found. Run the news listing step first."
+        )
 
     articles = pd.read_parquet(config.ARTICLES_PQ)
     listings = pd.read_parquet(config.LISTINGS_PQ)
-
     # Only take articles that already have a body (full content for accurate labeling).
     has_body = articles["body"].notna() & (
         articles["body"].astype("string").str.len() > 0

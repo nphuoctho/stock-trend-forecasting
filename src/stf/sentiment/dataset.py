@@ -44,33 +44,44 @@ class Split:
 
 
 def normalize_labels(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize the `label` column to `label_id` (int 0/1/2). Accepts class names or numbers."""
+    """Normalize labels to integer ids and reject malformed rows."""
     df = df.copy()
-    if "label_id" in df.columns:
-        return df
-    raw = df["label"]
-    # Tell text labels (object or pandas' newer string dtype) apart from numeric ones.
-    is_text = raw.dtype == object or pd.api.types.is_string_dtype(raw)
-    if is_text:
-        df["label_id"] = raw.astype("string").str.upper().str.strip().map(LABEL2ID)
+    source = df["label_id"] if "label_id" in df.columns else df["label"]
+
+    if pd.api.types.is_string_dtype(source) or source.dtype == object:
+        text = source.astype("string").str.upper().str.strip()
+        values = text.map(LABEL2ID)
+        numeric = pd.to_numeric(text, errors="coerce")
+        values = values.fillna(numeric)
     else:
-        df["label_id"] = raw.astype(int)
-    if df["label_id"].isna().any():
-        bad = df.loc[df["label_id"].isna(), "label"].unique()[:5]
+        values = pd.to_numeric(source, errors="coerce")
+
+    invalid = values.isna() | (values % 1 != 0) | ~values.between(0, 2)
+    if invalid.any():
+        bad = source[invalid].drop_duplicates().head(5).tolist()
         raise ValueError(
             f"Invalid labels: {bad}. Expected NEGATIVE/NEUTRAL/POSITIVE or 0/1/2."
         )
-    df["label_id"] = df["label_id"].astype(int)
+
+    df["label_id"] = values.astype("int64")
     return df
 
 
 def load_labeled(path: str | Path) -> pd.DataFrame:
-    """Load a label file (.csv/.parquet), return a DataFrame with text, label_id[, date]."""
+    """Load a label file and return text plus normalized integer labels."""
     path = Path(path)
-    df = pd.read_parquet(path) if path.suffix == ".parquet" else pd.read_csv(path)
+    suffix = path.suffix.lower()
+    if suffix == ".parquet":
+        df = pd.read_parquet(path)
+    elif suffix == ".csv":
+        df = pd.read_csv(path)
+    else:
+        raise ValueError("Label file must be .csv or .parquet.")
     if "text" not in df.columns or "label" not in df.columns:
         raise ValueError("Label file needs 'text' and 'label' columns.")
-    df = df.dropna(subset=["text"]).reset_index(drop=True)
+    df = df.dropna(subset=["text"]).copy()
+    df["text"] = df["text"].astype("string").str.strip()
+    df = df[df["text"].ne("")].reset_index(drop=True)
     return normalize_labels(df)
 
 
@@ -82,50 +93,61 @@ def make_split(
     test_frac: float = 0.1,
     time_aware: bool = True,
 ) -> Split:
-    """Split into train/val/test.
+    """Split into train, validation and test sets without empty partitions."""
+    if df.empty:
+        raise ValueError("Cannot split an empty dataset.")
+    if not 0 < val_frac < 1 or not 0 < test_frac < 1:
+        raise ValueError("val_frac and test_frac must be between 0 and 1.")
+    if val_frac + test_frac >= 1:
+        raise ValueError("val_frac and test_frac must leave training rows.")
+    if "label_id" not in df.columns:
+        raise ValueError("Dataset needs a normalized 'label_id' column.")
 
-    time_aware=True with a `date` column: split BY TIME (train = oldest,
-    test = newest) to match the no-leakage constraint of forecast evaluation.
-    Otherwise: random split stratified by class (fixed seed).
-    """
     df = df.reset_index(drop=True)
+    n = len(df)
+    n_test = max(1, round(n * test_frac))
+    n_val = max(1, round(n * val_frac))
+    if n - n_val - n_test < 1:
+        raise ValueError("Dataset is too small for train, validation and test splits.")
+
     if time_aware and "date" in df.columns:
-        df = df.sort_values("date").reset_index(drop=True)
-        n = len(df)
-        n_test = int(n * test_frac)
-        n_val = int(n * val_frac)
-        train = df.iloc[: n - n_val - n_test]
-        val = df.iloc[n - n_val - n_test : n - n_test]
-        test = df.iloc[n - n_test :]
+        dates = pd.to_datetime(df["date"], errors="coerce")
+        if dates.isna().any():
+            raise ValueError("Time-aware splits require valid dates in every row.")
+        df = df.assign(_split_date=dates).sort_values("_split_date").drop(
+            columns="_split_date"
+        )
+        train_end = n - n_val - n_test
+        val_end = n - n_test
         return Split(
-            train.reset_index(drop=True),
-            val.reset_index(drop=True),
-            test.reset_index(drop=True),
+            df.iloc[:train_end].reset_index(drop=True),
+            df.iloc[train_end:val_end].reset_index(drop=True),
+            df.iloc[val_end:].reset_index(drop=True),
         )
 
-    # Random split stratified by class.
     rng = np.random.default_rng(seed)
     parts: dict[str, list[pd.DataFrame]] = {"train": [], "val": [], "test": []}
-    for _, grp in df.groupby("label_id"):
-        idx = rng.permutation(len(grp))
-        grp = grp.iloc[idx].reset_index(drop=True)
-        n = len(grp)
-        n_test = int(n * test_frac)
-        n_val = int(n * val_frac)
-        parts["test"].append(grp.iloc[:n_test])
-        parts["val"].append(grp.iloc[n_test : n_test + n_val])
-        parts["train"].append(grp.iloc[n_test + n_val :])
-    return Split(
-        pd.concat(parts["train"])
-        .sample(frac=1, random_state=seed)
-        .reset_index(drop=True),
-        pd.concat(parts["val"])
-        .sample(frac=1, random_state=seed)
-        .reset_index(drop=True),
-        pd.concat(parts["test"])
-        .sample(frac=1, random_state=seed)
-        .reset_index(drop=True),
-    )
+    for _, group in df.groupby("label_id", sort=True):
+        group = group.iloc[rng.permutation(len(group))].reset_index(drop=True)
+        n_group_test = min(max(1, round(len(group) * test_frac)), len(group))
+        n_group_val = min(
+            max(1, round(len(group) * val_frac)),
+            max(0, len(group) - n_group_test - 1),
+        )
+        parts["test"].append(group.iloc[:n_group_test])
+        parts["val"].append(group.iloc[n_group_test : n_group_test + n_group_val])
+        parts["train"].append(group.iloc[n_group_test + n_group_val :])
+
+    result = {}
+    for name, frames in parts.items():
+        result[name] = (
+            pd.concat(frames)
+            .sample(frac=1, random_state=seed)
+            .reset_index(drop=True)
+        )
+    if any(result[name].empty for name in ("train", "val", "test")):
+        raise ValueError("Stratified splitting produced an empty partition.")
+    return Split(result["train"], result["val"], result["test"])
 
 
 def synthetic_dataset(n: int = 120, seed: int = 42) -> pd.DataFrame:

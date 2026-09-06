@@ -1,9 +1,4 @@
-"""Central config for the whole pipeline.
-
-Every shared constant (ticker list, date window, data paths) lives here so one
-edit propagates to every module. Keeps scripts from drifting apart the way they
-did during the spike.
-"""
+"""Shared study settings and filesystem paths."""
 
 from __future__ import annotations
 
@@ -11,7 +6,7 @@ from pathlib import Path
 
 # --- Study scope ----------------------------------------------------------
 
-# 10 high-liquidity VN30 tickers with enough news coverage
+# Symbols in the current study scope.
 TICKERS: tuple[str, ...] = (
     "FPT",
     "GAS",

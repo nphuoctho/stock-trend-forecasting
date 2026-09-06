@@ -23,6 +23,9 @@ import os
 import re
 import time
 from datetime import datetime
+from hashlib import sha256
+from html.parser import HTMLParser
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
@@ -31,30 +34,120 @@ from stf import config
 
 BASE = "https://finance.vietstock.vn/View/PagingNewsContent"
 HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://finance.vietstock.vn/"}
-SLEEP = 0.4  # polite pacing, matches the spike that ran safely
+SLEEP = 0.4
 PAGE_SIZE = 20
-MAX_PAGES = 400  # guard against an infinite loop if the paginator repeats the last page
+MAX_PAGES = 400
 
-# --- Data-extraction regexes ----------------------------------------------
-HREF = re.compile(r"href=(//vietstock\.vn/\d{4}/\d{2}/[^\s\"']+\.htm)", re.IGNORECASE)
-DATE = re.compile(r"\b(\d{2}/\d{2}/\d{4})\b")
-PUB = re.compile(r"\b(\d{2}/\d{2}/\d{4} \d{2}:\d{2})\b")  # itemprop=datePublished
-OG_TITLE = re.compile(
-    r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)', re.IGNORECASE
-)
-TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
-ART_ID = re.compile(r"-(\d+)\.htm", re.IGNORECASE)
-# Article body block: <div itemprop="articleBody" id="vst_detail"> ... </div>
-BODY_BLOCK = re.compile(
-    r'<div[^>]*itemprop=["\']articleBody["\'][^>]*id=["\']vst_detail["\'][^>]*>(.*?)</div>',
-    re.IGNORECASE | re.DOTALL,
-)
-# Fallback for longform/feature articles with no vst_detail block: use og:description.
-OG_DESC = re.compile(
-    r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)',
+_VOID_TAGS = {
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
+}
+
+# Listing pages expose the article URL and date in separate fragments.
+HREF = re.compile(
+    r"""href\s*=\s*["']?((?://|https?://)(?:www\.)?vietstock\.vn/\d{4}/\d{2}/[^\s"'<>]+\.htm)""",
     re.IGNORECASE,
 )
-TAG = re.compile(r"<[^>]+>")
+DATE = re.compile(r"\b(\d{2}/\d{2}/\d{4})\b")
+ART_ID = re.compile(r"-(\d+)\.htm", re.IGNORECASE)
+
+
+class _ArticleParser(HTMLParser):
+    """Read the few article fields needed by the pipeline."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.body_parts: list[str] = []
+        self.og_title: str | None = None
+        self.og_description: str | None = None
+        self.title_parts: list[str] = []
+        self.published_parts: list[str] = []
+        self._body_depth = 0
+        self._capture: str | None = None
+        self._capture_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attr_map = {name.lower(): value or "" for name, value in attrs}
+        tag = tag.lower()
+
+        if tag == "meta":
+            prop = attr_map.get("property", "").lower()
+            if prop == "og:title":
+                self.og_title = attr_map.get("content")
+            elif prop == "og:description":
+                self.og_description = attr_map.get("content")
+
+        if self._body_depth:
+            if tag not in _VOID_TAGS:
+                self._body_depth += 1
+            return
+
+        if (
+            tag == "div"
+            and attr_map.get("id", "").lower() == "vst_detail"
+            and attr_map.get("itemprop", "").lower() == "articlebody"
+        ):
+            self._body_depth = 1
+            return
+
+        if self._capture is not None:
+            if tag not in _VOID_TAGS:
+                self._capture_depth += 1
+            return
+
+        if tag == "title":
+            self._capture = "title"
+            self._capture_depth = 1
+        elif tag == "span" and attr_map.get("itemprop", "").lower() == "datepublished":
+            self._capture = "published"
+            self._capture_depth = 1
+
+    def handle_startendtag(
+        self, tag: str, attrs: list[tuple[str, str | None]]
+    ) -> None:
+        self.handle_starttag(tag, attrs)
+        if tag.lower() not in _VOID_TAGS:
+            self.handle_endtag(tag)
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.lower()
+        if tag in _VOID_TAGS:
+            return
+        if self._body_depth:
+            self._body_depth -= 1
+            return
+        if self._capture is not None:
+            self._capture_depth -= 1
+            if self._capture_depth == 0:
+                self._capture = None
+
+    def handle_data(self, data: str) -> None:
+        if self._body_depth:
+            self.body_parts.append(data)
+        if self._capture == "title":
+            self.title_parts.append(data)
+        elif self._capture == "published":
+            self.published_parts.append(data)
+
+
+def _clean_text(value: str | None) -> str | None:
+    if not value:
+        return None
+    text = re.sub(r"\s+", " ", value).strip()
+    return text or None
+
 
 
 def _log(msg: str) -> None:
@@ -64,16 +157,27 @@ def _log(msg: str) -> None:
 def get(
     url: str, params: dict | None = None, tries: int = 4
 ) -> requests.Response | None:
-    """GET with exponential backoff. Returns None after retries run out (skip the bad article, don't kill the job)."""
-    for i in range(tries):
+    """Fetch one page, retrying transient failures."""
+    if tries < 1:
+        raise ValueError("tries must be at least 1.")
+
+    for attempt in range(tries):
         try:
-            r = requests.get(url, params=params, headers=HEADERS, timeout=30)
-            if r.status_code == 200:
-                r.encoding = "utf-8"
-                return r
-            time.sleep(SLEEP * (2**i))  # 429/5xx: back off longer
+            response = requests.get(
+                url, params=params, headers=HEADERS, timeout=30
+            )
         except requests.RequestException:
-            time.sleep(SLEEP * (2**i))
+            response = None
+
+        if response is not None:
+            if response.status_code == 200:
+                response.encoding = "utf-8"
+                return response
+            if response.status_code < 500 and response.status_code != 429:
+                return None
+
+        if attempt + 1 < tries:
+            time.sleep(SLEEP * (2**attempt))
     return None
 
 
@@ -134,10 +238,11 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
             to_date = config.DATE_END if year == end_year else f"{year}-12-31"
             rows = list_ticker_year(code, year, to_date=to_date)
             for href, d in rows:
+                url = href if href.startswith("http") else f"https:{href}"
                 recs.append(
                     {
                         "ticker": code,
-                        "url": "https:" + href,
+                        "url": url,
                         "list_date": d,
                         "year": year,
                     }
@@ -158,51 +263,59 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
 # --- Phase 2: article content (timestamp + title + body) ------------------
 
 
+def _parse_article_html(html: str) -> _ArticleParser:
+    parser = _ArticleParser()
+    parser.feed(html)
+    parser.close()
+    return parser
+
+
 def extract_body(html: str) -> str | None:
-    """Extract the article body from the vst_detail block, strip HTML, collapse whitespace.
-
-    Normal articles use the articleBody/vst_detail block (full content). Longform/feature
-    articles without it fall back to og:description (a short blurb) so sentiment still has
-    some text, instead of leaving it empty and re-crawling forever.
-    """
-    m = BODY_BLOCK.search(html)
-    if m:
-        text = TAG.sub(" ", m.group(1))  # drop all HTML tags
-        text = re.sub(r"\s+", " ", text).strip()
-        if text:
-            return text
-    # Fallback: og:description for longform/feature articles.
-    d = OG_DESC.search(html)
-    if d:
-        return re.sub(r"\s+", " ", d.group(1)).strip() or None
-    return None
+    """Return the full article body, falling back to the page description."""
+    parser = _parse_article_html(html)
+    body = _clean_text(" ".join(parser.body_parts))
+    return body or _clean_text(parser.og_description)
 
 
-def parse_article(html: str) -> dict:
-    """Return dict(timestamp_str, title, body) from one article's HTML."""
-    m = PUB.search(html)
-    ts = m.group(1).strip() if m else None
-    t = OG_TITLE.search(html) or TITLE.search(html)
-    title = re.sub(r"\s+", " ", t.group(1)).strip() if t else None
-    return {"published_at_str": ts, "title": title, "body": extract_body(html)}
+def parse_article(html: str) -> dict[str, str | None]:
+    """Extract the timestamp, title and body stored for one article."""
+    parser = _parse_article_html(html)
+    title = parser.og_title or _clean_text(" ".join(parser.title_parts))
+    timestamp = _clean_text(" ".join(parser.published_parts))
+    return {
+        "published_at_str": timestamp,
+        "title": _clean_text(title),
+        "body": _clean_text(" ".join(parser.body_parts))
+        or _clean_text(parser.og_description),
+    }
 
 
 def _to_iso(ts: str | None) -> str | None:
     if not ts:
         return None
     try:
-        return datetime.strptime(ts, "%d/%m/%Y %H:%M").isoformat()
+        local = datetime.strptime(ts, "%d/%m/%Y %H:%M")
     except ValueError:
         return None
+    return local.replace(tzinfo=ZoneInfo(config.TIMEZONE)).isoformat()
+
+
+def _normalize_stored_timestamp(value: str | None) -> str | None:
+    """Upgrade old naive timestamps to the study timezone."""
+    if not value:
+        return None
+    timestamp = pd.to_datetime(value, errors="coerce")
+    if pd.isna(timestamp):
+        return None
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.tz_localize(config.TIMEZONE)
+    else:
+        timestamp = timestamp.tz_convert(config.TIMEZONE)
+    return timestamp.isoformat()
 
 
 def _has_body(val) -> bool:
-    """True if body holds real content (not None, not NaN, not empty).
-
-    Needed because pandas stores missing cells as NaN (float), and `not float('nan')`
-    is False - so an article without a body can look like it has one. Check via pd.isna
-    to be safe.
-    """
+    """Return whether a stored body contains text."""
     if val is None:
         return False
     try:
@@ -216,23 +329,21 @@ def _has_body(val) -> bool:
 def fetch_articles(
     urls: list[str], *, limit_urls: int | None = None, max_new: int | None = None
 ) -> pd.DataFrame:
-    """Fetch minute timestamp + title + body for each url. Caches HTML, writes incrementally.
-
-    Upsert by url: KEEP every old article (including ones with only a title, no body yet)
-    and only ADD a body to those still missing one. max_new caps how many bodies get added
-    per run (lets cron crawl the whole corpus gradually across runs).
-    """
+    """Fetch article pages, reusing cached HTML and stored records."""
     config.NEWS_HTML_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Load every old article into the store keyed by url (drop nothing).
     store: dict[str, dict] = {}
     if config.ARTICLES_PQ.exists():
         prev = pd.read_parquet(config.ARTICLES_PQ)
-        for r in prev.to_dict("records"):
-            store[r["url"]] = r
-        with_body = sum(1 for r in store.values() if _has_body(r.get("body")))
+        for record in prev.to_dict("records"):
+            record["published_at"] = _normalize_stored_timestamp(
+                record.get("published_at")
+            )
+            store[record["url"]] = record
+        with_body = sum(_has_body(record.get("body")) for record in store.values())
         _log(
-            f"[articles] loaded {len(store)} existing articles ({with_body} already have a body)"
+            f"[articles] loaded {len(store)} existing articles "
+            f"({with_body} already have a body)"
         )
 
     if limit_urls is not None:
@@ -243,8 +354,7 @@ def fetch_articles(
         return rec is None or not _has_body(rec.get("body"))
 
     def _flush() -> None:
-        # Atomic write: write a temp file then os.replace, to avoid corruption on concurrent
-        # read/write or a mid-write crash (os.replace is atomic on the same filesystem).
+        # Replace in one operation so a crash cannot leave a partial parquet.
         tmp = config.ARTICLES_PQ.with_suffix(".parquet.tmp")
         pd.DataFrame(list(store.values())).to_parquet(tmp)
         os.replace(tmp, config.ARTICLES_PQ)
@@ -259,7 +369,7 @@ def fetch_articles(
             )
             break
         aid_m = ART_ID.search(url)
-        aid = aid_m.group(1) if aid_m else str(abs(hash(url)))
+        aid = aid_m.group(1) if aid_m else sha256(url.encode()).hexdigest()[:16]
         cache = config.NEWS_HTML_DIR / f"{aid}.html"
         if cache.exists():
             html = cache.read_text(encoding="utf-8", errors="ignore")
@@ -304,7 +414,11 @@ def summary(articles: pd.DataFrame) -> None:
     with_ts = (
         articles["published_at"].notna().sum() if "published_at" in articles else 0
     )
-    with_body = articles["body"].notna().sum() if "body" in articles else 0
+    with_body = (
+        sum(_has_body(value) for value in articles["body"])
+        if "body" in articles
+        else 0
+    )
     _log("\nNews summary")
     _log(
         f"articles : {len(articles)} total | {with_ts} with timestamp | {with_body} with body"

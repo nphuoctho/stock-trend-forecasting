@@ -185,10 +185,12 @@ def fine_tune(
 def predict_proba(
     texts, model_dir: Path | None = None, *, batch_size: int = 32
 ) -> np.ndarray:
-    """Produce 3-class probabilities for a list of texts (using the fine-tuned model).
-
-    Returns an array of shape (len(texts), 3) - class order follows labels.LABELS.
-    """
+    """Return one probability row per input text."""
+    if batch_size < 1:
+        raise ValueError("batch_size must be at least 1.")
+    texts = list(texts)
+    if not texts:
+        return np.empty((0, NUM_LABELS), dtype=np.float32)
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
@@ -200,7 +202,6 @@ def predict_proba(
     )
     model.eval()
 
-    texts = list(texts)
     out = []
     with torch.no_grad():
         for i in range(0, len(texts), batch_size):
