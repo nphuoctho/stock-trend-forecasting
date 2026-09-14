@@ -106,6 +106,36 @@ just continue to section 3 to check versions; it's usually fine.
    (section 12 extended): upload `articles.parquet`, run `predict_proba` on the title (or
    title+body), and save the output for Phase 3 (ticker-day features).
 
+## Thực nghiệm bắt buộc theo góp ý GVHD
+
+Không chọn cấu hình đầu vào dựa trên một lần chia ngẫu nhiên. Với tệp
+Vietstock đã gán nhãn, chạy `sentiment-cv` cho từng cấu hình:
+
+```bash
+uv run python -m stf.cli sentiment-cv \
+  --data data/labeled/indomain/labeled.csv \
+  --input-variant title \
+  --truncation-strategy head \
+  --folds 5 --epochs 3 \
+  --output models/experiments/title__head
+```
+
+Lặp lại với ba biến thể `title`, `context`, `title_context` và ba cách cắt
+`head`, `tail`, `head_tail`. PhoBERT có tối đa 256 token; phần cắt được thực
+hiện sau khi mã hóa token và trước khi thêm token đặc biệt. `head_tail` giữ
+hai vùng đầu và cuối, không phải cắt chuỗi theo số ký tự.
+
+Trong mỗi fold, outer holdout chỉ dùng để đánh giá. Một phần 10% của outer
+train được dùng làm validation để chọn checkpoint. Không gộp các kết quả
+holdout vào quá trình chọn mô hình. So sánh `macro-F1` trung bình và độ lệch
+chuẩn qua năm fold; báo cáo thêm accuracy, balanced accuracy và F1 từng lớp.
+
+Tập CafeF hiện chỉ có tiêu đề. Vì vậy, các cấu hình `context` và
+`title_context` trên CafeF sẽ không phải phép so sánh nội miền hợp lệ. Cần
+hoàn tất gán nhãn tệp Vietstock có `title`, `body` và `label` trước khi chạy
+ma trận đầy đủ. Không dùng bài viết hoặc nhãn phát sinh từ giai đoạn dự báo
+để huấn luyện mô hình cảm xúc.
+
 ## Optional quality improvements
 - **In-domain labels:** run `stf.sentiment.make_indomain_sample` locally, label ~300 articles
   by the guideline, save `indomain_labeled.csv`, and upload it (section 5 merges it).

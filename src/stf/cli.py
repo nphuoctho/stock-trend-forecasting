@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 import pandas as pd
 
 from stf import config
-
 
 def cmd_prices(args: argparse.Namespace) -> int:
     from stf.data import prices
@@ -125,19 +125,71 @@ def cmd_sentiment_smoke(args: argparse.Namespace) -> int:
 
 
 def cmd_sentiment_train(args: argparse.Namespace) -> int:
-    """Fine-tune PhoBERT on a real LABEL FILE (.csv/.parquet with text, label columns)."""
+    """Fine-tune PhoBERT on a real LABEL FILE."""
     from stf.sentiment import dataset, model
 
     df = dataset.load_labeled(args.data)
+    df = dataset.build_input_text(df, args.input_variant)
     split = dataset.make_split(df, seed=args.seed, time_aware=not args.no_time_split)
     print("Split:", split.describe())
     cfg = model.TrainConfig(
-        epochs=args.epochs, batch_size=args.batch_size, seed=args.seed
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        seed=args.seed,
+        truncation_strategy=args.truncation_strategy,
     )
     print(f"Device: {model.get_device()} | model: {cfg.model_name}\n")
     manifest = model.fine_tune(split, cfg)
     print("\nTest macro-F1:", manifest["test_metrics"]["macro_f1"])
     print("Per-class F1:", manifest["test_metrics"]["per_class_f1"])
+    return 0
+
+
+def cmd_sentiment_cv(args: argparse.Namespace) -> int:
+    """Run one leakage-safe input/truncation configuration with 5-fold CV."""
+    from stf.sentiment import dataset, experiments, model
+
+    df = dataset.load_labeled(args.data)
+    cfg = model.TrainConfig(
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        seed=args.seed,
+    )
+    result = experiments.run_cross_validation(
+        df,
+        input_variant=args.input_variant,
+        truncation_strategy=args.truncation_strategy,
+        cfg=cfg,
+        folds=args.folds,
+        seed=args.seed,
+        out_dir=Path(args.output),
+    )
+    print("Data:", result["data_size"], "| folds:", result["folds"])
+    for metric, values in result["aggregate"].items():
+        print(f"{metric}: {values['mean']:.4f} +/- {values['std']:.4f}")
+    print("Results:", Path(args.output) / "cv_results.json")
+    return 0
+
+
+def cmd_sentiment_ablation(args: argparse.Namespace) -> int:
+    """Run all title/context and truncation combinations sequentially."""
+    from stf.sentiment import dataset, experiments, model
+
+    df = dataset.load_labeled(args.data)
+    cfg = model.TrainConfig(
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        seed=args.seed,
+    )
+    summary = experiments.run_ablation(
+        df,
+        cfg=cfg,
+        folds=args.folds,
+        seed=args.seed,
+        out_dir=Path(args.output),
+    )
+    print(summary.to_string(index=False))
+    print("Summary:", Path(args.output) / "ablation_summary.csv")
     return 0
 
 
@@ -187,11 +239,59 @@ def main(argv: list[str] | None = None) -> int:
     p_train.add_argument("--batch-size", type=int, default=16)
     p_train.add_argument("--seed", type=int, default=42)
     p_train.add_argument(
+        "--input-variant",
+        choices=("title", "context", "title_context"),
+        default="title",
+        help="text supplied to PhoBERT",
+    )
+    p_train.add_argument(
+        "--truncation-strategy",
+        choices=("head", "tail", "head_tail"),
+        default="head",
+        help="how inputs longer than 256 tokens are shortened",
+    )
+    p_train.add_argument(
         "--no-time-split",
         action="store_true",
         help="random split instead of time-based split",
     )
     p_train.set_defaults(func=cmd_sentiment_train)
+
+    def add_experiment_args(subparser):
+        subparser.add_argument("--data", required=True)
+        subparser.add_argument("--epochs", type=float, default=3.0)
+        subparser.add_argument("--batch-size", type=int, default=16)
+        subparser.add_argument("--folds", type=int, default=5)
+        subparser.add_argument("--seed", type=int, default=42)
+        subparser.add_argument(
+            "--input-variant",
+            choices=("title", "context", "title_context"),
+            default="title",
+        )
+        subparser.add_argument(
+            "--truncation-strategy",
+            choices=("head", "tail", "head_tail"),
+            default="head",
+        )
+        subparser.add_argument("--output", required=True)
+
+    p_cv = sub.add_parser(
+        "sentiment-cv", help="evaluate one PhoBERT configuration with K-fold CV"
+    )
+    add_experiment_args(p_cv)
+    p_cv.set_defaults(func=cmd_sentiment_cv)
+
+    p_ablation = sub.add_parser(
+        "sentiment-ablation",
+        help="evaluate all title/context and truncation combinations",
+    )
+    p_ablation.add_argument("--data", required=True)
+    p_ablation.add_argument("--epochs", type=float, default=3.0)
+    p_ablation.add_argument("--batch-size", type=int, default=16)
+    p_ablation.add_argument("--folds", type=int, default=5)
+    p_ablation.add_argument("--seed", type=int, default=42)
+    p_ablation.add_argument("--output", required=True)
+    p_ablation.set_defaults(func=cmd_sentiment_ablation)
 
     args = parser.parse_args(argv)
     return args.func(args)

@@ -22,6 +22,67 @@ import pandas as pd
 
 from stf.sentiment.labels import LABEL2ID
 
+INPUT_VARIANTS: tuple[str, ...] = ("title", "context", "title_context")
+
+
+def build_input_text(df: pd.DataFrame, variant: str) -> pd.DataFrame:
+    """Create the selected model input from title/context columns.
+
+    Label files from CafeF contain only ``text`` (headline), while in-domain
+    files may retain separate ``title`` and ``body`` columns. Missing columns
+    therefore fall back to ``text`` so both sources use one code path.
+    """
+    if variant not in INPUT_VARIANTS:
+        raise ValueError(
+            f"Unknown input variant {variant!r}; expected one of {INPUT_VARIANTS}."
+        )
+
+    out = df.copy()
+    empty = pd.Series("", index=out.index, dtype="string")
+    text = (
+        out["text"].fillna("").astype("string").str.strip()
+        if "text" in out.columns
+        else empty
+    )
+    has_title = "title" in out.columns
+    has_context = "body" in out.columns or "body_preview" in out.columns
+    title = (
+        out["title"].fillna("").astype("string").str.strip()
+        if has_title
+        else text
+    )
+    if "body" in out.columns:
+        context = out["body"].fillna("").astype("string").str.strip()
+    elif "body_preview" in out.columns:
+        context = out["body_preview"].fillna("").astype("string").str.strip()
+    else:
+        context = text
+
+    if variant == "title":
+        selected = title.mask(title.eq(""), text)
+    elif variant == "context":
+        selected = context
+    elif not has_title and not has_context:
+        selected = text
+    elif not has_title:
+        selected = context
+    elif not has_context:
+        selected = title
+    else:
+        selected = title.where(
+            context.eq(""),
+            title + "\n\n" + context,
+        )
+        selected = selected.mask(title.eq(""), context)
+        selected = selected.mask(selected.eq(""), text)
+
+
+    out["text"] = selected.astype("string").str.strip()
+    out = out[out["text"].notna() & out["text"].ne("")].reset_index(drop=True)
+    if out.empty:
+        raise ValueError(f"Input variant {variant!r} produced no non-empty text.")
+    return out
+
 
 @dataclass
 class Split:
@@ -68,7 +129,7 @@ def normalize_labels(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_labeled(path: str | Path) -> pd.DataFrame:
-    """Load a label file and return text plus normalized integer labels."""
+    """Load a label file with text or separate title/body columns."""
     path = Path(path)
     suffix = path.suffix.lower()
     if suffix == ".parquet":
@@ -77,11 +138,20 @@ def load_labeled(path: str | Path) -> pd.DataFrame:
         df = pd.read_csv(path)
     else:
         raise ValueError("Label file must be .csv or .parquet.")
-    if "text" not in df.columns or "label" not in df.columns:
-        raise ValueError("Label file needs 'text' and 'label' columns.")
-    df = df.dropna(subset=["text"]).copy()
-    df["text"] = df["text"].astype("string").str.strip()
-    df = df[df["text"].ne("")].reset_index(drop=True)
+    if "label" not in df.columns:
+        raise ValueError("Label file needs a 'label' column.")
+    if not (
+        {"text"} <= set(df.columns)
+        or {"title", "body"} <= set(df.columns)
+        or {"title", "body_preview"} <= set(df.columns)
+    ):
+        raise ValueError(
+            "Label file needs 'text' or title plus body/body_preview columns."
+        )
+    if "text" in df.columns:
+        df = df.dropna(subset=["text"]).copy()
+        df["text"] = df["text"].astype("string").str.strip()
+        df = df[df["text"].ne("")].reset_index(drop=True)
     return normalize_labels(df)
 
 

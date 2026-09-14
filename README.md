@@ -34,7 +34,7 @@ models/                  model checkpoints (gitignored)
 ## Data pipeline
 
 ```bash
-# Fetch prices for the 10 VN30 tickers (2020-01 -> 2026-03-31)
+# Fetch prices for the 10 VN30 tickers (2020-01 -> 2025-12-31)
 uv run python -m stf.cli prices              # full run
 uv run python -m stf.cli prices --limit 1    # quick 1-symbol test
 
@@ -55,6 +55,38 @@ uv run python -m stf.cli sentiment-smoke --n 60
 # Fine-tune on a real label file (.csv/.parquet with text, label columns)
 uv run python -m stf.cli sentiment-train --data data/labeled/seed.csv --epochs 3
 ```
+
+### So sánh đầu vào và cắt độ dài
+
+Khi tệp nhãn có các cột `title`, `body` (hoặc `body_preview`) và `label`, có thể
+chạy một cấu hình với 5-fold cross-validation:
+
+```bash
+uv run python -m stf.cli sentiment-cv \
+  --data data/labeled/indomain/labeled.csv \
+  --input-variant title_context \
+  --truncation-strategy head_tail \
+  --epochs 3 --folds 5 \
+  --output models/experiments/title_context__head_tail
+```
+
+Mỗi fold dùng 80% dữ liệu làm outer holdout; 10% của phần huấn luyện được giữ
+lại để chọn checkpoint tốt nhất. Chỉ số chính là `macro_f1`; kết quả từng fold
+được lưu trong `cv_results.csv` và tổng hợp trong `cv_results.json`.
+
+Chạy toàn bộ ma trận 3 phương án đầu vào (`title`, `context`, `title_context`)
+nhân 3 cách cắt (`head`, `tail`, `head_tail`) tuần tự:
+
+```bash
+uv run python -m stf.cli sentiment-ablation \
+  --data data/labeled/indomain/labeled.csv \
+  --epochs 3 --folds 5 \
+  --output models/experiments/ablation
+```
+
+Không dùng nhãn hoặc giá tương lai để tạo đầu vào cảm xúc. Tập CafeF chỉ có
+tiêu đề nên không đủ để kết luận riêng về `context`; cần dùng tệp Vietstock đã
+gán nhãn có nội dung bài viết.
 
 > This machine has no GPU/CUDA. Real fine-tuning should run on a GPU (Google Colab/Kaggle).
 > See `notebooks/training-guide.md`.

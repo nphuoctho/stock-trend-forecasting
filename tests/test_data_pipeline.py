@@ -10,9 +10,74 @@ import pytest
 
 from stf.data import news, prices
 from stf.sentiment import model
-from stf.sentiment.dataset import make_split, normalize_labels
+from stf.sentiment.dataset import (
+    build_input_text,
+    make_split,
+    normalize_labels,
+)
+from stf.sentiment.experiments import make_stratified_folds
 from stf.sentiment.metrics import classification_metrics, fleiss_kappa
 
+
+
+def test_build_input_text_selects_title_context_variants():
+    frame = pd.DataFrame(
+        {
+            "title": ["Tiêu đề tốt", "Chỉ có tiêu đề"],
+            "body": ["Nội dung dài", ""],
+            "label": ["POSITIVE", "NEUTRAL"],
+        }
+    )
+    assert build_input_text(frame, "title")["text"].tolist() == [
+        "Tiêu đề tốt",
+        "Chỉ có tiêu đề",
+    ]
+    assert build_input_text(frame, "context")["text"].tolist() == [
+        "Nội dung dài",
+    ]
+    assert build_input_text(frame, "title_context")["text"].tolist() == [
+        "Tiêu đề tốt\n\nNội dung dài",
+        "Chỉ có tiêu đề",
+    ]
+
+
+def test_text_dataset_truncates_before_adding_special_tokens():
+    class FakeTokenizer:
+        def num_special_tokens_to_add(self, pair=False):
+            return 2
+
+        def __call__(self, text, **_kwargs):
+            return {"input_ids": list(range(8))}
+
+        def prepare_for_model(self, token_ids, **_kwargs):
+            ids = [101, *token_ids, 102]
+            return {"input_ids": ids, "attention_mask": [1] * len(ids)}
+
+    ds = model._TextDataset(
+        ["dữ liệu dài"],
+        [2],
+        FakeTokenizer(),
+        max_len=6,
+        truncation_strategy="head_tail",
+    )
+    assert ds[0]["input_ids"] == [101, 0, 1, 6, 7, 102]
+
+
+def test_truncation_strategies_preserve_requested_regions():
+    tokens = list(range(10))
+    assert model.truncate_token_ids(tokens, 4, "head") == [0, 1, 2, 3]
+    assert model.truncate_token_ids(tokens, 4, "tail") == [6, 7, 8, 9]
+    assert model.truncate_token_ids(tokens, 4, "head_tail") == [0, 1, 8, 9]
+
+
+def test_stratified_folds_are_disjoint_and_cover_every_row():
+    frame = pd.DataFrame({"label_id": [0, 1, 2] * 5})
+    folds = make_stratified_folds(frame, n_splits=5, seed=7)
+    holdouts = [set(holdout) for _, holdout in folds]
+    assert set.union(*holdouts) == set(range(len(frame)))
+    assert sum(len(part) for part in holdouts) == len(frame)
+    for train, holdout in folds:
+        assert set(train).isdisjoint(holdout)
 
 def test_extract_body_from_vst_detail():
     """Extract content correctly from the articleBody/vst_detail block and strip HTML."""
