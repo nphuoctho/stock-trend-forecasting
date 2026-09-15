@@ -3,7 +3,7 @@
 Builds on the recipe verified in the spike (finance.vietstock.vn/View/PagingNewsContent),
 extended to:
   - Extract the ARTICLE BODY (div itemprop="articleBody" id="vst_detail"), not just the title.
-  - Cover the window up to config.DATE_END (default 2026-03-31).
+  - Cover the window up to config.DATE_END (default 2025-12-31).
   - Keep minute-level timestamps (itemprop="datePublished") for the 15:00 cutoff in Phase 3.
 
 Built for long background runs and cheap reruns:
@@ -234,7 +234,7 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
     for code in config.TICKERS:
         tot = 0
         for year in range(start_year, end_year + 1):
-            # Final year stops at DATE_END (e.g. 2026-03-31); other years go to Dec 31.
+            # Final year stops at DATE_END (e.g. 2025-12-31); other years go to Dec 31.
             to_date = config.DATE_END if year == end_year else f"{year}-12-31"
             rows = list_ticker_year(code, year, to_date=to_date)
             for href, d in rows:
