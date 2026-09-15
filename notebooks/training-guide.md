@@ -79,9 +79,9 @@ If the session dies during training (free-tier timeout, lost network), you don't
 1. Go to https://www.kaggle.com/code > New Notebook.
 2. Import `sentiment_cv.ipynb` for the cross-validation experiment, or
    `phobert_finetune.ipynb` for the basic training run.
-3. In the notebook, attach the dataset
-   `phuocthoai/stock-trend-forecasting`; the code finds `labeled.csv` and
-   `cafef_seed.csv` under `/kaggle/input/stock-trend-forecasting`.
+3. Trong notebook, đính kèm dataset
+   `phuocthoai/stock-trend-forecasting`; mã sẽ tìm `to_label_r1.csv` và
+   `cafef_seed.csv` trong `/kaggle/input/stock-trend-forecasting`.
 
 ### Step 2: Enable GPU + Internet
 1. Open the right panel **Settings**.
@@ -120,11 +120,11 @@ save a new notebook version after the run.
 ## Thực nghiệm bắt buộc theo góp ý GVHD
 
 Không chọn cấu hình đầu vào dựa trên một lần chia ngẫu nhiên. Với tệp
-Vietstock đã gán nhãn, chạy `sentiment-cv` cho từng cấu hình:
+Vietstock đã được một người rà soát gán nhãn đầy đủ, chạy `sentiment-cv` cho từng cấu hình:
 
 ```bash
 uv run python -m stf.cli sentiment-cv \
-  --data data/labeled/indomain/labeled.csv \
+  --data data/labeled/indomain/to_label_r1.csv \
   --input-variant title \
   --truncation-strategy head \
   --folds 5 --epochs 3 \
@@ -142,13 +142,14 @@ holdout vào quá trình chọn mô hình. So sánh `macro-F1` trung bình và �
 chuẩn qua năm fold; báo cáo thêm accuracy, balanced accuracy và F1 từng lớp.
 
 Tập CafeF hiện chỉ có tiêu đề. Vì vậy, các cấu hình `context` và
-`title_context` trên CafeF sẽ không phải phép so sánh nội miền hợp lệ. Cần
-hoàn tất gán nhãn tệp Vietstock có `title`, `body` và `label` trước khi chạy
-ma trận đầy đủ. Không dùng bài viết hoặc nhãn phát sinh từ giai đoạn dự báo
-để huấn luyện mô hình cảm xúc.
+`title_context` trên CafeF sẽ không phải phép so sánh nội miền hợp lệ. Tệp
+Vietstock phải có ít nhất 301 bài, gồm `title`, `body_preview`,
+`published_at`, `url` và `label` cuối đã được người rà soát xác nhận. Không
+dùng bài viết hoặc nhãn phát sinh từ giai đoạn dự báo để huấn luyện mô hình
+cảm xúc.
 
 ## Optional quality improvements
-- **In-domain labels:** run `stf.sentiment.make_indomain_sample` locally, label ~300 articles
-  by the guideline, save `indomain_labeled.csv`, and upload it (section 5 merges it).
+- **In-domain labels:** run `stf.sentiment.make_indomain_sample --n 310` locally,
+  label at least 301 articles by the guideline, and save `to_label_r1.csv`.
 - **Word segmentation:** install `py_vncorenlp` to segment words before tokenizing (PhoBERT was
   trained on segmented text), which usually improves macro-F1.

@@ -237,11 +237,11 @@ của đề tài.
 
 Đánh giá cảm xúc cần được tách khỏi đánh giá dự báo xu hướng. Ở tầng phân loại văn
 bản, mô hình được đánh giá bằng độ chính xác, độ chính xác dương tính, độ bao phủ và F1 theo từng lớp.
-F1 vĩ mô nên được ưu tiên khi số lượng mẫu tích cực, trung tính và tiêu cực không cân
-bằng. Độ chính xác khoảng 93\% của một tập nhỏ không thể được dùng thay thế cho phân tích
-theo lớp hoặc kiểm tra trên thời gian khác. Nếu có nhiều người gán nhãn, độ đồng thuận
-có thể được báo cáo bằng Cohen's kappa hoặc Fleiss' kappa. Các mẫu bất đồng cần được
-ghi nhận và giải thích, không chỉ loại bỏ cho đến khi điểm số tăng.
+F1 vĩ mô nên được ưu tiên khi số lượng mẫu tích cực, trung tính và tiêu cực không cân bằng.
+Độ tin cậy của bộ nhãn được kiểm soát bằng hướng dẫn thống nhất, lưu vết phiên bản,
+kiểm tra nhãn thiếu và rà soát thủ công toàn bộ mẫu bởi một người. Nếu dùng mô hình
+ngôn ngữ lớn để tạo nhãn sơ bộ, các nhãn đó chỉ là đầu vào hỗ trợ và không thay thế
+nhãn đã được con người kiểm tra; không tính độ đồng thuận liên người gán nhãn.
 
 Đầu ra đưa sang nhánh dự báo cũng không nên chỉ là nhãn có xác suất cao nhất. Với mỗi
 bài viết, mô hình tạo vector:
@@ -590,7 +590,7 @@ Omranpour2024_241210540v1}. Sự khác biệt này làm hạn chế khả năng 
 duy trì cùng định nghĩa nhãn và giao thức để có thể so sánh giữa các mã.
 
 Thứ tư, phương pháp đánh giá theo thời gian chưa được áp dụng nhất quán. Việc
-dùng ten-phần chia cross-xác thực cho dữ liệu thị trường có thể trộn lẫn các giai đoạn
+dùng kiểm định chéo mười nếp gấp cho dữ liệu thị trường có thể trộn lẫn các giai đoạn
 trước và sau nếu các nếp gấp không bảo toàn thứ tự thời gian. Khi đó, các thống kê
 chuẩn hóa, ngưỡng tạo nhãn, lựa chọn đặc trưng hoặc thông tin về phân phối tương lai
 có thể vô tình đi vào quá trình huấn luyện. Bài toán dự báo thực tế cần tách dữ liệu
@@ -631,7 +631,7 @@ ra giá trị bổ sung ổn định hay không.
     \cite{Halder2022_221107392v1} & Không kiểm tra giá trị gia tăng của văn bản & Đối chứng cơ sở
     sâu \\
     Transformer dự báo biến động & Cơ chế chú ý cho phụ thuộc thời gian, đa phương thức hoặc
-    liên mã \cite{Boyle2023_230503835v1,Omranpour2024_241101368v1} & Phức tạp,
+    liên mã \cite{Boyle2023_230503835v1,Omranpour2024_241210540v1} & Phức tạp,
     chưa có bằng chứng trực tiếp trên HOSE & TFT mở rộng \\
     Hợp nhất tin tức - giá & Nối cảm xúc, biểu diễn, sự kiện hoặc LLM
     \cite{Chen2021_210708721v1,Elahi2024_241101368v1} & Dễ trộn lẫn khác biệt dữ liệu,

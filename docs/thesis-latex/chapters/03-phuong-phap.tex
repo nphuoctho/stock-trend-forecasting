@@ -57,7 +57,7 @@ $K$ và giá trị $V$, phép chú ý tích vô hướng có điều chỉnh đ�
 \end{equation}
 
 trong đó $d_k$ là số chiều của khóa. Phép chia cho $\sqrt{d_k}$ giúp giữ độ lớn của
-tích vô hướng trong khoảng ổn định trước khi áp dụng softmax. Multi-tầng phân loại chú ý
+tích vô hướng trong khoảng ổn định trước khi áp dụng softmax. Chú ý nhiều đầu
 thực hiện nhiều phép chiếu song song rồi ghép kết quả, nhờ đó mô hình có thể học các
 kiểu quan hệ khác nhau giữa các token. Trong mô hình ngôn ngữ, mỗi token được biểu diễn
 theo ngữ cảnh của toàn bộ câu. Điều này đặc biệt hữu ích với tin tài chính, vì ý nghĩa
@@ -195,10 +195,10 @@ bỏ ở biến thể báo cáo không kèm hình.
     ]
     \node[stage] (g1) {1. Thu thập dữ liệu\\ Giá OHLCV của 10 mã VN30 và tin tức Vietstock trong giai đoạn 2020 đến hết năm 2025};
     \node[model, below=of g1] (g2) {2. Phân tích cảm xúc\\ PhoBERT được tinh chỉnh để sinh xác suất của 3 lớp: Tích cực, Trung tính và Tiêu cực};
-    \node[stage, below=of g2] (g3) {3. Đặc trưng giá\\ Lợi suất và các chỉ báo kỹ thuật gồm MA, RSI, MACD và biến động};
+    \node[stage, below=of g2] (g3) {3. Đặc trưng giá\\ Lợi suất, lợi suất log, MA, khối lượng và biến động};
     \node[stage, below=of g3] (g4) {4. Căn chỉnh và gán nhãn\\ Gộp cảm xúc và giá theo mã và ngày, mốc cắt 15:00, nhãn UP, FLAT và DOWN};
     \node[floor, below=of g4] (g5) {5. Mô hình dự báo\\ Đối chứng cơ sở, sau đó là LSTM một nhánh và LSTM hai nhánh ở mức sàn tốt nghiệp};
-    \node[ext, below=of g5] (g6) {Mở rộng: Bộ biến đổi hợp nhất theo thời gian (TFT), hợp nhất có cổng và chú ý chéo};
+    \node[ext, below=of g5] (g6) {Mở rộng có điều kiện: đặc trưng kỹ thuật và TFT};
     \node[stage, below=of g6] (g7) {6. Đánh giá\\ Cuốn chiếu theo thời gian + loại bỏ đặc trưng có/không cảm xúc, F1 vĩ mô, khoảng tin cậy lấy mẫu lặp};
 
     \draw[arr] (g1) -- (g2);
@@ -346,13 +346,16 @@ nội dung đó thuộc thời điểm và phạm vi được phép sử dụng.
 \end{itemize}
 
 Tin có hai chiều trái ngược được gán theo tác động nổi trội nếu hướng dẫn cho phép,
-hoặc giữ trong nhóm bất đồng để thảo luận. Tin không thể xác định chủ thể hoặc hướng
-tác động không được ép vào lớp tích cực chỉ vì có từ ngữ mang sắc thái thuận lợi. Báo
-cáo annotation phải ghi số người gán, số mẫu, phân bố lớp, tỷ lệ bất đồng và Cohen's
-hoặc Fleiss' kappa tùy số người tham gia. Các mẫu dùng để đánh giá dự báo phải tách theo
-thời gian khỏi dữ liệu dùng để tinh chỉnh cảm xúc trong phần chia tương ứng. Quy tắc này
-giúp tránh việc mô hình cảm xúc được huấn luyện từ văn bản tương lai rồi tạo tín hiệu
-cho một phép đánh giá được gọi là ngoài mẫu.
+hoặc đánh dấu cần rà soát. Tin không thể xác định chủ thể hoặc hướng tác động rõ ràng
+được giữ lại với nhãn trung tính khi có đủ căn cứ; nếu không, mẫu được loại khỏi tập
+huấn luyện và lưu lý do.
+
+Mỗi mẫu được gán một trong ba lớp NEGATIVE, NEUTRAL hoặc POSITIVE theo hướng dẫn đã
+khóa. Báo cáo gán nhãn phải ghi số mẫu, tiêu chí, phiên bản hướng dẫn, số mẫu đã được
+rà soát và phân bố lớp. Mô hình ngôn ngữ lớn chỉ tạo nhãn sơ bộ; một người duy nhất
+rà soát toàn bộ nhãn trước khi huấn luyện chính thức, không tính Cohen's hoặc Fleiss'
+kappa do không có người gán nhãn thứ hai. Các mẫu dùng để đánh giá dự báo phải tách
+theo thời gian khỏi dữ liệu dùng để tinh chỉnh cảm xúc trong phần chia tương ứng.
 
 \section{Nhánh cảm xúc: tinh chỉnh PhoBERT}
 \label{sec:pp-phobert}
@@ -450,21 +453,18 @@ nhưng mô hình không chắc chắn''.
 Từ adjusted OHLCV, hệ thống tạo các nhóm đặc trưng sau:
 
 \begin{itemize}[nosep]
-  \item Lợi suất ngày và lợi suất log trong các cửa sổ ngắn;
-  \item Tỷ lệ giữa giá đóng cửa với trung bình động ở một số độ dài;
-  \item RSI để mô tả động lượng tương đối \cite{Wilder1978_rsi};
-  \item MACD và chênh lệch giữa các đường trung bình \cite{Appel2005_macd};
-  \item Thay đổi khối lượng, OBV hoặc đại lượng tỷ lệ với khối lượng;
-  \item Độ lệch chuẩn lợi suất trong cửa sổ để mô tả độ biến động.
+  \item Lợi suất ngày và lợi suất log;
+  \item Tỷ lệ giữa giá đóng cửa với trung bình động năm phiên;
+  \item Thay đổi khối lượng trong một phiên;
+  \item Độ lệch chuẩn lợi suất trong cửa sổ năm phiên để mô tả độ biến động;
+  \item Số lượng tin, xác suất cảm xúc tổng hợp, tỷ lệ lớp và biến chỉ báo có tin.
 \end{itemize}
 
-Các chỉ báo được tính từ dữ liệu đến ngày quan sát $t$. Để giảm phụ thuộc vào mức giá
+Các đặc trưng được tính từ dữ liệu đến ngày quan sát $t$. Để giảm phụ thuộc vào mức giá
 tuyệt đối, các đại lượng có đơn vị giá được chuyển thành tỷ lệ hoặc sai khác tương đối.
-Mỗi chỉ báo phải được tính bằng một cửa sổ chỉ nhìn về quá khứ, không dùng giá của phiên
-kế tiếp. Giá trị khuyết ở đầu chuỗi được xử lý bằng cách loại mẫu chưa đủ lịch sử hoặc
-dùng quy tắc imputation đã khóa. Scaler, imputer và mọi phép chọn đặc trưng chỉ được ước lượng
-trên tập huấn luyện của phần chia. Số lượng chỉ báo cũng được giới hạn ở mức cần thiết, tránh đưa quá
-nhiều biến tương quan cao vào mô hình khi quy mô dữ liệu chưa đủ lớn.
+Mỗi đặc trưng chỉ nhìn về quá khứ, không dùng giá của phiên kế tiếp. Các hàng đầu chuỗi
+chưa đủ lịch sử được giữ dưới dạng khuyết và loại khi tạo cửa sổ. Bộ chuẩn hóa được ước
+lượng một lần trên phần huấn luyện rồi áp dụng nguyên trạng cho xác thực và kiểm thử.
 
 \subsection{Căn chỉnh hai nguồn dữ liệu}
 
@@ -555,7 +555,7 @@ luật từ dữ liệu, nhưng cần thiết để kiểm tra một kiến trú
 
 \subsection{Tầng mô hình cổ điển chỉ giá}
 
-hồi quy logistic, Đối chứng ngẫu nhiên Forest và XGBoost chỉ nhận vector đặc trưng giá. Các mô
+hồi quy logistic, rừng ngẫu nhiên và XGBoost chỉ nhận vector đặc trưng giá. Các mô
 hình này tạo mốc phi tuần tự để kiểm tra đặc trưng engineering và cho biết dữ liệu có tín
 hiệu đủ rõ trước khi dùng mô hình sâu hay không. Chúng không được nhận bất kỳ cột
 cảm xúc nào, kể cả số tin, cờ có tin hoặc siêu dữ liệu phát sinh từ văn bản. Siêu tham số
@@ -631,6 +631,12 @@ cách chia lệch. Mẫu được tạo từ cửa sổ lịch sử cũng phải
 chỉ theo ngày bắt đầu cửa sổ. Nếu một mẫu dùng lịch sử có phần nằm ở giai đoạn trước
 nhưng nhãn mục tiêu nằm sau mốc chia, mẫu đó thuộc chia tập của nhãn và phải được kiểm tra
 riêng trong kiểm tra.
+
+Trong cấu hình hiện tại, các đoạn chia theo ngày mục tiêu được đặt liền nhau và không
+chèn khoảng cấm. Với nhãn phiên kế tiếp, giá dùng để tạo đặc trưng tại ngày quan sát
+đã được biết trước khi bắt đầu phiên mục tiêu; nhãn của đoạn sau không được dùng để
+huấn luyện đoạn trước. Nếu mở rộng chân trời dự báo hoặc dùng đặc trưng công bố trễ,
+phải bổ sung khoảng cấm và kiểm tra lại giao thức.
 
 \subsection{Kiểm soát điểm nhìn và các phép biến đổi}
 
@@ -710,7 +716,7 @@ Mỗi lần chạy cần lưu hạt giống, phiên bản Python và thư viện
 dữ liệu, thời gian thu thập tự động, cấu hình model, chia tập, chỉ số và số lần thử. Báo cáo phải
 phân biệt ba trạng thái: đã đo, chưa chạy và không áp dụng. Ô số chưa có kết quả không
 được thay bằng số tham chiếu từ bài khác. Cùng với bảng điểm, cần báo cáo độ bao phủ, số
-bản ghi bị loại, phân bố lớp, kappa của nhãn và các giới hạn về nguồn dữ liệu.
+bản ghi bị loại, phân bố lớp và các giới hạn về nguồn dữ liệu.
 
 Bảng~\ref{tab:cau-hinh} tóm tắt các quyết định thiết kế chính của quy trình.
 

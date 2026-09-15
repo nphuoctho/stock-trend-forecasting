@@ -1,7 +1,7 @@
-"""Sentiment evaluation metrics and annotation agreement.
+"""Sentiment evaluation metrics for the fixed three-class protocol.
 
-macro-F1 is the PRIMARY metric (class-imbalanced corpus). Plus accuracy, balanced
-accuracy, per-class precision/recall/F1. Cohen's/Fleiss' κ for reporting annotation agreement.
+Macro-F1 is the primary fixed-three-class metric. Balanced accuracy keeps its
+standard definition over classes present in the evaluation targets.
 """
 
 from __future__ import annotations
@@ -30,8 +30,17 @@ def classification_metrics(y_true, y_pred) -> dict:
     p, r, f1, support = precision_recall_fscore_support(
         y_true, y_pred, labels=[0, 1, 2], zero_division=0
     )
+    fixed_labels = [0, 1, 2]
     return {
-        "macro_f1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+        "macro_f1": float(
+            f1_score(
+                y_true,
+                y_pred,
+                average="macro",
+                labels=fixed_labels,
+                zero_division=0,
+            )
+        ),
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
         "per_class_f1": {i: float(v) for i, v in enumerate(f1)},
@@ -39,28 +48,3 @@ def classification_metrics(y_true, y_pred) -> dict:
         "per_class_recall": {i: float(v) for i, v in enumerate(r)},
         "support": {i: int(v) for i, v in enumerate(support)},
     }
-
-
-def fleiss_kappa(table: np.ndarray) -> float:
-    """Calculate Fleiss' kappa from an item-by-class count table."""
-    table = np.asarray(table, dtype=float)
-    if table.ndim != 2 or table.shape[0] == 0 or table.shape[1] < 2:
-        raise ValueError("table must be a non-empty two-dimensional count matrix.")
-    if not np.isfinite(table).all() or (table < 0).any():
-        raise ValueError("table counts must be finite and non-negative.")
-
-    rater_counts = table.sum(axis=1)
-    if not np.allclose(rater_counts, rater_counts[0]):
-        raise ValueError("Every item must have the same number of ratings.")
-    n_raters = rater_counts[0]
-    if n_raters < 2 or not n_raters.is_integer():
-        raise ValueError("Each item needs at least two ratings.")
-
-    n_items = table.shape[0]
-    p_j = table.sum(axis=0) / (n_items * n_raters)
-    P_i = (np.square(table).sum(axis=1) - n_raters) / (n_raters * (n_raters - 1))
-    P_bar = P_i.mean()
-    P_e = np.square(p_j).sum()
-    if np.isclose(1 - P_e, 0):
-        return 1.0
-    return float((P_bar - P_e) / (1 - P_e))

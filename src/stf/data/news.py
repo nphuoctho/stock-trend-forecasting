@@ -24,7 +24,10 @@ import re
 import time
 from datetime import datetime
 from hashlib import sha256
+from html import unescape
 from html.parser import HTMLParser
+from pathlib import Path
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -37,6 +40,9 @@ HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://finance.vietstock.vn
 SLEEP = 0.4
 PAGE_SIZE = 20
 MAX_PAGES = 400
+
+# Every outbound request must be https to exactly one of these Vietstock hosts.
+ALLOWED_HOSTS = frozenset({"finance.vietstock.vn", "vietstock.vn", "www.vietstock.vn"})
 
 _VOID_TAGS = {
     "area",
@@ -55,13 +61,30 @@ _VOID_TAGS = {
     "wbr",
 }
 
-# Listing pages expose the article URL and date in separate fragments.
 HREF = re.compile(
     r"""href\s*=\s*["']?((?://|https?://)(?:www\.)?vietstock\.vn/\d{4}/\d{2}/[^\s"'<>]+\.htm)""",
     re.IGNORECASE,
 )
 DATE = re.compile(r"\b(\d{2}/\d{2}/\d{4})\b")
 ART_ID = re.compile(r"-(\d+)\.htm", re.IGNORECASE)
+
+
+def _listing_rows(html: str) -> list[tuple[str, str]]:
+    """Pair each discovered article URL with the nearest date in its listing fragment."""
+    matches = list(HREF.finditer(html))
+    rows: list[tuple[str, str]] = []
+    for index, match in enumerate(matches):
+        left = matches[index - 1].end() if index else 0
+        right = matches[index + 1].start() if index + 1 < len(matches) else len(html)
+        fragment = html[left:right]
+        dates = list(DATE.finditer(fragment))
+        if not dates:
+            date = ""
+        else:
+            offset = match.start() - left
+            date = min(dates, key=lambda item: abs(item.start() - offset)).group(1)
+        rows.append((match.group(1), date))
+    return rows
 
 
 class _ArticleParser(HTMLParser):
@@ -77,6 +100,7 @@ class _ArticleParser(HTMLParser):
         self._body_depth = 0
         self._capture: str | None = None
         self._capture_depth = 0
+        self._skip_depth = 0  # inside <style>/<script>: drop CSS/JS payload
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attr_map = {name.lower(): value or "" for name, value in attrs}
@@ -88,6 +112,15 @@ class _ArticleParser(HTMLParser):
                 self.og_title = attr_map.get("content")
             elif prop == "og:description":
                 self.og_description = attr_map.get("content")
+
+        if self._skip_depth:
+            if tag not in _VOID_TAGS:
+                self._skip_depth += 1
+            return
+
+        if tag in ("style", "script"):
+            self._skip_depth = 1
+            return
 
         if self._body_depth:
             if tag not in _VOID_TAGS:
@@ -125,6 +158,9 @@ class _ArticleParser(HTMLParser):
         tag = tag.lower()
         if tag in _VOID_TAGS:
             return
+        if self._skip_depth:
+            self._skip_depth -= 1
+            return
         if self._body_depth:
             self._body_depth -= 1
             return
@@ -134,12 +170,40 @@ class _ArticleParser(HTMLParser):
                 self._capture = None
 
     def handle_data(self, data: str) -> None:
+        if self._skip_depth:
+            return
         if self._body_depth:
             self.body_parts.append(data)
         if self._capture == "title":
             self.title_parts.append(data)
         elif self._capture == "published":
             self.published_parts.append(data)
+
+
+# <style>/<script> blocks (with their CSS/JS payload), HTML comments, and any
+# residual tags are removed deterministically. Ordering matters: strip comments
+# and style/script bodies before generic tags so their inner text never leaks.
+_HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+_STYLE_SCRIPT = re.compile(r"<(style|script)\b[^>]*>.*?</\1\s*>", re.IGNORECASE | re.DOTALL)
+_HTML_TAG = re.compile(r"<[^>]+>")
+
+
+def clean_html(value: str | None) -> str | None:
+    """Strip HTML/CSS markup from a text fragment, keeping readable words.
+
+    Deterministically removes HTML comments, ``<style>``/``<script>`` blocks
+    (including their CSS/JS payload), and any remaining tags, then unescapes
+    entities and collapses whitespace. Only markup is discarded; title and body
+    word content is preserved. Returns ``None`` when nothing readable remains.
+    """
+    if not value:
+        return None
+    text = _HTML_COMMENT.sub(" ", value)
+    text = _STYLE_SCRIPT.sub(" ", text)
+    text = _HTML_TAG.sub(" ", text)
+    text = unescape(text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text or None
 
 
 def _clean_text(value: str | None) -> str | None:
@@ -154,17 +218,46 @@ def _log(msg: str) -> None:
     print(msg, flush=True)
 
 
+def _atomic_to_parquet(df: pd.DataFrame, path: Path) -> None:
+    """Write ``df`` to ``path`` via temp file + ``os.replace``.
+
+    A crash mid-write can never leave a partial/corrupt parquet at ``path``.
+    """
+    tmp = path.with_suffix(".parquet.tmp")
+    df.to_parquet(tmp)
+    os.replace(tmp, path)
+
+
+def _is_allowed_url(url: str) -> bool:
+    """Return whether ``url`` is https and targets an exact allowed Vietstock host."""
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    return parsed.scheme == "https" and parsed.hostname in ALLOWED_HOSTS
+
+
 def get(
     url: str, params: dict | None = None, tries: int = 4
 ) -> requests.Response | None:
-    """Fetch one page, retrying transient failures."""
+    """Fetch one page, retrying transient failures.
+
+    Every request is restricted to https and an exact allowed Vietstock host. This is
+    the single network choke point, so it applies equally to freshly discovered URLs
+    and to URLs read back from a cached listings parquet -- neither can bypass
+    validation. Redirects are never followed automatically: a redirect response is
+    treated as a failure rather than silently retargeted.
+    """
     if tries < 1:
         raise ValueError("tries must be at least 1.")
+    if not _is_allowed_url(url):
+        _log(f"[fetch] refusing disallowed url: {url}")
+        return None
 
     for attempt in range(tries):
         try:
             response = requests.get(
-                url, params=params, headers=HEADERS, timeout=30
+                url, params=params, headers=HEADERS, timeout=30, allow_redirects=False
             )
         except requests.RequestException:
             response = None
@@ -204,10 +297,10 @@ def list_ticker_year(code: str, year: int, *, to_date: str) -> list[tuple[str, s
         )
         if r is None:
             break
-        hrefs = HREF.findall(r.text)
-        dates = DATE.findall(r.text)
         new = [
-            (h, d) for h, d in zip(hrefs, dates + [""] * len(hrefs)) if h not in seen
+            (href, date)
+            for href, date in _listing_rows(r.text)
+            if href not in seen
         ]
         if not new:  # empty page / only articles already seen => year exhausted
             break
@@ -238,7 +331,12 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
             to_date = config.DATE_END if year == end_year else f"{year}-12-31"
             rows = list_ticker_year(code, year, to_date=to_date)
             for href, d in rows:
-                url = href if href.startswith("http") else f"https:{href}"
+                if href.startswith("//"):
+                    url = f"https:{href}"
+                elif href.startswith("http://"):
+                    url = f"https://{href[len('http://'):]}"
+                else:
+                    url = href
                 recs.append(
                     {
                         "ticker": code,
@@ -252,12 +350,39 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
                 f"[listings] {code} {year}: {len(rows)} articles (ticker running total {tot})"
             )
         config.NEWS_DIR.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(recs).to_parquet(
-            config.LISTINGS_PQ
-        )  # save incrementally after each ticker
+        _atomic_to_parquet(pd.DataFrame(recs), config.LISTINGS_PQ)  # save incrementally after each ticker
     df = pd.DataFrame(recs)
     _log(f"[listings] done: {len(df)} rows, {df['url'].nunique()} unique urls")
     return df
+
+
+def join_listings_articles(
+    listings: pd.DataFrame, articles: pd.DataFrame
+) -> pd.DataFrame:
+    """Attach article content to every listed ticker without collapsing mappings.
+
+    An article may be listed under multiple tickers. The returned frame therefore
+    keeps one row per ``(ticker, url)`` and only deduplicates article storage rows.
+    """
+    required_listings = {"ticker", "url"}
+    required_articles = {"url", "published_at", "title", "body"}
+    if not required_listings <= set(listings.columns):
+        raise ValueError("listings needs 'ticker' and 'url' columns.")
+    if not required_articles <= set(articles.columns):
+        raise ValueError("articles needs url, published_at, title and body columns.")
+    links = listings.loc[:, ["ticker", "url"]].drop_duplicates(["ticker", "url"])
+    content = articles.drop_duplicates("url", keep="last")
+    return links.merge(content, on="url", how="inner", validate="many_to_one")
+
+
+def load_ticker_articles() -> pd.DataFrame:
+    """Load the persisted listing/content join used by the forecasting panel."""
+    if not config.LISTINGS_PQ.exists() or not config.ARTICLES_PQ.exists():
+        raise FileNotFoundError("Both listings.parquet and articles.parquet are required.")
+    return join_listings_articles(
+        pd.read_parquet(config.LISTINGS_PQ),
+        pd.read_parquet(config.ARTICLES_PQ),
+    )
 
 
 # Article content
@@ -271,22 +396,27 @@ def _parse_article_html(html: str) -> _ArticleParser:
 
 
 def extract_body(html: str) -> str | None:
-    """Return the full article body, falling back to the page description."""
+    """Return the full article body, falling back to the page description.
+
+    The joined body/description passes through :func:`clean_html`, the
+    HTML/CSS normalization boundary, so any residual markup or entities are
+    removed without altering the readable body semantics.
+    """
     parser = _parse_article_html(html)
-    body = _clean_text(" ".join(parser.body_parts))
-    return body or _clean_text(parser.og_description)
+    body = clean_html(" ".join(parser.body_parts))
+    return body or clean_html(parser.og_description)
 
 
 def parse_article(html: str) -> dict[str, str | None]:
     """Extract the timestamp, title and body stored for one article."""
     parser = _parse_article_html(html)
-    title = parser.og_title or _clean_text(" ".join(parser.title_parts))
+    title = clean_html(parser.og_title) or clean_html(" ".join(parser.title_parts))
     timestamp = _clean_text(" ".join(parser.published_parts))
     return {
         "published_at_str": timestamp,
-        "title": _clean_text(title),
-        "body": _clean_text(" ".join(parser.body_parts))
-        or _clean_text(parser.og_description),
+        "title": title,
+        "body": clean_html(" ".join(parser.body_parts))
+        or clean_html(parser.og_description),
     }
 
 
@@ -336,10 +466,14 @@ def fetch_articles(
     if config.ARTICLES_PQ.exists():
         prev = pd.read_parquet(config.ARTICLES_PQ)
         for record in prev.to_dict("records"):
-            record["published_at"] = _normalize_stored_timestamp(
-                record.get("published_at")
+            normalized = {
+                key: record.get(key)
+                for key in ("url", "article_id", "published_at", "title", "body")
+            }
+            normalized["published_at"] = _normalize_stored_timestamp(
+                normalized.get("published_at")
             )
-            store[record["url"]] = record
+            store[normalized["url"]] = normalized
         with_body = sum(_has_body(record.get("body")) for record in store.values())
         _log(
             f"[articles] loaded {len(store)} existing articles "
@@ -354,10 +488,7 @@ def fetch_articles(
         return rec is None or not _has_body(rec.get("body"))
 
     def _flush() -> None:
-        # Replace in one operation so a crash cannot leave a partial parquet.
-        tmp = config.ARTICLES_PQ.with_suffix(".parquet.tmp")
-        pd.DataFrame(list(store.values())).to_parquet(tmp)
-        os.replace(tmp, config.ARTICLES_PQ)
+        _atomic_to_parquet(pd.DataFrame(list(store.values())), config.ARTICLES_PQ)
 
     n_new = 0
     for i, url in enumerate(urls, 1):
@@ -385,7 +516,8 @@ def fetch_articles(
             "url": url,
             "article_id": aid,
             "published_at": _to_iso(parsed["published_at_str"]),
-            **parsed,
+            "title": parsed["title"],
+            "body": parsed["body"],
         }
         n_new += 1
         if n_new % 100 == 0:

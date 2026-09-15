@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import sys
 
+import numpy as np
 import pandas as pd
 
 from stf import config
@@ -39,7 +40,12 @@ def fetch_one(symbol: str, start: str, end: str) -> pd.DataFrame | None:
 
 
 def _normalize(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
-    """Normalize the vendor response and enforce the stored schema."""
+    """Normalize the vendor response and enforce the stored schema.
+
+    Rejects rows with non-finite OHLCV values, non-positive close/volume, an
+    unparseable timestamp, or duplicate trading dates -- a data error at ingestion
+    should fail loudly rather than persist a silently corrupt parquet.
+    """
     df = df.copy()
     df.columns = [str(column).strip().lower() for column in df.columns]
     if "time" not in df.columns:
@@ -52,6 +58,19 @@ def _normalize(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
         raise ValueError(f"{symbol}: price response missing columns {missing}")
 
     df["time"] = pd.to_datetime(df["time"], errors="raise")
+    if df["time"].isna().any():
+        raise ValueError(f"{symbol}: price response has invalid/missing timestamps")
+
+    ohlcv_cols = ("open", "high", "low", "close", "volume")
+    numeric = df[list(ohlcv_cols)].apply(pd.to_numeric, errors="coerce")
+    if not np.isfinite(numeric.to_numpy(dtype=float)).all():
+        raise ValueError(f"{symbol}: price response has non-finite OHLCV values")
+    if (numeric["close"] <= 0).any():
+        raise ValueError(f"{symbol}: price response has non-positive close values")
+    if (numeric["volume"] <= 0).any():
+        raise ValueError(f"{symbol}: price response has non-positive volume values")
+    df[list(ohlcv_cols)] = numeric
+
     df["ticker"] = symbol
     result = df[[*_EXPECTED_COLS, "ticker"]].sort_values("time")
     if result["time"].duplicated().any():

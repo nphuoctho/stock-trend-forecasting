@@ -10,8 +10,9 @@ nhận trạng thái hiện tại và cố định cách báo cáo cho giai đo�
 \label{sec:kq-setup}
 
 Thực nghiệm sẽ được chạy trong môi trường ghi nhận phiên bản hệ điều hành, Python,
-PyTorch, Transformers, scikit-learn, vnstock và các thư viện dùng để tính chỉ báo kỹ
-thuật. Bước tinh chỉnh PhoBERT dự kiến thực hiện trên GPU của Google Colab hoặc Kaggle
+PyTorch, Transformers, scikit-learn, vnstock và các thư viện dùng để tính đặc trưng
+giá và tổng hợp cảm xúc. Bước tinh chỉnh PhoBERT dự kiến thực hiện trên GPU của Google
+Colab hoặc Kaggle
 vì máy phát triển hiện không có GPU phù hợp. Tên GPU, dung lượng bộ nhớ, thời gian chạy
 và điểm kiểm sẽ được lưu trong bản kiểm kê cấu hình.
 
@@ -24,7 +25,7 @@ Các quy tắc về mốc cắt thông tin, cách tạo nhãn và tiền xử l�
 \label{sec:kq-plan}
 
 Khi có số liệu, chương này sẽ báo cáo theo thứ tự: thống kê dữ liệu sau các cổng xử lý,
-chất lượng nhãn cảm xúc và độ đồng thuận, chỉ số phân loại của PhoBERT trên tập kiểm thử,
+quy trình và chất lượng nhãn cảm xúc, chỉ số phân loại của PhoBERT trên tập kiểm thử,
 sau đó là kết quả dự báo xu hướng theo thang mô hình.
 
 Chỉ số chính là F1 vĩ mô, kèm độ chính xác cân bằng và độ chính xác dương tính, độ bao phủ, F1 theo từng lớp
@@ -41,7 +42,6 @@ giá trị gia tăng trong quy trình hiện tại.
 \section{Dự kiến hoàn thành}
 \label{sec:kq-timeline}
 
-Bước tinh chỉnh PhoBERT và sinh xác suất cảm xúc dự kiến hoàn thành trong tuần đầu
-tháng 9. Bước ghép đặc trưng, chạy đối chứng cơ sở và LSTM hai nhánh dự kiến thực hiện trong
-hai tuần tiếp theo, hướng tới hoàn thành trước hạn nộp ngày 23 tháng 9. Các mốc này là
-kế hoạch, không phải kết quả đã đạt được.
+Bước tinh chỉnh PhoBERT và sinh xác suất cảm xúc, tiếp theo là bước ghép đặc trưng,
+chạy đối chứng cơ sở và LSTM hai nhánh, hướng tới hoàn thành trước hạn nộp ngày 23
+tháng 9 năm 2026. Các mốc này là kế hoạch, không phải kết quả đã đạt được.
