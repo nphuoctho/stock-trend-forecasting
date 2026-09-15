@@ -137,6 +137,7 @@ def cmd_sentiment_train(args: argparse.Namespace) -> int:
         batch_size=args.batch_size,
         seed=args.seed,
         truncation_strategy=args.truncation_strategy,
+        class_weighting=args.class_weighting,
     )
     print(f"Device: {model.get_device()} | model: {cfg.model_name}\n")
     manifest = model.fine_tune(split, cfg)
@@ -154,6 +155,7 @@ def cmd_sentiment_cv(args: argparse.Namespace) -> int:
         epochs=args.epochs,
         batch_size=args.batch_size,
         seed=args.seed,
+        class_weighting=args.class_weighting,
     )
     result = experiments.run_cross_validation(
         df,
@@ -180,6 +182,7 @@ def cmd_sentiment_ablation(args: argparse.Namespace) -> int:
         epochs=args.epochs,
         batch_size=args.batch_size,
         seed=args.seed,
+        class_weighting=args.class_weighting,
     )
     summary = experiments.run_ablation(
         df,
@@ -190,6 +193,23 @@ def cmd_sentiment_ablation(args: argparse.Namespace) -> int:
     )
     print(summary.to_string(index=False))
     print("Summary:", Path(args.output) / "ablation_summary.csv")
+    return 0
+
+
+def cmd_annotation_check(args: argparse.Namespace) -> int:
+    """Validate completed rater files and report agreement."""
+    from stf.sentiment.annotation import compare_raters
+
+    result = compare_raters(args.files)
+    print("Items:", result["n_items"])
+    print("Disagreements:", result["n_disagreements"])
+    print(f"Agreement rate: {result['agreement_rate']:.4f}")
+    print(f"Cohen's kappa: {result['cohen_kappa']:.4f}")
+    if args.disagreements:
+        output = Path(args.disagreements)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        result["disagreements"].to_csv(output, index=False)
+        print("Disagreements:", output)
     return 0
 
 
@@ -251,6 +271,12 @@ def main(argv: list[str] | None = None) -> int:
         help="how inputs longer than 256 tokens are shortened",
     )
     p_train.add_argument(
+        "--class-weighting",
+        choices=("none", "inverse_frequency"),
+        default="none",
+        help="class weighting computed from the training split",
+    )
+    p_train.add_argument(
         "--no-time-split",
         action="store_true",
         help="random split instead of time-based split",
@@ -273,6 +299,12 @@ def main(argv: list[str] | None = None) -> int:
             choices=("head", "tail", "head_tail"),
             default="head",
         )
+        subparser.add_argument(
+            "--class-weighting",
+            choices=("none", "inverse_frequency"),
+            default="none",
+            help="class weighting computed from each training fold",
+        )
         subparser.add_argument("--output", required=True)
 
     p_cv = sub.add_parser(
@@ -290,8 +322,31 @@ def main(argv: list[str] | None = None) -> int:
     p_ablation.add_argument("--batch-size", type=int, default=16)
     p_ablation.add_argument("--folds", type=int, default=5)
     p_ablation.add_argument("--seed", type=int, default=42)
+    p_ablation.add_argument(
+        "--class-weighting",
+        choices=("none", "inverse_frequency"),
+        default="none",
+        help="class weighting computed from each training fold",
+    )
     p_ablation.add_argument("--output", required=True)
     p_ablation.set_defaults(func=cmd_sentiment_ablation)
+
+    p_annotation = sub.add_parser(
+        "sentiment-annotation-check",
+        help="validate completed rater files and calculate agreement",
+    )
+    p_annotation.add_argument(
+        "--files",
+        nargs="+",
+        required=True,
+        help="completed annotation CSV files, one per rater",
+    )
+    p_annotation.add_argument(
+        "--disagreements",
+        default=None,
+        help="optional CSV path for rows with rater disagreement",
+    )
+    p_annotation.set_defaults(func=cmd_annotation_check)
 
     args = parser.parse_args(argv)
     return args.func(args)

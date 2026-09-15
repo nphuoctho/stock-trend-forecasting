@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 
 from stf.data import news, prices
+from stf.sentiment.annotation import compare_raters, load_annotation_file
 from stf.sentiment import model
 from stf.sentiment.dataset import (
     build_input_text,
@@ -68,6 +69,15 @@ def test_truncation_strategies_preserve_requested_regions():
     assert model.truncate_token_ids(tokens, 4, "head") == [0, 1, 2, 3]
     assert model.truncate_token_ids(tokens, 4, "tail") == [6, 7, 8, 9]
     assert model.truncate_token_ids(tokens, 4, "head_tail") == [0, 1, 8, 9]
+def test_compute_class_weights_uses_training_class_frequencies():
+    weights = model.compute_class_weights([0, 0, 1, 2, 2, 2])
+    assert weights.tolist() == pytest.approx([1.0, 2.0, 2.0 / 3.0])
+
+
+def test_compute_class_weights_rejects_missing_class():
+    with pytest.raises(ValueError, match="Every class"):
+        model.compute_class_weights([0, 0, 1, 1])
+
 
 
 def test_stratified_folds_are_disjoint_and_cover_every_row():
@@ -214,6 +224,36 @@ def test_fleiss_kappa_requires_consistent_rater_counts():
     assert fleiss_kappa(pd.DataFrame([[2, 0, 0], [0, 2, 0]]).to_numpy()) == 1.0
     with pytest.raises(ValueError, match="same number"):
         fleiss_kappa(pd.DataFrame([[2, 0, 0], [1, 0, 0]]).to_numpy())
+
+
+def test_annotation_comparison_requires_complete_matching_raters(tmp_path):
+    rater_a = pd.DataFrame({"sample_id": [1, 2, 3], "label": ["NEGATIVE", "NEUTRAL", "POSITIVE"]})
+    rater_b = pd.DataFrame({"sample_id": [1, 2, 3], "label": ["NEGATIVE", "POSITIVE", "POSITIVE"]})
+    path_a = tmp_path / "rater_a.csv"
+    path_b = tmp_path / "rater_b.csv"
+    rater_a.to_csv(path_a, index=False)
+    rater_b.to_csv(path_b, index=False)
+
+    result = compare_raters([path_a, path_b])
+
+    assert result["n_items"] == 3
+    assert result["n_disagreements"] == 1
+    assert result["disagreements"]["sample_id"].tolist() == [2]
+
+
+def test_annotation_loader_rejects_unlabeled_rows(tmp_path):
+    path = tmp_path / "incomplete.csv"
+    pd.DataFrame({"sample_id": [1], "label": [""]}).to_csv(path, index=False)
+
+    with pytest.raises(ValueError, match="no label"):
+        load_annotation_file(path)
+
+def test_annotation_loader_rejects_empty_files(tmp_path):
+    path = tmp_path / "empty.csv"
+    pd.DataFrame(columns=["sample_id", "label"]).to_csv(path, index=False)
+
+    with pytest.raises(ValueError, match="empty"):
+        load_annotation_file(path)
 
 
 def test_predict_proba_handles_empty_input_without_loading_model():

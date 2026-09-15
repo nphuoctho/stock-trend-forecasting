@@ -37,7 +37,24 @@ class TrainConfig:
     weight_decay: float = 0.01
     warmup_steps: int = 50
     seed: int = 42
+    class_weighting: str = "none"
 
+
+def compute_class_weights(
+    labels: list[int] | np.ndarray, num_classes: int = NUM_LABELS
+) -> np.ndarray:
+    """Return inverse-frequency weights computed from one training split."""
+    if num_classes < 1:
+        raise ValueError("num_classes must be at least 1.")
+    values = np.asarray(labels, dtype=np.int64)
+    if values.ndim != 1 or values.size == 0:
+        raise ValueError("labels must be a non-empty one-dimensional array.")
+    if (values < 0).any() or (values >= num_classes).any():
+        raise ValueError("labels must be valid class ids.")
+    counts = np.bincount(values, minlength=num_classes)
+    if (counts == 0).any():
+        raise ValueError("Every class must occur in the training split.")
+    return values.size / (num_classes * counts.astype(np.float64))
 
 def set_seed(seed: int) -> None:
     """Fix the seed for reproducibility (python, numpy, torch)."""
@@ -159,6 +176,13 @@ def fine_tune(
     out_dir.mkdir(parents=True, exist_ok=True)
     set_seed(cfg.seed)
     device = get_device()
+    if cfg.class_weighting not in ("none", "inverse_frequency"):
+        raise ValueError("class_weighting must be 'none' or 'inverse_frequency'.")
+    class_weights = (
+        compute_class_weights(split.train["label_id"].to_numpy())
+        if cfg.class_weighting == "inverse_frequency"
+        else None
+    )
 
     tokenizer = AutoTokenizer.from_pretrained(cfg.model_name, use_fast=True)
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -209,14 +233,42 @@ def fine_tune(
         use_cpu=(device == "cpu"),
     )
 
-    trainer = Trainer(
-        model=model,
-        args=args,
-        train_dataset=ds_train,
-        eval_dataset=ds_val,
-        data_collator=DataCollatorWithPadding(tokenizer),
-        compute_metrics=_compute_metrics,
-    )
+    trainer_kwargs = {
+        "model": model,
+        "args": args,
+        "train_dataset": ds_train,
+        "eval_dataset": ds_val,
+        "data_collator": DataCollatorWithPadding(tokenizer),
+        "compute_metrics": _compute_metrics,
+    }
+    if class_weights is None:
+        trainer = Trainer(**trainer_kwargs)
+    else:
+        import torch
+
+        class WeightedTrainer(Trainer):
+            def __init__(self, *args, class_weights, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.class_weights = torch.as_tensor(
+                    class_weights, dtype=torch.float32
+                )
+            def compute_loss(
+                self,
+                model,
+                inputs,
+                return_outputs=False,
+                num_items_in_batch=None,
+            ):
+                labels = inputs.pop("labels")
+                outputs = model(**inputs)
+                loss = torch.nn.functional.cross_entropy(
+                    outputs.logits,
+                    labels,
+                    weight=self.class_weights.to(outputs.logits.device),
+                )
+                return (loss, outputs) if return_outputs else loss
+
+        trainer = WeightedTrainer(class_weights=class_weights, **trainer_kwargs)
     trainer.train()
 
     # Full evaluation on test.
@@ -232,6 +284,7 @@ def fine_tune(
     manifest = {
         "config": asdict(cfg),
         "device": device,
+        "class_weights": class_weights.tolist() if class_weights is not None else None,
         "split_sizes": {
             "train": len(split.train),
             "val": len(split.val),
