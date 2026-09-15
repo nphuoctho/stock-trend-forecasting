@@ -8,6 +8,7 @@ distinguishable from neutral-news days. Feature columns never read future values
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from stf import config
@@ -80,12 +81,14 @@ def build_panel(
     else:
         merged = feats.copy()
         for col in SENTIMENT_COLUMNS:
-            merged[col] = pd.NA
+            merged[col] = np.nan
 
     for col, value in NO_NEWS_FILL.items():
         merged[col] = merged[col].fillna(value)
     merged["news_count"] = merged["news_count"].astype("int64")
     merged["has_news"] = merged["has_news"].astype("int64")
+    float_sentiment = [col for col in SENTIMENT_COLUMNS if col not in {"news_count", "has_news"}]
+    merged[float_sentiment] = merged[float_sentiment].astype("float64")
 
     merged["target_label"] = pd.array([pd.NA] * len(merged), dtype="string")
     merged["split"] = pd.array([pd.NA] * len(merged), dtype="string")

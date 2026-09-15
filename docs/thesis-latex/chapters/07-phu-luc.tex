@@ -10,10 +10,10 @@ dung có sẵn, ghi nhận trường hợp có nhiều sự kiện hoặc hướ
 đồng thời không suy luận nhãn từ biến động giá xảy ra sau thời điểm bài viết được
 đăng.
 
-Các mẫu bất đồng được giữ lại để kiểm tra ranh giới khó. Báo cáo cuối phải ghi số
-người gán nhãn, số mẫu hợp lệ, phân bố ba lớp, cách giải quyết bất đồng và Cohen's
-kappa hoặc Fleiss' kappa. Không được loại bỏ mẫu bất đồng chỉ vì mẫu đó làm giảm điểm
-đánh giá.
+Các mẫu được mô hình gán nhãn sơ bộ rồi được một người rà soát toàn bộ. Báo cáo cuối
+phải ghi số người rà soát, số mẫu hợp lệ, phân bố ba lớp, số mẫu phải chỉnh sửa và
+nguyên tắc xử lý mẫu khó. Do chỉ có một người rà soát, không tính Cohen's kappa hoặc
+Fleiss' kappa.
 
 \section{Hồ sơ thiết kế hệ thống}
 
@@ -78,9 +78,8 @@ ngược cấu hình.
   \item[\texttt{stf.sentiment.dataset}] Đọc tập nhãn, chuẩn hóa nhãn về ba lớp và tạo
   các tập huấn luyện, xác thực, kiểm thử theo thời gian khi có cột ngày.
   \item[\texttt{stf.sentiment.model}] Tinh chỉnh PhoBERT, lưu điểm kiểm và sinh xác
-  suất cho ba lớp cảm xúc.
-  \item[\texttt{stf.sentiment.metrics}] Tính F1 vĩ mô, chỉ số theo lớp và độ đồng thuận
-  của tập nhãn.
+  suất cảm xúc cho ba lớp.
+  \item[\texttt{stf.sentiment.metrics}] Tính F1 vĩ mô cố định trên ba lớp và chỉ số theo lớp.
 \end{description}
 
 \section{Cấu hình tái lập}

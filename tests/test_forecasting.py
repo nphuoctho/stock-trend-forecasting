@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from stf.forecasting import calendar as cal
-from stf.forecasting.features import price_feature_columns, price_features
+from stf.forecasting.features import FeatureScaler, price_feature_columns, price_features
 from stf.forecasting.labels import add_target, apply_labels, fit_thresholds, label_panel
 from stf.forecasting.models import (
     MajorityBaseline,
@@ -21,6 +21,7 @@ from stf.forecasting.models import (
     fit_lstm,
     make_sequences,
     make_two_branch_sequences,
+    set_seed,
 )
 from stf.forecasting.panel import assemble, build_panel
 from stf.forecasting.sentiment_agg import daily_sentiment
@@ -96,6 +97,19 @@ def test_weekend_news_maps_to_next_trading_session():
     assert aligned.loc[0, "mapping_status"] == "next_session"
     assert aligned.loc[0, "observation_date"] == pd.Timestamp("2021-01-11")  # Monday
 
+
+
+def test_stale_news_before_calendar_is_dropped_explicitly():
+    prices = _prices(n=5)
+    news = pd.DataFrame(
+        {
+            "ticker": ["FPT"],
+            "published_at": ["2019-01-01T09:00:00+07:00"],
+        }
+    )
+    aligned = cal.align_news_to_sessions(news, prices)
+    assert aligned.loc[0, "mapping_status"] == "stale"
+    assert cal.alignment_report(aligned)["dropped"] == 1
 
 def test_out_of_calendar_and_invalid_are_reported_not_kept():
     prices = _prices(n=5)  # last session 2021-01-08
@@ -247,21 +261,19 @@ def test_chronological_split_is_ordered_and_non_overlapping():
     panel = build_panel(prices)
     split = chronological_split(panel, val_frac=0.2, test_frac=0.2)
     train, val, test = split.frames(panel)
-
-    assert train["observation_date"].max() < val["observation_date"].min()
-    assert val["observation_date"].max() < test["observation_date"].min()
-    # Positional indices are disjoint and cover every row exactly once.
+    assert train["target_date"].max() < val["target_date"].min()
+    assert val["target_date"].max() < test["target_date"].min()
+    # Only rows with a realized target belong to an evaluation partition.
     idx = np.concatenate([split.train, split.val, split.test])
-    assert len(idx) == len(np.unique(idx)) == len(panel)
+    assert len(idx) == len(np.unique(idx)) == panel["target_date"].notna().sum()
 
 
-def test_split_keeps_same_day_rows_together():
+def test_split_keeps_same_target_day_rows_together():
     prices = pd.concat([_prices("FPT", n=20), _prices("VNM", n=20)], ignore_index=True)
     panel = build_panel(prices)
     split = chronological_split(panel, val_frac=0.2, test_frac=0.2)
-    tagged = split.assign_split(panel)
-    # Every observation_date belongs to exactly one split partition.
-    per_date = tagged.groupby("observation_date")["split"].nunique()
+    tagged = split.assign_split(panel).dropna(subset=["target_date"])
+    per_date = tagged.groupby("target_date")["split"].nunique()
     assert (per_date == 1).all()
 
 
@@ -351,9 +363,36 @@ def test_fit_lstm_runs_real_gradient_steps():
     cols = price_feature_columns()
     panel = _labeled_panel()
     X, y, _ = make_sequences(panel, cols, seq_len=5)
+    set_seed(0)
     model = PriceLSTM(n_features=len(cols), hidden=8)
     history = fit_lstm(model, X, y, epochs=6, lr=0.05, seed=0)
     assert len(history) == 6
     assert all(np.isfinite(history))
     # A real optimizer on separable-ish synthetic data reduces the loss.
     assert history[-1] < history[0]
+
+
+def test_feature_scaler_uses_training_rows_and_preserves_schema():
+    cols = price_feature_columns()
+    train = pd.DataFrame({col: [1.0, 2.0, 3.0] for col in cols})
+    holdout = pd.DataFrame({col: [100.0] for col in cols})
+    scaler = FeatureScaler.fit(train, cols)
+    transformed = scaler.transform(holdout)
+    assert transformed[cols[0]].iloc[0] > 90
+    assert np.allclose(scaler.transform(train)[cols].mean().to_numpy(), 0.0)
+
+
+def test_panel_without_news_has_stable_numeric_sentiment_dtypes():
+    panel = build_panel(_prices(n=12))
+    assert all(str(panel[col].dtype) == "float64" for col in [
+        "sent_prob_negative_mean",
+        "sent_prob_neutral_mean",
+        "sent_prob_positive_mean",
+        "sent_dispersion",
+    ])
+
+
+def test_session_as_of_is_timezone_aware_even_with_nat():
+    values = cal.session_as_of([pd.Timestamp("2021-01-05"), pd.NaT])
+    assert str(values.dt.tz) == "Asia/Ho_Chi_Minh"
+    assert pd.isna(values.iloc[1])

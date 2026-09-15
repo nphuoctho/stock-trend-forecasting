@@ -19,6 +19,7 @@ from stf.forecasting.calendar import (
     trading_sessions,
 )
 from stf.forecasting.features import (
+    FeatureScaler,
     MA_WINDOW,
     VOL_WINDOW,
     price_feature_columns,
@@ -48,8 +49,7 @@ __all__ = [
     "alignment_report",
     "session_as_of",
     "trading_sessions",
-    "MA_WINDOW",
-    "VOL_WINDOW",
+    "FeatureScaler",
     "price_feature_columns",
     "price_features",
     "SENTIMENT_COLUMNS",

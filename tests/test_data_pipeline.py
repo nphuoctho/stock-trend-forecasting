@@ -193,6 +193,28 @@ def test_to_iso_parsing():
     assert news._to_iso("không hợp lệ") is None
 
 
+def test_join_listings_articles_preserves_many_to_many_ticker_links():
+    listings = pd.DataFrame(
+        {
+            "ticker": ["FPT", "VNM", "FPT"],
+            "url": ["u1", "u1", "u1"],
+        }
+    )
+    articles = pd.DataFrame(
+        {
+            "url": ["u1", "u1"],
+            "published_at": ["2024-01-01T10:00:00+07:00"] * 2,
+            "title": ["Tin"] * 2,
+            "body": ["Nội dung"] * 2,
+        }
+    )
+    joined = news.join_listings_articles(listings, articles)
+    assert joined[["ticker", "url"]].drop_duplicates().to_dict("records") == [
+        {"ticker": "FPT", "url": "u1"},
+        {"ticker": "VNM", "url": "u1"},
+    ]
+
+
 def test_old_stored_timestamp_is_upgraded():
     assert (
         news._normalize_stored_timestamp("2022-09-08T16:35:00")
@@ -317,6 +339,44 @@ def test_time_aware_split_derives_date_column_from_published_at():
     assert "date" in split.train.columns
     assert str(split.train["date"].dt.tz) == "Asia/Ho_Chi_Minh"
     assert split.train["date"].max() < split.test["date"].min()
+
+
+def test_metrics_keep_absent_classes_in_macro_scores():
+    result = classification_metrics([0, 2, 0, 2], [0, 2, 0, 2])
+    assert result["macro_f1"] == pytest.approx(2 / 3)
+    assert result["balanced_accuracy"] == pytest.approx(2 / 3)
+
+
+def test_time_split_deduplicates_and_keeps_whole_dates_together():
+    frame = pd.DataFrame(
+        {
+            "text": ["a", "a", "b", "c", "d", "e", "f", "g", "h"],
+            "label_id": [0, 0, 1, 2, 0, 1, 2, 0, 1],
+            "published_at": [
+                "2024-01-01T10:00:00+07:00",
+                "2024-01-01T12:00:00+07:00",
+                "2024-01-02T10:00:00+07:00",
+                "2024-01-03T10:00:00+07:00",
+                "2024-01-04T10:00:00+07:00",
+                "2024-01-05T10:00:00+07:00",
+                "2024-01-06T10:00:00+07:00",
+                "2024-01-07T10:00:00+07:00",
+                "2024-01-08T10:00:00+07:00",
+            ],
+        }
+    )
+    split = make_split(frame, val_frac=0.2, test_frac=0.2)
+    assert sum(len(part) for part in (split.train, split.val, split.test)) == 8
+    assert set(split.train["date"]).isdisjoint(split.val["date"])
+    assert set(split.val["date"]).isdisjoint(split.test["date"])
+
+
+def test_resolve_time_column_accepts_mixed_offsets():
+    frame = pd.DataFrame(
+        {"published_at": ["2024-01-01T10:00:00+07:00", "2024-01-01T03:00:00Z"]}
+    )
+    dates = resolve_time_column(frame)
+    assert str(dates.dt.tz) == "Asia/Ho_Chi_Minh"
 
 
 def test_price_normalize_sorts_rows_and_adds_ticker():

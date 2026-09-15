@@ -23,9 +23,13 @@ src/stf/                 main package
     news.py              Vietstock scraper: timestamp + title + body
   sentiment/
     labels.py            the 3 classes NEGATIVE/NEUTRAL/POSITIVE
-    dataset.py           load labels, time-based split (leakage-safe)
-    metrics.py           macro-F1, per-class, Cohen/Fleiss kappa
+    metrics.py           macro-F1 fixed over NEG/NEU/POS
     model.py             fine-tune PhoBERT + 3-class probabilities
+  forecasting/
+    calendar.py          cutoff-safe news/session alignment
+    features.py          causal price features and train-only scaler
+    panel.py             price-sentiment panel and next-session target
+    models.py             baselines and LSTM harness
 tests/                   offline pipeline tests
 data/                    raw/processed data (gitignored; rebuilt by scripts)
 models/                  model checkpoints (gitignored)
@@ -44,6 +48,11 @@ uv run python -m stf.cli news --limit-urls 20     # quick 20-article test
 
 # Coverage report for existing data (offline, no network)
 uv run python -m stf.cli verify
+```
+
+```bash
+# Offline smoke-test for point-in-time panel, labels and price LSTM
+uv run python -m stf.cli forecast-smoke --n 40 --epochs 2
 ```
 
 ## Phase 2: PhoBERT sentiment
@@ -70,9 +79,10 @@ uv run python -m stf.cli sentiment-cv \
   --output models/experiments/title_context__head_tail
 ```
 
-Mỗi fold dùng 80% dữ liệu làm outer holdout; 10% của phần huấn luyện được giữ
-lại để chọn checkpoint tốt nhất. Chỉ số chính là `macro_f1`; kết quả từng fold
-được lưu trong `cv_results.csv` và tổng hợp trong `cv_results.json`.
+Mỗi fold giữ lại 20% dữ liệu làm outer holdout và dùng 80% còn lại để huấn luyện;
+10% của phần huấn luyện được giữ lại để chọn checkpoint tốt nhất. Chỉ số chính là
+`macro_f1` trên đủ ba lớp; kết quả từng fold được lưu trong `cv_results.csv` và
+tổng hợp trong `cv_results.json`.
 
 Khi dữ liệu huấn luyện bị lệch lớp, có thể dùng trọng số nghịch đảo tần suất.
 Trọng số được tính riêng từ phần huấn luyện của từng fold; tập đánh giá không
@@ -93,18 +103,10 @@ thống tạo chỉ dùng để chẩn đoán, không dùng làm số liệu ch�
 
 ### Kiểm tra chất lượng gán nhãn
 
-Sau khi hai người hoàn tất hai tệp CSV độc lập, kiểm tra nhãn thiếu/sai và
-tính Cohen's kappa:
-
-```bash
-uv run python -m stf.cli sentiment-annotation-check \
-  --files data/labeled/indomain/to_label_r1.csv \
-          data/labeled/indomain/to_label_r2.csv \
-  --disagreements data/labeled/indomain/disagreements.csv
-```
-
-Tệp gán nhãn sơ bộ của hệ thống không thay thế nhãn người và không dùng để
-tính mức độ đồng thuận.
+Tập in-domain phải có hơn 300 mẫu. Mô hình ngôn ngữ lớn chỉ được dùng để tạo
+nhãn sơ bộ và gợi ý mức độ không chắc chắn; một người duy nhất rà soát toàn bộ
+nhãn trước khi huấn luyện chính thức. Không dùng nhãn sơ bộ làm kết quả chính và
+không báo cáo Cohen's kappa vì quy trình không có người gán nhãn thứ hai.
 
 Chạy toàn bộ ma trận 3 phương án đầu vào (`title`, `context`, `title_context`)
 nhân 3 cách cắt (`head`, `tail`, `head_tail`) tuần tự:

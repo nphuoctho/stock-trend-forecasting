@@ -14,9 +14,9 @@ from stf.sentiment.dataset import (
     INPUT_VARIANTS,
     Split,
     build_input_text,
+    deduplicate_labeled,
     normalize_labels,
 )
-
 
 TRUNCATION_STRATEGIES = model.TRUNCATION_STRATEGIES
 
@@ -43,9 +43,8 @@ def make_stratified_folds(
 
 
 def _prepare_frame(df: pd.DataFrame, input_variant: str) -> pd.DataFrame:
-    frame = build_input_text(normalize_labels(df), input_variant)
-    # Identical articles must not appear in different folds.
-    return frame.drop_duplicates(subset=["text"]).reset_index(drop=True)
+    frame = deduplicate_labeled(normalize_labels(df))
+    return build_input_text(frame, input_variant)
 
 
 def _outer_split(

@@ -8,7 +8,7 @@
         <mxCell id="title" value="Tổng quan kiến trúc và pipeline — dự báo xu hướng giá cổ phiếu từ sentiment tin tức" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=22;fontStyle=1;fontColor=#0f172a;" vertex="1" parent="1">
           <mxGeometry x="40" y="20" width="1750" height="38" as="geometry" />
         </mxCell>
-        <mxCell id="protocol" value="Khóa protocol nghiên cứu&lt;br&gt;10 mã HOSE/VN30 · 2020–03/2026&lt;br&gt;next-session · 3 lớp · cutoff 15:00 · seed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ecfeff;strokeColor=#0891b2;fontColor=#164e63;fontSize=13;" vertex="1" parent="1">
+        <mxCell id="protocol" value="Khóa protocol nghiên cứu&lt;br&gt;10 mã HOSE/VN30 · 2020–2025&lt;br&gt;next-session · 3 lớp · cutoff 15:00 · seed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ecfeff;strokeColor=#0891b2;fontColor=#164e63;fontSize=13;" vertex="1" parent="1">
           <mxGeometry x="40" y="75" width="320" height="78" as="geometry" />
         </mxCell>
 
@@ -34,7 +34,7 @@
         <mxCell id="annotate" value="Seed CafeF&lt;br&gt;+ gán nhãn in-domain" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#c2410c;fontColor=#7c2d12;fontSize=11;" vertex="1" parent="sentLane">
           <mxGeometry x="20" y="58" width="145" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="agreement" value="Cohen/Fleiss κ&lt;br&gt;kiểm tra phân bố lớp" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#c2410c;fontColor=#7c2d12;fontSize=11;" vertex="1" parent="sentLane">
+        <mxCell id="agreement" value="Con người rà soát toàn bộ&lt;br&gt;LLM chỉ tạo nhãn sơ bộ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#c2410c;fontColor=#7c2d12;fontSize=11;" vertex="1" parent="sentLane">
           <mxGeometry x="185" y="58" width="145" height="60" as="geometry" />
         </mxCell>
         <mxCell id="sentSplit" value="Tách theo thời gian&lt;br&gt;fine-tune / val / test" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#c2410c;fontColor=#7c2d12;fontSize=11;" vertex="1" parent="sentLane">
@@ -43,14 +43,14 @@
         <mxCell id="phobert" value="PhoBERT-base&lt;br&gt;vinai/phobert-base&lt;br&gt;fine-tune 3 lớp" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#2563eb;strokeWidth=2;fontColor=#1e3a8a;fontSize=11;" vertex="1" parent="sentLane">
           <mxGeometry x="525" y="50" width="160" height="75" as="geometry" />
         </mxCell>
-        <mxCell id="infer" value="Linear head chính&lt;br&gt;BiLSTM head so sánh&lt;br&gt;→ NEG / NEU / POS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#1e3a8a;fontSize=11;" vertex="1" parent="sentLane">
+        <mxCell id="infer" value="Linear head&lt;br&gt;→ NEG / NEU / POS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#1e3a8a;fontSize=11;" vertex="1" parent="sentLane">
           <mxGeometry x="705" y="50" width="125" height="75" as="geometry" />
         </mxCell>
 
         <mxCell id="marketLane" value="2B. Nhánh giá — chuỗi thời gian" style="swimlane;html=1;rounded=1;horizontal=1;startSize=30;fillColor=#f8fafc;strokeColor=#94a3b8;fontColor=#334155;fontStyle=1;fontSize=14;" vertex="1" parent="1">
           <mxGeometry x="930" y="405" width="860" height="190" as="geometry" />
         </mxCell>
-        <mxCell id="technical" value="Lợi suất, khối lượng và chỉ báo&lt;br&gt;MA · RSI · MACD · OBV · volatility" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#1e3a8a;fontSize=12;" vertex="1" parent="marketLane">
+        <mxCell id="technical" value="Lợi suất, khối lượng và chỉ báo&lt;br&gt;MA · volatility" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#1e3a8a;fontSize=12;" vertex="1" parent="marketLane">
           <mxGeometry x="25" y="58" width="330" height="65" as="geometry" />
         </mxCell>
         <mxCell id="priceFeatures" value="Đặc trưng thị trường&lt;br&gt;theo mã-ngày" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ecfeff;strokeColor=#0891b2;fontColor=#164e63;fontSize=12;" vertex="1" parent="marketLane">
@@ -63,7 +63,7 @@
         <mxCell id="cutoff" value="Cutoff 15:00&lt;br&gt;tin sau giờ / cuối tuần → phiên kế" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#c2410c;fontColor=#7c2d12;fontSize=11;" vertex="1" parent="alignLane">
           <mxGeometry x="25" y="58" width="270" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="daily" value="Tổng hợp sentiment mã-ngày&lt;br&gt;count · tỷ lệ · mean probability&lt;br&gt;pos−neg · std · window 1/3/5 · has_news" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ecfeff;strokeColor=#0891b2;fontColor=#164e63;fontSize=11;" vertex="1" parent="alignLane">
+        <mxCell id="daily" value="Tổng hợp sentiment mã-ngày&lt;br&gt;count · tỷ lệ · mean probability&lt;br&gt;pos−neg · độ phân tán · has_news" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ecfeff;strokeColor=#0891b2;fontColor=#164e63;fontSize=11;" vertex="1" parent="alignLane">
           <mxGeometry x="335" y="48" width="360" height="85" as="geometry" />
         </mxCell>
         <mxCell id="panel" value="Bảng panel mã × ngày&lt;br&gt;sentiment + market features" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ecfeff;strokeColor=#0891b2;fontColor=#164e63;fontSize=12;" vertex="1" parent="alignLane">
@@ -98,7 +98,7 @@
         <mxCell id="majority" value="Majority + random&lt;br&gt;baseline" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#1e3a8a;fontSize=10;" vertex="1" parent="modelLane">
           <mxGeometry x="175" y="58" width="120" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="classical" value="Price-only classical&lt;br&gt;LogReg · RF · XGBoost" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#1e3a8a;fontSize=10;" vertex="1" parent="modelLane">
+        <mxCell id="classical" value="Classical baselines&lt;br&gt;planned after core" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#1e3a8a;fontSize=10;" vertex="1" parent="modelLane">
           <mxGeometry x="315" y="58" width="160" height="65" as="geometry" />
         </mxCell>
         <mxCell id="priceLstm" value="LSTM một nhánh&lt;br&gt;chỉ giá" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#2563eb;fontColor=#1e3a8a;fontSize=10;" vertex="1" parent="modelLane">

@@ -8,6 +8,8 @@ history carry ``NaN`` and are dropped downstream, never imputed with future data
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 
@@ -90,3 +92,35 @@ def price_features(
         cols = ["ticker", "observation_date", "close", *price_feature_columns(ma_window, vol_window)]
         return pd.DataFrame(columns=cols)
     return pd.concat(frames, ignore_index=True)
+
+
+@dataclass(frozen=True)
+class FeatureScaler:
+    """Train-only standardization for numeric forecasting features."""
+
+    columns: tuple[str, ...]
+    mean: np.ndarray
+    scale: np.ndarray
+
+    @classmethod
+    def fit(cls, frame: pd.DataFrame, columns: list[str] | tuple[str, ...]):
+        names = tuple(columns)
+        if not names or not set(names) <= set(frame.columns):
+            raise ValueError("Feature scaler columns must exist and be non-empty.")
+        values = frame.loc[:, names].to_numpy(dtype=float)
+        finite = np.isfinite(values).all(axis=1)
+        if not finite.any():
+            raise ValueError("Feature scaler needs at least one finite training row.")
+        mean = values[finite].mean(axis=0)
+        scale = values[finite].std(axis=0)
+        scale = np.where(scale > 0, scale, 1.0)
+        return cls(names, mean, scale)
+
+    def transform(self, frame: pd.DataFrame) -> pd.DataFrame:
+        """Return a copy with this training fit applied to the selected columns."""
+        if not set(self.columns) <= set(frame.columns):
+            raise ValueError("Frame is missing one or more scaler columns.")
+        out = frame.copy()
+        values = out.loc[:, self.columns].to_numpy(dtype=float)
+        out.loc[:, self.columns] = (values - self.mean) / self.scale
+        return out

@@ -2,11 +2,9 @@
 
 Label sources:
   1. Public seed: the CafeF headline corpus (3 classes) for a quick baseline.
-  2. In-domain add-on: self-labeled samples following a fixed guideline (report Cohen/Fleiss kappa).
+  2. In-domain add-on: model prelabels reviewed by one human under a fixed guideline.
 
 Expected label CSV/parquet format: a `text` column (str) and a `label` column
-(NEGATIVE/NEUTRAL/POSITIVE or 0/1/2). If a `date` column (ISO) exists, the split is done
-BY TIME to avoid leakage.
 
 PhoBERT ideally takes word-segmented input (VnCoreNLP). Here we tokenize raw text for
 simplicity/reproducibility; to improve quality, add a segmentation step before the tokenizer.
@@ -129,8 +127,33 @@ def normalize_labels(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def deduplicate_labeled(df: pd.DataFrame) -> pd.DataFrame:
+    """Remove repeated source items before any split or input variant is built.
+
+    URL is the strongest identity when available. Otherwise the normalized source
+    text columns form a stable exact-match key shared by title/context variants.
+    """
+    out = df.copy()
+    if "url" in out.columns:
+        key = out["url"].astype("string").str.strip()
+    elif "text" in out.columns:
+        key = out["text"].astype("string").str.strip()
+    else:
+        key_parts = []
+        for column in ("title", "body", "body_preview"):
+            if column in out.columns:
+                key_parts.append(out[column].fillna("").astype("string").str.strip())
+        if not key_parts:
+            return out.reset_index(drop=True)
+        key = key_parts[0]
+        for part in key_parts[1:]:
+            key = key + "\n" + part
+    keep = key.notna() & key.ne("") & ~key.duplicated()
+    return out.loc[keep].reset_index(drop=True)
+
+
 def load_labeled(path: str | Path) -> pd.DataFrame:
-    """Load a label file with text or separate title/body columns."""
+    """Load, validate, normalize, and deduplicate a label file."""
     path = Path(path)
     suffix = path.suffix.lower()
     if suffix == ".parquet":
@@ -153,17 +176,11 @@ def load_labeled(path: str | Path) -> pd.DataFrame:
         df = df.dropna(subset=["text"]).copy()
         df["text"] = df["text"].astype("string").str.strip()
         df = df[df["text"].ne("")].reset_index(drop=True)
-    return normalize_labels(df)
+    return deduplicate_labeled(normalize_labels(df))
 
 
 def resolve_time_column(df: pd.DataFrame) -> pd.Series:
-    """Return timezone-aware timestamps to drive a time-aware split.
-
-    Prefers an existing ``date`` column, otherwise normalizes ``published_at``
-    into the study timezone. Raises loudly when neither column yields a valid
-    timestamp for every row, so a requested time-aware split never silently
-    degrades into a random split (a look-ahead leakage risk).
-    """
+    """Return timezone-aware timestamps to drive a time-aware split."""
     if "date" in df.columns:
         source, name = df["date"], "date"
     elif "published_at" in df.columns:
@@ -173,18 +190,12 @@ def resolve_time_column(df: pd.DataFrame) -> pd.Series:
             "Time-aware split requires a 'date' or 'published_at' column; "
             "pass time_aware=False to request a random split explicitly."
         )
-    dates = pd.to_datetime(source, errors="coerce")
+    dates = pd.to_datetime(source, errors="coerce", utc=True)
     if dates.isna().any():
         raise ValueError(
             f"Time-aware split requires a valid timestamp in every '{name}' row."
         )
-    if dates.dt.tz is None:
-        dates = dates.dt.tz_localize(config.TIMEZONE)
-    else:
-        dates = dates.dt.tz_convert(config.TIMEZONE)
-    return dates
-
-
+    return dates.dt.tz_convert(config.TIMEZONE)
 def make_split(
     df: pd.DataFrame,
     *,
@@ -193,7 +204,7 @@ def make_split(
     test_frac: float = 0.1,
     time_aware: bool = True,
 ) -> Split:
-    """Split into train, validation and test sets without empty partitions."""
+    """Split into train, validation and test without duplicate or date leakage."""
     if df.empty:
         raise ValueError("Cannot split an empty dataset.")
     if not 0 < val_frac < 1 or not 0 < test_frac < 1:
@@ -203,28 +214,30 @@ def make_split(
     if "label_id" not in df.columns:
         raise ValueError("Dataset needs a normalized 'label_id' column.")
 
-    df = df.reset_index(drop=True)
+    df = deduplicate_labeled(df.reset_index(drop=True))
+    if time_aware:
+        dates = resolve_time_column(df).dt.normalize()
+        df = df.assign(date=dates)
+        unique_dates = np.sort(dates.drop_duplicates().to_numpy())
+        n_dates = len(unique_dates)
+        n_test = max(1, round(n_dates * test_frac))
+        n_val = max(1, round(n_dates * val_frac))
+        if n_dates - n_val - n_test < 1:
+            raise ValueError("Dataset is too small for train, validation and test dates.")
+        train_dates = set(unique_dates[: n_dates - n_val - n_test])
+        val_dates = set(unique_dates[n_dates - n_val - n_test : n_dates - n_test])
+        test_dates = set(unique_dates[n_dates - n_test :])
+        return Split(
+            df.loc[dates.isin(train_dates)].reset_index(drop=True),
+            df.loc[dates.isin(val_dates)].reset_index(drop=True),
+            df.loc[dates.isin(test_dates)].reset_index(drop=True),
+        )
+
     n = len(df)
     n_test = max(1, round(n * test_frac))
     n_val = max(1, round(n * val_frac))
     if n - n_val - n_test < 1:
         raise ValueError("Dataset is too small for train, validation and test splits.")
-
-    if time_aware:
-        dates = resolve_time_column(df)
-        df = (
-            df.assign(date=dates)
-            .sort_values("date", kind="stable")
-            .reset_index(drop=True)
-        )
-        train_end = n - n_val - n_test
-        val_end = n - n_test
-        return Split(
-            df.iloc[:train_end].reset_index(drop=True),
-            df.iloc[train_end:val_end].reset_index(drop=True),
-            df.iloc[val_end:].reset_index(drop=True),
-        )
-
     rng = np.random.default_rng(seed)
     parts: dict[str, list[pd.DataFrame]] = {"train": [], "val": [], "test": []}
     for _, group in df.groupby("label_id", sort=True):
@@ -237,7 +250,6 @@ def make_split(
         parts["test"].append(group.iloc[:n_group_test])
         parts["val"].append(group.iloc[n_group_test : n_group_test + n_group_val])
         parts["train"].append(group.iloc[n_group_test + n_group_val :])
-
     result = {}
     for name, frames in parts.items():
         result[name] = (
@@ -248,46 +260,3 @@ def make_split(
     if any(result[name].empty for name in ("train", "val", "test")):
         raise ValueError("Stratified splitting produced an empty partition.")
     return Split(result["train"], result["val"], result["test"])
-
-
-def synthetic_dataset(n: int = 120, seed: int = 42) -> pd.DataFrame:
-    """Build a balanced 3-class fake dataset to smoke-test the pipeline before real labels exist.
-
-    Not for reporting results - only to check the train/eval code runs.
-    """
-    rng = np.random.default_rng(seed)
-    # Vietnamese phrases on purpose: the real model reads Vietnamese financial news.
-    pos = [
-        "cổ phiếu tăng mạnh",
-        "lợi nhuận vượt kỳ vọng",
-        "doanh thu kỷ lục",
-        "khối ngoại mua ròng",
-        "triển vọng tích cực",
-    ]
-    neg = [
-        "cổ phiếu lao dốc",
-        "thua lỗ nặng",
-        "khối ngoại bán tháo",
-        "nợ xấu tăng cao",
-        "triển vọng ảm đạm",
-    ]
-    neu = [
-        "công bố thông tin định kỳ",
-        "họp đại hội cổ đông",
-        "thay đổi nhân sự",
-        "phát hành trái phiếu",
-        "cập nhật giao dịch",
-    ]
-    rows = []
-    pools = {0: neg, 1: neu, 2: pos}
-    for i in range(n):
-        lab = i % 3
-        text = rng.choice(pools[lab]) + f" phiên {i}"
-        rows.append(
-            {
-                "text": text,
-                "label_id": lab,
-                "date": pd.Timestamp("2020-01-01") + pd.Timedelta(days=i),
-            }
-        )
-    return pd.DataFrame(rows)
