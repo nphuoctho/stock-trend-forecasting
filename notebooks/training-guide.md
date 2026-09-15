@@ -1,16 +1,22 @@
-# Running the PhoBERT fine-tuning notebook (Colab / Kaggle)
+# Chạy notebook huấn luyện và đánh giá PhoBERT trên Colab / Kaggle
 
-Step-by-step guide to fine-tune PhoBERT into a 3-class sentiment model. Follow the order;
-each numbered item maps to a section in `phobert_finetune_colab.ipynb`.
+Có hai notebook cho hai mục đích:
+
+- `phobert_finetune.ipynb`: huấn luyện PhoBERT cơ bản và xuất checkpoint.
+- `sentiment_cv.ipynb`: chạy so sánh biến thể đầu vào/cắt token với 5-fold
+  cross-validation và lưu kết quả vào Google Drive.
+
+Phần dưới đây hướng dẫn notebook huấn luyện cơ bản; khi cần lấy kết quả so sánh
+theo góp ý GVHD, dùng `sentiment_cv.ipynb`.
 
 ---
 
 ## Part A: Google Colab
 
 ### Step 1: Open the notebook
-1. Go to https://colab.research.google.com
-2. File > Upload notebook > pick `phobert_finetune_colab.ipynb`.
-
+1. Go to https://colab.research.google.com.
+2. Upload `sentiment_cv.ipynb` for the 5-fold input/truncation experiments,
+   or `phobert_finetune.ipynb` for the basic single-split training run.
 ### Step 2: Enable the GPU (required)
 1. Menu **Runtime > Change runtime type**.
 2. Hardware accelerator > **T4 GPU** > Save.
@@ -69,18 +75,23 @@ If the session dies during training (free-tier timeout, lost network), you don't
 
 ## Part B: Kaggle
 
-### Step 1: Create the notebook
+### Step 1: Create or import the notebook
 1. Go to https://www.kaggle.com/code > New Notebook.
-2. File > Import Notebook > upload `phobert_finetune_colab.ipynb`.
+2. Import `sentiment_cv.ipynb` for the cross-validation experiment, or
+   `phobert_finetune.ipynb` for the basic training run.
+3. In the notebook, attach the dataset
+   `phuocthoai/stock-trend-forecasting`; the code finds `labeled.csv` and
+   `cafef_seed.csv` under `/kaggle/input/stock-trend-forecasting`.
 
 ### Step 2: Enable GPU + Internet
-1. Right panel > **Settings**.
-2. Accelerator > **GPU T4 x2** (or P100).
-3. Internet > **On** (needed to download the model + seed).
+1. Open the right panel **Settings**.
+2. Set **Accelerator** to **GPU T4 x2** (or P100).
+3. Set **Internet** to **On** so the notebook can clone the repository and
+   download PhoBERT when needed.
 
-### Step 3: Run like Colab (sections 1-12)
-Kaggle rarely needs a restart after install. If section 2 reports a dependency conflict,
-just continue to section 3 to check versions; it's usually fine.
+### Step 3: Run cells in order
+The CV notebook writes results to `/kaggle/working`; download the output or
+save a new notebook version after the run.
 
 ---
 

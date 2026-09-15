@@ -7,7 +7,7 @@
 quy trình này, tin tức tài chính tiếng Việt được xử lý bằng PhoBERT, còn dữ liệu giá được
 biểu diễn bằng lợi suất và các đặc trưng kỹ thuật. Hai nhánh dữ liệu được căn chỉnh theo
 mã cổ phiếu, ngày giao dịch và mốc cắt thông tin, sau đó được đưa vào thang mô hình từ
-đối chứng cơ sở đến LSTM hai nhánh có cơ chế hợp nhất. Temporal Fusion Transformer được
+đối chứng cơ sở đến LSTM hai nhánh có cơ chế hợp nhất. Bộ biến đổi hợp nhất theo thời gian được
 đặt ở vị trí mở rộng để không làm thay đổi cấu hình cơ sở của đồ án.
 
 Quy trình gồm thu thập dữ liệu, kiểm tra thông tin truy nguyên và bản ghi trùng, gán nhãn
@@ -25,7 +25,7 @@ nội dung, lịch giá và nguồn dữ liệu. Bản ghi không thể xác min
 tích chính hoặc báo cáo riêng để xác định phạm vi quan sát thực tế.
 
 Mục tiêu thứ hai là đánh giá PhoBERT ở tầng cảm xúc. Kết luận về tầng này phải dựa trên
-độ chính xác, macro-F1, F1 theo lớp và độ đồng thuận của tập nhãn trong miền. Chất lượng
+độ chính xác, F1 vĩ mô, F1 theo lớp và độ đồng thuận của tập nhãn trong miền. Chất lượng
 phân loại cảm xúc không đồng nghĩa với giá trị dự báo, vì một mô hình phân loại tốt vẫn
 có thể tạo ra tín hiệu ít liên quan đến lợi suất của phiên kế tiếp. PhoBERT được lựa chọn
 do phù hợp với ngôn ngữ của dữ liệu; việc lựa chọn này không thay thế cho kết quả đánh
@@ -67,7 +67,7 @@ trong một nghiên cứu riêng.
 
 \section{Giới hạn của đồ án}
 
-Thứ nhất, phạm vi chỉ gồm 10 mã VN30 trên HOSE trong giai đoạn 2020 đến quý I năm 2026.
+Thứ nhất, phạm vi chỉ gồm 10 mã VN30 trên HOSE trong giai đoạn 2020 đến hết năm 2025.
 Đặc điểm ngành, thanh khoản và mật độ tin của các mã này có thể ảnh hưởng đến kết quả,
 nên chưa đủ cơ sở để suy rộng sang cổ phiếu vốn hóa nhỏ, HNX, UPCOM hoặc thị trường
 quốc tế.

@@ -4,20 +4,21 @@ Fine-tune `vinai/phobert-base` into a 3-class sentiment classifier
 (NEGATIVE / NEUTRAL / POSITIVE) for Vietnamese financial news.
 
 ## Files
-- `phobert_finetune_colab.ipynb` - the fine-tuning notebook, runs on Colab/Kaggle.
-- `phobert_finetune_colab.py` - the same notebook as a jupytext script (easier to diff/review).
+- `phobert_finetune.ipynb` - the fine-tuning notebook, runs on Colab/Kaggle.
+- `sentiment_cv.ipynb` - the 5-fold input/truncation comparison notebook.
 - `training-guide.md` - step-by-step run instructions and troubleshooting.
 
 ## Quick start
 
 ### Google Colab
-1. Upload `phobert_finetune_colab.ipynb`.
+1. Upload `phobert_finetune.ipynb` for the basic run, or `sentiment_cv.ipynb` for
+   the 5-fold input/truncation experiments.
 2. Runtime > Change runtime type > **T4 GPU**.
 3. Run cells in order. If Colab asks to restart after the install cell,
    restart and continue FROM section 3 (don't re-run section 2).
 
 ### Kaggle
-1. New Notebook > Upload `phobert_finetune_colab.ipynb`.
+1. New Notebook > Upload `phobert_finetune.ipynb` or `sentiment_cv.ipynb`.
 2. Settings > Accelerator > **GPU** (T4 x2 or P100), and turn **Internet** on.
 3. Run cells in order.
 
