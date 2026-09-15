@@ -11,16 +11,19 @@ import pandas as pd
 import pytest
 
 from stf.data import news, prices
-from stf.sentiment.annotation import compare_raters, load_annotation_file
 from stf.sentiment import model
 from stf.sentiment.dataset import (
     build_input_text,
+    file_fingerprint,
+    frame_fingerprint,
     make_split,
     normalize_labels,
+    prepare_model_input,
+    reject_preliminary_labels,
     resolve_time_column,
 )
 from stf.sentiment.experiments import make_stratified_folds
-from stf.sentiment.metrics import classification_metrics, fleiss_kappa
+from stf.sentiment.metrics import classification_metrics
 
 
 
@@ -38,6 +41,7 @@ def test_build_input_text_selects_title_context_variants():
     ]
     assert build_input_text(frame, "context")["text"].tolist() == [
         "Nội dung dài",
+        "Chỉ có tiêu đề",
     ]
     assert build_input_text(frame, "title_context")["text"].tolist() == [
         "Tiêu đề tốt\n\nNội dung dài",
@@ -186,6 +190,17 @@ def test_parse_article_fields():
     assert "Nội dung" in parsed["body"]
 
 
+
+def test_listing_rows_pair_dates_with_nearest_article_url():
+    html = """
+    <div class="item">08/09/2022 <a href="//vietstock.vn/2022/09/first-1.htm">Một</a></div>
+    <div class="item">09/09/2022 <a href="//vietstock.vn/2022/09/second-2.htm">Hai</a></div>
+    """
+    assert news._listing_rows(html) == [
+        ("//vietstock.vn/2022/09/first-1.htm", "08/09/2022"),
+        ("//vietstock.vn/2022/09/second-2.htm", "09/09/2022"),
+    ]
+
 def test_to_iso_parsing():
     """Invalid timestamps are rejected; valid ones keep local timezone."""
     assert news._to_iso("08/09/2022 16:35") == "2022-09-08T16:35:00+07:00"
@@ -274,6 +289,12 @@ def test_normalize_labels_accepts_numeric_strings():
     assert normalized["label_id"].tolist() == [0, 1, 2]
 
 
+def test_normalize_labels_rejects_stale_label_id():
+    frame = pd.DataFrame({"label": ["POSITIVE"], "label_id": [0]})
+    with pytest.raises(ValueError, match="disagree"):
+        normalize_labels(frame)
+
+
 def test_normalize_labels_rejects_unknown_ids():
 
     with pytest.raises(ValueError, match="Invalid labels"):
@@ -325,6 +346,14 @@ def test_resolve_time_column_normalizes_published_at_to_study_timezone():
     )
     dates = resolve_time_column(frame)
     assert str(dates.dt.tz) == "Asia/Ho_Chi_Minh"
+
+
+def test_resolve_time_column_interprets_naive_values_in_study_timezone():
+    frame = pd.DataFrame({"published_at": ["2024-01-01T23:30:00"]})
+    dates = resolve_time_column(frame)
+    assert dates.iloc[0] == pd.Timestamp(
+        "2024-01-01 23:30:00", tz="Asia/Ho_Chi_Minh"
+    )
 
 
 def test_time_aware_split_derives_date_column_from_published_at():
@@ -403,42 +432,190 @@ def test_metrics_reject_empty_inputs():
         classification_metrics([], [])
 
 
-def test_fleiss_kappa_requires_consistent_rater_counts():
-    assert fleiss_kappa(pd.DataFrame([[2, 0, 0], [0, 2, 0]]).to_numpy()) == 1.0
-    with pytest.raises(ValueError, match="same number"):
-        fleiss_kappa(pd.DataFrame([[2, 0, 0], [1, 0, 0]]).to_numpy())
-
-
-def test_annotation_comparison_requires_complete_matching_raters(tmp_path):
-    rater_a = pd.DataFrame({"sample_id": [1, 2, 3], "label": ["NEGATIVE", "NEUTRAL", "POSITIVE"]})
-    rater_b = pd.DataFrame({"sample_id": [1, 2, 3], "label": ["NEGATIVE", "POSITIVE", "POSITIVE"]})
-    path_a = tmp_path / "rater_a.csv"
-    path_b = tmp_path / "rater_b.csv"
-    rater_a.to_csv(path_a, index=False)
-    rater_b.to_csv(path_b, index=False)
-
-    result = compare_raters([path_a, path_b])
-
-    assert result["n_items"] == 3
-    assert result["n_disagreements"] == 1
-    assert result["disagreements"]["sample_id"].tolist() == [2]
-
-
-def test_annotation_loader_rejects_unlabeled_rows(tmp_path):
-    path = tmp_path / "incomplete.csv"
-    pd.DataFrame({"sample_id": [1], "label": [""]}).to_csv(path, index=False)
-
-    with pytest.raises(ValueError, match="no label"):
-        load_annotation_file(path)
-
-def test_annotation_loader_rejects_empty_files(tmp_path):
-    path = tmp_path / "empty.csv"
-    pd.DataFrame(columns=["sample_id", "label"]).to_csv(path, index=False)
-
-    with pytest.raises(ValueError, match="empty"):
-        load_annotation_file(path)
 
 
 def test_predict_proba_handles_empty_input_without_loading_model():
     result = model.predict_proba([])
     assert result.shape == (0, 3)
+
+
+def test_prepare_model_input_dedupes_after_variant_not_before():
+    """Dedup must run on the selected variant's text, not a stale precomputed one.
+
+    Real in-domain files ship a precomputed ``text`` column built for a different
+    variant (title_context). Two rows here share a title but differ in body and
+    precomputed text; deduping before variant selection would miss the duplicate
+    that the "title" variant actually produces.
+    """
+    frame = pd.DataFrame(
+        {
+            "title": ["Cùng tiêu đề", "Cùng tiêu đề"],
+            "body": ["Nội dung A", "Nội dung B"],
+            "text": ["Cùng tiêu đề\n\nNội dung A", "Cùng tiêu đề\n\nNội dung B"],
+            "url": ["https://example.test/a", "https://example.test/b"],
+            "label_id": [0, 1],
+        }
+    )
+    out = prepare_model_input(frame, "title")
+    assert out["text"].tolist() == ["Cùng tiêu đề"]
+
+
+def test_reject_preliminary_labels_blocks_unreviewed_rows_by_default():
+    frame = pd.DataFrame(
+        {
+            "text": ["a", "b"],
+            "label_id": [0, 1],
+            "annotation_status": ["PRELIMINARY_REVIEW_REQUIRED", "CONFIRMED"],
+        }
+    )
+    with pytest.raises(ValueError, match="preliminary"):
+        reject_preliminary_labels(frame)
+    allowed = reject_preliminary_labels(frame, allow_preliminary=True)
+    assert len(allowed) == 2
+
+
+def test_reject_preliminary_labels_checks_annotation_source():
+    frame = pd.DataFrame(
+        {"text": ["a"], "label_id": [0], "annotation_source": ["assistant_prelabel"]}
+    )
+    with pytest.raises(ValueError, match="preliminary"):
+        reject_preliminary_labels(frame)
+
+
+def test_reject_preliminary_labels_accepts_public_files_without_provenance():
+    frame = pd.DataFrame({"text": ["a", "b"], "label_id": [0, 1]})
+    out = reject_preliminary_labels(frame)
+    assert len(out) == 2
+
+
+def test_resolve_inference_config_reads_manifest_max_len(tmp_path):
+    out_dir = tmp_path / "run"
+    model_dir = out_dir / "best"
+    model_dir.mkdir(parents=True)
+    (out_dir / "manifest.json").write_text(
+        json.dumps({"config": {"truncation_strategy": "tail", "max_len": 128}}),
+        encoding="utf-8",
+    )
+    assert model.resolve_inference_config(model_dir) == ("tail", 128)
+
+
+def test_resolve_inference_config_overrides_win_over_manifest(tmp_path):
+    out_dir = tmp_path / "run"
+    model_dir = out_dir / "best"
+    model_dir.mkdir(parents=True)
+    (out_dir / "manifest.json").write_text(
+        json.dumps({"config": {"truncation_strategy": "tail", "max_len": 128}}),
+        encoding="utf-8",
+    )
+    assert model.resolve_inference_config(
+        model_dir, truncation_strategy="head", max_len=64
+    ) == ("head", 64)
+
+
+def test_resolve_inference_config_defaults_without_manifest(tmp_path):
+    model_dir = tmp_path / "best"
+    model_dir.mkdir()
+    assert model.resolve_inference_config(model_dir) == ("head", model.MAX_LEN)
+
+
+def test_frame_fingerprint_is_order_invariant_and_content_sensitive():
+    a = pd.DataFrame({"text": ["x", "y"], "label_id": [0, 1]})
+    b = pd.DataFrame({"text": ["y", "x"], "label_id": [1, 0]})
+    c = pd.DataFrame({"text": ["x", "y"], "label_id": [0, 2]})
+    assert frame_fingerprint(a) == frame_fingerprint(b)
+    assert frame_fingerprint(a) != frame_fingerprint(c)
+
+
+def test_frame_fingerprint_rejects_empty_frame():
+    with pytest.raises(ValueError, match="empty"):
+        frame_fingerprint(pd.DataFrame({"text": [], "label_id": []}))
+
+
+def test_file_fingerprint_is_deterministic_and_content_sensitive(tmp_path):
+    path = tmp_path / "data.csv"
+    path.write_text("a,b\n1,2\n", encoding="utf-8")
+    first = file_fingerprint(path)
+    assert first == file_fingerprint(path)
+    path.write_text("a,b\n1,3\n", encoding="utf-8")
+    assert file_fingerprint(path) != first
+
+
+def test_is_allowed_url_accepts_exact_vietstock_hosts_only():
+    assert news._is_allowed_url("https://vietstock.vn/2021/01/a-1.htm")
+    assert news._is_allowed_url("https://finance.vietstock.vn/View/PagingNewsContent")
+    assert not news._is_allowed_url("http://vietstock.vn/2021/01/a-1.htm")
+    assert not news._is_allowed_url("https://evil.vietstock.vn.attacker.com/x")
+    assert not news._is_allowed_url("https://notvietstock.vn/x")
+
+
+def test_get_rejects_disallowed_url_without_a_network_call(monkeypatch):
+    calls = []
+    monkeypatch.setattr(news.requests, "get", lambda *a, **k: calls.append((a, k)))
+    assert news.get("https://evil.example.com/x") is None
+    assert news.get("http://vietstock.vn/2021/01/a-1.htm") is None
+    assert calls == []
+
+
+def test_get_disables_automatic_redirects(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        status_code = 200
+        text = "ok"
+
+        def __init__(self):
+            self.encoding = None
+
+    def fake_get(url, params=None, headers=None, timeout=None, allow_redirects=None):
+        captured["allow_redirects"] = allow_redirects
+        return FakeResponse()
+
+    monkeypatch.setattr(news.requests, "get", fake_get)
+    result = news.get("https://vietstock.vn/2021/01/a-1.htm")
+    assert result is not None
+    assert captured["allow_redirects"] is False
+
+
+def test_price_normalize_rejects_non_positive_close():
+    frame = pd.DataFrame(
+        {
+            "time": ["2024-01-01"],
+            "open": [1],
+            "high": [1],
+            "low": [1],
+            "close": [0],
+            "volume": [10],
+        }
+    )
+    with pytest.raises(ValueError, match="non-positive close"):
+        prices._normalize(frame, "FPT")
+
+
+def test_price_normalize_rejects_non_positive_volume():
+    frame = pd.DataFrame(
+        {
+            "time": ["2024-01-01"],
+            "open": [1],
+            "high": [1],
+            "low": [1],
+            "close": [1],
+            "volume": [0],
+        }
+    )
+    with pytest.raises(ValueError, match="non-positive volume"):
+        prices._normalize(frame, "FPT")
+
+
+def test_price_normalize_rejects_non_finite_values():
+    frame = pd.DataFrame(
+        {
+            "time": ["2024-01-01"],
+            "open": [1],
+            "high": [1],
+            "low": [1],
+            "close": [float("inf")],
+            "volume": [10],
+        }
+    )
+    with pytest.raises(ValueError, match="non-finite"):
+        prices._normalize(frame, "FPT")

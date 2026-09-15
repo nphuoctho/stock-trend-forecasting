@@ -36,35 +36,70 @@ def parse_cutoff(cutoff: str = config.SESSION_CUTOFF) -> tuple[int, int]:
 def to_local(values, tz: str = config.TIMEZONE) -> pd.Series:
     """Coerce timestamps to a tz-aware Series in the study timezone.
 
-    Naive inputs are interpreted in ``tz``; aware inputs are converted. Mixed
-    offsets are handled row by row instead of raising.
+    Naive inputs are interpreted in ``tz``; aware inputs are converted. A batch that is
+    already a pandas datetime dtype, or a batch of strings sharing one offset (or all
+    naive), converts in one vectorized pass. Anything else -- mixed naive/aware values,
+    mixed offsets, or raw datetime objects with different tzinfo -- is handled row by
+    row so no value is silently dropped.
     """
+    series = pd.Series(values).reset_index(drop=True)
+    parsed = None
+    if pd.api.types.is_datetime64_any_dtype(series):
+        parsed = series
+    elif pd.api.types.infer_dtype(series, skipna=True) == "string":
+        try:
+            parsed = pd.to_datetime(series, format="mixed", errors="coerce")
+        except (ValueError, TypeError):
+            parsed = None
+    if parsed is not None:
+        localized = (
+            parsed.dt.tz_localize(tz)
+            if parsed.dt.tz is None
+            else parsed.dt.tz_convert(tz)
+        )
+        return localized.dt.as_unit("ns")
+
     converted = []
-    for value in pd.Series(values).reset_index(drop=True):
-        parsed = pd.to_datetime(value, errors="coerce")
-        if pd.isna(parsed):
+    for value in series:
+        single = pd.to_datetime(value, errors="coerce")
+        if pd.isna(single):
             converted.append(pd.NaT)
-        elif parsed.tzinfo is None:
-            converted.append(parsed.tz_localize(tz))
+        elif single.tzinfo is None:
+            converted.append(single.tz_localize(tz))
         else:
-            converted.append(parsed.tz_convert(tz))
+            converted.append(single.tz_convert(tz))
     return pd.Series(pd.array(converted, dtype=f"datetime64[ns, {tz}]"))
 
 
-def trading_sessions(prices: pd.DataFrame) -> dict[str, np.ndarray]:
+def trading_sessions(
+    prices: pd.DataFrame, tz: str = config.TIMEZONE
+) -> dict[str, np.ndarray]:
     """Return ``{ticker: sorted unique session dates}`` as normalized ``datetime64[ns]``.
 
-    The session dates are the observed price rows: the price calendar is ground truth for
-    which days a ticker actually traded.
+    The session dates are the observed price rows: the price calendar is ground truth
+    for which days a ticker actually traded. Timestamps go through the same
+    :func:`to_local` study-timezone policy as news alignment before being normalized to
+    a date, so naive and timezone-aware price feeds land on the same calendar. A ticker
+    with more than one row normalizing to the same session date is a data error and
+    raises rather than silently collapsing rows.
     """
     if not {"ticker", "time"} <= set(prices.columns):
         raise ValueError("prices must have 'ticker' and 'time' columns.")
     out: dict[str, np.ndarray] = {}
-    times = pd.to_datetime(prices["time"], errors="raise").dt.normalize()
-    frame = pd.DataFrame({"ticker": prices["ticker"].to_numpy(), "date": times.to_numpy()})
+    local_dates = to_local(prices["time"], tz).dt.tz_localize(None).dt.normalize()
+    frame = pd.DataFrame(
+        {"ticker": prices["ticker"].to_numpy(), "date": local_dates.to_numpy()}
+    )
     for ticker, group in frame.groupby("ticker", sort=True):
-        dates = np.unique(group["date"].to_numpy("datetime64[ns]"))
-        out[str(ticker)] = np.sort(dates)
+        raw = group["date"].to_numpy("datetime64[ns]")
+        unique = np.unique(raw)
+        if len(unique) != len(raw):
+            counts = pd.Series(raw).value_counts()
+            dupes = sorted(str(d)[:10] for d in counts[counts > 1].index)
+            raise ValueError(
+                f"Duplicate normalized trading session dates for {ticker!r}: {dupes}."
+            )
+        out[str(ticker)] = np.sort(unique)
     return out
 
 
@@ -98,7 +133,7 @@ def align_news_to_sessions(
         raise ValueError("news must have 'ticker' and 'published_at' columns.")
     if max_rollforward_days < 0:
         raise ValueError("max_rollforward_days must be non-negative.")
-    calendar = prices if isinstance(prices, dict) else trading_sessions(prices)
+    calendar = prices if isinstance(prices, dict) else trading_sessions(prices, tz)
     hour, minute = parse_cutoff(cutoff)
     cutoff_seconds = hour * 3600 + minute * 60
 

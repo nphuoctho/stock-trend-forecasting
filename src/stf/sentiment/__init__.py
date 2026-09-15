@@ -1,6 +1,6 @@
 """stf.sentiment - fine-tune PhoBERT and produce 3-class sentiment probabilities.
 
-Validity constraints (per docs/research-gap-analysis-and-development-flow.md):
+Validity constraints:
   - 3 classes NEGATIVE / NEUTRAL / POSITIVE.
   - macro-F1 is the primary metric (class-imbalanced corpus).
   - The fine-tune split separates TIME from the forecast evaluation (no leakage).

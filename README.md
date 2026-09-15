@@ -17,19 +17,24 @@ Transformer (PhoBERT) sentiment branch with a time-series price branch. Market: 
 ```
 src/stf/                 main package
   config.py              central config: tickers, date window, paths
-  cli.py                 CLI: prices | news | verify | sentiment-* | forecast-smoke
+  cli.py                 CLI: prices | news | verify | sentiment-* | forecast-smoke | score-news
   data/
     prices.py            adjusted OHLCV loader (vnstock/VCI)
     news.py              Vietstock scraper: timestamp + title + body
   sentiment/
     dataset.py            labels, deduplication and time-aware split
+    experiments.py        leakage-safe CV and input/truncation ablations
+    make_indomain_sample.py  one-reviewer Vietstock sample generator
     labels.py             the 3 classes NEGATIVE/NEUTRAL/POSITIVE
     metrics.py            macro-F1 fixed over NEG/NEU/POS
     model.py              fine-tune PhoBERT + 3-class probabilities
   forecasting/
-    calendar.py          cutoff-safe news/session alignment
-    features.py          causal price features and train-only scaler
-    panel.py             price-sentiment panel and next-session target
+    calendar.py           cutoff-safe news/session alignment
+    features.py           causal price features and train-only scaler
+    labels.py             train-only trend thresholds and target labels
+    panel.py              price-sentiment panel and next-session target
+    sentiment_agg.py      daily probability aggregation
+    split.py              chronological and walk-forward splits
     models.py             baselines and LSTM harness
 tests/                   offline pipeline tests
 data/                    raw/processed data (gitignored; rebuilt by scripts)
@@ -38,21 +43,23 @@ models/                  model checkpoints (gitignored)
 
 ## Data pipeline
 
-```bash
 # Fetch prices for the 10 VN30 tickers (2020-01 -> 2025-12-31)
 uv run python -m stf.cli prices              # full run
 uv run python -m stf.cli prices --limit 1    # quick 1-symbol test
 
 # Crawl news (minute timestamp + title + body)
-uv run python -m stf.cli news                     # full run (long)
-uv run python -m stf.cli news --limit-urls 20     # quick 20-article test
+uv run python -m stf.cli news                 # full run (long)
+# `--refresh` re-crawls listings and repairs cached listing dates after parser changes.
+uv run python -m stf.cli news --refresh       # full crawl/refresh
+uv run python -m stf.cli news --limit-urls 20 # quick 20-article test
 
 # Coverage report for existing data (offline, no network)
 uv run python -m stf.cli verify
 ```
 
 ```bash
-# Offline smoke-test for point-in-time panel, labels and price LSTM
+# Offline smoke-test for point-in-time panel, labels, and both LSTM variants
+# (price-only PriceLSTM and the two-branch PriceSentimentLSTM)
 uv run python -m stf.cli forecast-smoke --n 40 --epochs 2
 ```
 
@@ -73,7 +80,7 @@ chạy một cấu hình với 5-fold cross-validation:
 
 ```bash
 uv run python -m stf.cli sentiment-cv \
-  --data data/labeled/indomain/labeled.csv \
+  --data data/labeled/indomain/to_label_r1.csv \
   --input-variant title_context \
   --truncation-strategy head_tail \
   --epochs 3 --folds 5 \
@@ -91,7 +98,7 @@ bị lấy mẫu lại:
 
 ```bash
 uv run python -m stf.cli sentiment-cv \
-  --data data/labeled/indomain/labeled.csv \
+  --data data/labeled/indomain/to_label_r1.csv \
   --input-variant title_context \
   --truncation-strategy head_tail \
   --class-weighting inverse_frequency \
@@ -109,12 +116,19 @@ nhãn sơ bộ và gợi ý mức độ không chắc chắn; một người duy
 nhãn trước khi huấn luyện chính thức. Không dùng nhãn sơ bộ làm kết quả chính và
 không báo cáo Cohen's kappa vì quy trình không có người gán nhãn thứ hai.
 
+Theo mặc định, `sentiment-train`/`sentiment-cv`/`sentiment-ablation` từ chối các
+dòng còn gắn cờ `annotation_status=PRELIMINARY_REVIEW_REQUIRED` hoặc
+`annotation_source=assistant_prelabel` (ví dụ `labeled.csv`). Thêm
+`--allow-preliminary` chỉ để chẩn đoán nhanh; không dùng cờ này khi báo cáo kết
+quả chính thức. Tệp người dùng rà soát phải chỉ chứa nhãn cuối hợp lệ và được
+kiểm tra trước khi chạy.
+
 Chạy toàn bộ ma trận 3 phương án đầu vào (`title`, `context`, `title_context`)
 nhân 3 cách cắt (`head`, `tail`, `head_tail`) tuần tự:
 
 ```bash
 uv run python -m stf.cli sentiment-ablation \
-  --data data/labeled/indomain/labeled.csv \
+  --data data/labeled/indomain/to_label_r1.csv \
   --epochs 3 --folds 5 \
   --output models/experiments/ablation
 ```
@@ -122,6 +136,18 @@ uv run python -m stf.cli sentiment-ablation \
 Không dùng nhãn hoặc giá tương lai để tạo đầu vào cảm xúc. Tập CafeF chỉ có
 tiêu đề nên không đủ để kết luận riêng về `context`; cần dùng tệp Vietstock đã
 gán nhãn có nội dung bài viết.
+
+### Gán nhãn cảm xúc cho tin đã crawl
+
+Sau khi có checkpoint đã huấn luyện (`models/sentiment/best` hoặc thư mục fold
+tương ứng), sinh xác suất 3 lớp cho toàn bộ tin đã crawl và lưu ra parquet:
+
+```bash
+uv run python -m stf.cli score-news \
+  --model-dir models/sentiment/best \
+  --input-variant title \
+  --output data/processed/news_sentiment.parquet
+```
 
 > This machine has no GPU/CUDA. Real fine-tuning should run on a GPU (Google Colab/Kaggle).
 > See `notebooks/training-guide.md`.

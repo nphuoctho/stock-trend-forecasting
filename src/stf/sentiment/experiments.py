@@ -9,14 +9,8 @@ from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
 
-from stf.sentiment import model
-from stf.sentiment.dataset import (
-    INPUT_VARIANTS,
-    Split,
-    build_input_text,
-    deduplicate_labeled,
-    normalize_labels,
-)
+from stf.sentiment import dataset, model
+from stf.sentiment.dataset import INPUT_VARIANTS, Split
 
 TRUNCATION_STRATEGIES = model.TRUNCATION_STRATEGIES
 
@@ -42,9 +36,13 @@ def make_stratified_folds(
     ]
 
 
-def _prepare_frame(df: pd.DataFrame, input_variant: str) -> pd.DataFrame:
-    frame = deduplicate_labeled(normalize_labels(df))
-    return build_input_text(frame, input_variant)
+def _prepare_frame(
+    df: pd.DataFrame, input_variant: str, *, allow_preliminary: bool = False
+) -> pd.DataFrame:
+    frame = dataset.reject_preliminary_labels(
+        dataset.normalize_labels(df), allow_preliminary=allow_preliminary
+    )
+    return dataset.prepare_model_input(frame, input_variant)
 
 
 def _outer_split(
@@ -71,18 +69,23 @@ def run_cross_validation(
     folds: int = 5,
     seed: int = 42,
     out_dir: Path,
+    allow_preliminary: bool = False,
+    source_path: str | Path | None = None,
 ) -> dict:
     """Train/evaluate one input configuration with outer stratified K-fold CV.
 
     The full labeled frame is used exactly once as an outer holdout per fold.
     A separate 10% split inside each training fold selects the best checkpoint,
-    so the outer metric remains unseen during model selection.
+    so the outer metric remains unseen during model selection. Unreviewed
+    preliminary rows are rejected unless ``allow_preliminary=True`` (diagnostics
+    only). ``source_path``, when given, is fingerprinted into each fold's manifest
+    and the top-level result for provenance.
     """
     if input_variant not in INPUT_VARIANTS:
         raise ValueError(f"Unknown input variant {input_variant!r}.")
     if truncation_strategy not in TRUNCATION_STRATEGIES:
         raise ValueError(f"Unknown truncation strategy {truncation_strategy!r}.")
-    frame = _prepare_frame(df, input_variant)
+    frame = _prepare_frame(df, input_variant, allow_preliminary=allow_preliminary)
     fold_indices = make_stratified_folds(frame, n_splits=folds, seed=seed)
     cfg = cfg or model.TrainConfig()
     cfg = replace(cfg, seed=seed, truncation_strategy=truncation_strategy)
@@ -93,7 +96,9 @@ def run_cross_validation(
         split = _outer_split(frame, train_idx, holdout_idx, seed + fold_number)
         fold_cfg = replace(cfg, seed=seed + fold_number)
         fold_dir = out_dir / f"fold-{fold_number:02d}"
-        manifest = model.fine_tune(split, fold_cfg, out_dir=fold_dir)
+        manifest = model.fine_tune(
+            split, fold_cfg, out_dir=fold_dir, source_path=source_path
+        )
         fold_results.append(
             {
                 "fold": fold_number,
@@ -125,6 +130,9 @@ def run_cross_validation(
         "fold_results": fold_results,
         "aggregate": aggregate,
         "reproducibility": model.reproducibility_metadata(),
+        "source_file_sha256": (
+            dataset.file_fingerprint(source_path) if source_path is not None else None
+        ),
     }
     metrics.to_csv(out_dir / "cv_results.csv", index=False)
     (out_dir / "cv_results.json").write_text(
@@ -142,6 +150,8 @@ def run_ablation(
     out_dir: Path,
     input_variants: tuple[str, ...] = INPUT_VARIANTS,
     truncation_strategies: tuple[str, ...] = TRUNCATION_STRATEGIES,
+    allow_preliminary: bool = False,
+    source_path: str | Path | None = None,
 ) -> pd.DataFrame:
     """Run the full input-by-truncation matrix sequentially and rank it."""
     rows = []
@@ -156,6 +166,8 @@ def run_ablation(
                 folds=folds,
                 seed=seed,
                 out_dir=combo_dir,
+                allow_preliminary=allow_preliminary,
+                source_path=source_path,
             )
             row = {
                 "input_variant": input_variant,

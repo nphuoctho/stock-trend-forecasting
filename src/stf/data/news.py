@@ -26,6 +26,8 @@ from datetime import datetime
 from hashlib import sha256
 from html import unescape
 from html.parser import HTMLParser
+from pathlib import Path
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -38,6 +40,9 @@ HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://finance.vietstock.vn
 SLEEP = 0.4
 PAGE_SIZE = 20
 MAX_PAGES = 400
+
+# Every outbound request must be https to exactly one of these Vietstock hosts.
+ALLOWED_HOSTS = frozenset({"finance.vietstock.vn", "vietstock.vn", "www.vietstock.vn"})
 
 _VOID_TAGS = {
     "area",
@@ -56,13 +61,30 @@ _VOID_TAGS = {
     "wbr",
 }
 
-# Listing pages expose the article URL and date in separate fragments.
 HREF = re.compile(
     r"""href\s*=\s*["']?((?://|https?://)(?:www\.)?vietstock\.vn/\d{4}/\d{2}/[^\s"'<>]+\.htm)""",
     re.IGNORECASE,
 )
 DATE = re.compile(r"\b(\d{2}/\d{2}/\d{4})\b")
 ART_ID = re.compile(r"-(\d+)\.htm", re.IGNORECASE)
+
+
+def _listing_rows(html: str) -> list[tuple[str, str]]:
+    """Pair each discovered article URL with the nearest date in its listing fragment."""
+    matches = list(HREF.finditer(html))
+    rows: list[tuple[str, str]] = []
+    for index, match in enumerate(matches):
+        left = matches[index - 1].end() if index else 0
+        right = matches[index + 1].start() if index + 1 < len(matches) else len(html)
+        fragment = html[left:right]
+        dates = list(DATE.finditer(fragment))
+        if not dates:
+            date = ""
+        else:
+            offset = match.start() - left
+            date = min(dates, key=lambda item: abs(item.start() - offset)).group(1)
+        rows.append((match.group(1), date))
+    return rows
 
 
 class _ArticleParser(HTMLParser):
@@ -196,17 +218,46 @@ def _log(msg: str) -> None:
     print(msg, flush=True)
 
 
+def _atomic_to_parquet(df: pd.DataFrame, path: Path) -> None:
+    """Write ``df`` to ``path`` via temp file + ``os.replace``.
+
+    A crash mid-write can never leave a partial/corrupt parquet at ``path``.
+    """
+    tmp = path.with_suffix(".parquet.tmp")
+    df.to_parquet(tmp)
+    os.replace(tmp, path)
+
+
+def _is_allowed_url(url: str) -> bool:
+    """Return whether ``url`` is https and targets an exact allowed Vietstock host."""
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    return parsed.scheme == "https" and parsed.hostname in ALLOWED_HOSTS
+
+
 def get(
     url: str, params: dict | None = None, tries: int = 4
 ) -> requests.Response | None:
-    """Fetch one page, retrying transient failures."""
+    """Fetch one page, retrying transient failures.
+
+    Every request is restricted to https and an exact allowed Vietstock host. This is
+    the single network choke point, so it applies equally to freshly discovered URLs
+    and to URLs read back from a cached listings parquet -- neither can bypass
+    validation. Redirects are never followed automatically: a redirect response is
+    treated as a failure rather than silently retargeted.
+    """
     if tries < 1:
         raise ValueError("tries must be at least 1.")
+    if not _is_allowed_url(url):
+        _log(f"[fetch] refusing disallowed url: {url}")
+        return None
 
     for attempt in range(tries):
         try:
             response = requests.get(
-                url, params=params, headers=HEADERS, timeout=30
+                url, params=params, headers=HEADERS, timeout=30, allow_redirects=False
             )
         except requests.RequestException:
             response = None
@@ -246,10 +297,10 @@ def list_ticker_year(code: str, year: int, *, to_date: str) -> list[tuple[str, s
         )
         if r is None:
             break
-        hrefs = HREF.findall(r.text)
-        dates = DATE.findall(r.text)
         new = [
-            (h, d) for h, d in zip(hrefs, dates + [""] * len(hrefs)) if h not in seen
+            (href, date)
+            for href, date in _listing_rows(r.text)
+            if href not in seen
         ]
         if not new:  # empty page / only articles already seen => year exhausted
             break
@@ -280,7 +331,12 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
             to_date = config.DATE_END if year == end_year else f"{year}-12-31"
             rows = list_ticker_year(code, year, to_date=to_date)
             for href, d in rows:
-                url = href if href.startswith("http") else f"https:{href}"
+                if href.startswith("//"):
+                    url = f"https:{href}"
+                elif href.startswith("http://"):
+                    url = f"https://{href[len('http://'):]}"
+                else:
+                    url = href
                 recs.append(
                     {
                         "ticker": code,
@@ -294,9 +350,7 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
                 f"[listings] {code} {year}: {len(rows)} articles (ticker running total {tot})"
             )
         config.NEWS_DIR.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(recs).to_parquet(
-            config.LISTINGS_PQ
-        )  # save incrementally after each ticker
+        _atomic_to_parquet(pd.DataFrame(recs), config.LISTINGS_PQ)  # save incrementally after each ticker
     df = pd.DataFrame(recs)
     _log(f"[listings] done: {len(df)} rows, {df['url'].nunique()} unique urls")
     return df
@@ -412,10 +466,14 @@ def fetch_articles(
     if config.ARTICLES_PQ.exists():
         prev = pd.read_parquet(config.ARTICLES_PQ)
         for record in prev.to_dict("records"):
-            record["published_at"] = _normalize_stored_timestamp(
-                record.get("published_at")
+            normalized = {
+                key: record.get(key)
+                for key in ("url", "article_id", "published_at", "title", "body")
+            }
+            normalized["published_at"] = _normalize_stored_timestamp(
+                normalized.get("published_at")
             )
-            store[record["url"]] = record
+            store[normalized["url"]] = normalized
         with_body = sum(_has_body(record.get("body")) for record in store.values())
         _log(
             f"[articles] loaded {len(store)} existing articles "
@@ -430,10 +488,7 @@ def fetch_articles(
         return rec is None or not _has_body(rec.get("body"))
 
     def _flush() -> None:
-        # Replace in one operation so a crash cannot leave a partial parquet.
-        tmp = config.ARTICLES_PQ.with_suffix(".parquet.tmp")
-        pd.DataFrame(list(store.values())).to_parquet(tmp)
-        os.replace(tmp, config.ARTICLES_PQ)
+        _atomic_to_parquet(pd.DataFrame(list(store.values())), config.ARTICLES_PQ)
 
     n_new = 0
     for i, url in enumerate(urls, 1):
@@ -461,7 +516,8 @@ def fetch_articles(
             "url": url,
             "article_id": aid,
             "published_at": _to_iso(parsed["published_at_str"]),
-            **parsed,
+            "title": parsed["title"],
+            "body": parsed["body"],
         }
         n_new += 1
         if n_new % 100 == 0:

@@ -15,6 +15,7 @@ simplicity/reproducibility; to improve quality, add a segmentation step before t
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,6 +26,11 @@ from stf import config
 from stf.sentiment.labels import LABEL2ID
 
 INPUT_VARIANTS: tuple[str, ...] = ("title", "context", "title_context")
+
+# Provenance markers for in-domain rows an automatic pass has not yet had a human
+# reviewer confirm (see reject_preliminary_labels below).
+PRELIMINARY_STATUS = "PRELIMINARY_REVIEW_REQUIRED"
+PRELIMINARY_SOURCE = "assistant_prelabel"
 
 
 def build_input_text(df: pd.DataFrame, variant: str) -> pd.DataFrame:
@@ -63,7 +69,7 @@ def build_input_text(df: pd.DataFrame, variant: str) -> pd.DataFrame:
     if variant == "title":
         selected = title.mask(title.eq(""), text)
     elif variant == "context":
-        selected = context
+        selected = context.mask(context.eq(""), title).mask(title.eq(""), text)
     elif not has_title and not has_context:
         selected = text
     elif not has_title:
@@ -107,9 +113,9 @@ class Split:
 
 
 def normalize_labels(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize labels to integer ids and reject malformed rows."""
+    """Normalize the human-reviewed ``label`` column to integer ids."""
     df = df.copy()
-    source = df["label_id"] if "label_id" in df.columns else df["label"]
+    source = df["label"] if "label" in df.columns else df["label_id"]
 
     if pd.api.types.is_string_dtype(source) or source.dtype == object:
         text = source.astype("string").str.upper().str.strip()
@@ -126,15 +132,22 @@ def normalize_labels(df: pd.DataFrame) -> pd.DataFrame:
             f"Invalid labels: {bad}. Expected NEGATIVE/NEUTRAL/POSITIVE or 0/1/2."
         )
 
+    if "label" in df.columns and "label_id" in df.columns:
+        existing_ids = pd.to_numeric(df["label_id"], errors="coerce")
+        mismatch = existing_ids.isna() | existing_ids.ne(values)
+        if mismatch.any():
+            raise ValueError("label and label_id columns disagree.")
+
     df["label_id"] = values.astype("int64")
     return df
 
 
 def deduplicate_labeled(df: pd.DataFrame) -> pd.DataFrame:
-    """Remove repeated source items before any split or input variant is built.
+    """Remove repeated source items using the frame's final model input.
 
-    URL is the strongest identity when available. Otherwise the normalized source
-    text columns form a stable exact-match key shared by title/context variants.
+    Callers should select an input variant with :func:`build_input_text` first.
+    The model input text is the identity used for deduplication even when distinct
+    source URLs carry the same title or body.
     """
     out = df.copy()
     if "text" in out.columns:
@@ -149,17 +162,97 @@ def deduplicate_labeled(df: pd.DataFrame) -> pd.DataFrame:
         text_key = key_parts[0]
         for part in key_parts[1:]:
             text_key = text_key + "\n" + part
-    if "url" in out.columns:
-        url_key = out["url"].fillna("").astype("string").str.strip()
-        key = url_key.where(url_key.ne(""), text_key)
-    else:
-        key = text_key
+    key = text_key
     keep = key.notna() & key.ne("") & ~key.duplicated()
     return out.loc[keep].reset_index(drop=True)
 
 
-def load_labeled(path: str | Path) -> pd.DataFrame:
-    """Load, validate, normalize, and deduplicate a label file."""
+def reject_preliminary_labels(
+    df: pd.DataFrame, *, allow_preliminary: bool = False
+) -> pd.DataFrame:
+    """Reject rows an automatic pass labeled that a human has not yet reviewed.
+
+    In-domain files may carry ``annotation_status=PRELIMINARY_REVIEW_REQUIRED`` and/or
+    ``annotation_source=assistant_prelabel`` until the single human reviewer confirms
+    them. Training/CV/ablation must not learn from unreviewed labels by default. Pass
+    ``allow_preliminary=True`` to include them anyway, for diagnostics only -- never
+    for reported thesis results. Public files (e.g. the CafeF seed) without these
+    columns are unaffected.
+    """
+    if allow_preliminary:
+        return df
+    flagged = pd.Series(False, index=df.index)
+    if "annotation_status" in df.columns:
+        flagged |= df["annotation_status"].astype("string").eq(PRELIMINARY_STATUS)
+    if "annotation_source" in df.columns:
+        flagged |= df["annotation_source"].astype("string").eq(PRELIMINARY_SOURCE)
+    if flagged.any():
+        raise ValueError(
+            f"{int(flagged.sum())} row(s) carry unreviewed preliminary annotation "
+            f"provenance (annotation_status={PRELIMINARY_STATUS!r} or "
+            f"annotation_source={PRELIMINARY_SOURCE!r}); pass allow_preliminary=True "
+            "to include them for diagnostics only."
+        )
+    return df
+
+
+def prepare_model_input(df: pd.DataFrame, variant: str) -> pd.DataFrame:
+    """Build the selected model input variant, then deduplicate on that final text.
+
+    Deduplication must run AFTER variant selection: a source file may carry a
+    precomputed ``text`` column built for a different variant (e.g. title_context),
+    so deduplicating on it first can miss duplicate model inputs for the requested
+    variant and let identical text leak across a train/CV split boundary.
+    """
+    return deduplicate_labeled(build_input_text(df, variant))
+
+
+def file_fingerprint(path: str | Path) -> str:
+    """SHA-256 of a source data file's bytes, for manifest provenance.
+
+    Records only a digest, never the file's content, so manifests stay free of raw
+    text or secrets.
+    """
+    path = Path(path)
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def frame_fingerprint(
+    df: pd.DataFrame, columns: tuple[str, ...] = ("text", "label_id")
+) -> str:
+    """Deterministic, order-invariant SHA-256 fingerprint of a split frame's rows.
+
+    Hashes each row's selected column values individually, then combines the sorted
+    per-row digests into one fingerprint. Only the resulting hash is ever stored in a
+    manifest -- no raw text or label leaves this function.
+    """
+    missing = [c for c in columns if c not in df.columns]
+    if missing:
+        raise ValueError(f"frame missing fingerprint columns {missing}.")
+    if df.empty:
+        raise ValueError("Cannot fingerprint an empty frame.")
+    joined = (
+        df.loc[:, list(columns)].astype("string").fillna("").agg("\x1f".join, axis=1)
+    )
+    row_hashes = sorted(
+        hashlib.sha256(value.encode("utf-8")).hexdigest() for value in joined
+    )
+    return hashlib.sha256("".join(row_hashes).encode("utf-8")).hexdigest()
+
+
+def load_labeled(path: str | Path, *, allow_preliminary: bool = False) -> pd.DataFrame:
+    """Load, validate and normalize a label file.
+
+    Rejects rows carrying unreviewed preliminary annotation provenance unless
+    ``allow_preliminary=True`` (see :func:`reject_preliminary_labels`). Does not
+    deduplicate: dedup must run after the model input variant is selected (see
+    :func:`prepare_model_input`), since deduplicating on a source ``text`` column
+    built for a different variant can hide duplicate model inputs.
+    """
     path = Path(path)
     suffix = path.suffix.lower()
     if suffix == ".parquet":
@@ -182,11 +275,12 @@ def load_labeled(path: str | Path) -> pd.DataFrame:
         df = df.dropna(subset=["text"]).copy()
         df["text"] = df["text"].astype("string").str.strip()
         df = df[df["text"].ne("")].reset_index(drop=True)
-    return deduplicate_labeled(normalize_labels(df))
+    df = normalize_labels(df)
+    return reject_preliminary_labels(df, allow_preliminary=allow_preliminary)
 
 
 def resolve_time_column(df: pd.DataFrame) -> pd.Series:
-    """Return timezone-aware timestamps to drive a time-aware split."""
+    """Return timestamps in the study timezone, interpreting naive values locally."""
     if "date" in df.columns:
         source, name = df["date"], "date"
     elif "published_at" in df.columns:
@@ -196,12 +290,16 @@ def resolve_time_column(df: pd.DataFrame) -> pd.Series:
             "Time-aware split requires a 'date' or 'published_at' column; "
             "pass time_aware=False to request a random split explicitly."
         )
-    dates = pd.to_datetime(source, errors="coerce", utc=True)
+    from stf.forecasting.calendar import to_local
+
+    dates = to_local(source, config.TIMEZONE)
     if dates.isna().any():
         raise ValueError(
             f"Time-aware split requires a valid timestamp in every '{name}' row."
         )
-    return dates.dt.tz_convert(config.TIMEZONE)
+    return dates
+
+
 def make_split(
     df: pd.DataFrame,
     *,

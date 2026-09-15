@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 
 from stf import config
+from stf.sentiment import dataset
 from stf.sentiment.dataset import Split
 from stf.sentiment.labels import ID2LABEL, LABEL2ID, NUM_LABELS
 
@@ -139,6 +140,32 @@ def resolve_truncation_strategy(
     return "head"
 
 
+def resolve_inference_config(
+    model_dir: Path,
+    *,
+    truncation_strategy: str | None = None,
+    max_len: int | None = None,
+) -> tuple[str, int]:
+    """Resolve the ``(truncation_strategy, max_len)`` pair used to train a checkpoint.
+
+    Explicit overrides always win. Otherwise both values come from the checkpoint
+    manifest saved by :func:`fine_tune`, so inference matches training exactly
+    instead of silently using the module's default ``MAX_LEN``. Falls back to
+    ``"head"``/``MAX_LEN`` only when no manifest value is available.
+    """
+    strategy = resolve_truncation_strategy(model_dir, truncation_strategy)
+    if max_len is not None:
+        if max_len < 1:
+            raise ValueError("max_len must be at least 1.")
+        return strategy, max_len
+    manifest = _load_manifest(model_dir)
+    if manifest:
+        saved = manifest.get("config", {}).get("max_len")
+        if isinstance(saved, int) and saved >= 1:
+            return strategy, saved
+    return strategy, MAX_LEN
+
+
 def reproducibility_metadata() -> dict:
     """Data-independent environment metadata for manifests.
 
@@ -249,9 +276,14 @@ def fine_tune(
     cfg: TrainConfig | None = None,
     *,
     out_dir: Path | None = None,
+    source_path: str | Path | None = None,
 ) -> dict:
     """Fine-tune PhoBERT on split.train, pick the best by macro-F1 on val,
     evaluate on test. Return a result dict and save checkpoint + manifest.
+
+    ``source_path``, when given, is hashed (never copied) into the manifest's
+    provenance block alongside deterministic fingerprints of the train/val/test
+    frames, for reproducibility without embedding raw text.
     """
     from transformers import (
         AutoModelForSequenceClassification,
@@ -387,6 +419,16 @@ def fine_tune(
         },
         "test_metrics": test_metrics,
         "reproducibility": reproducibility_metadata(),
+        "provenance": {
+            "source_file_sha256": (
+                dataset.file_fingerprint(source_path) if source_path is not None else None
+            ),
+            "split_fingerprints": {
+                "train": dataset.frame_fingerprint(split.train),
+                "val": dataset.frame_fingerprint(split.val),
+                "test": dataset.frame_fingerprint(split.test),
+            },
+        },
     }
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -400,12 +442,13 @@ def predict_proba(
     *,
     batch_size: int = 32,
     truncation_strategy: str | None = None,
+    max_len: int | None = None,
 ) -> np.ndarray:
     """Return one probability row per input text.
 
-    When ``truncation_strategy`` is ``None`` the strategy saved in the
+    When ``truncation_strategy`` or ``max_len`` is ``None``, the value saved in the
     checkpoint manifest is used so inference matches training; pass an explicit
-    strategy to override it.
+    value to override either one (see :func:`resolve_inference_config`).
     """
     if batch_size < 1:
         raise ValueError("batch_size must be at least 1.")
@@ -416,7 +459,9 @@ def predict_proba(
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
     model_dir = model_dir or (config.SENTIMENT_DIR / "best")
-    strategy = resolve_truncation_strategy(model_dir, truncation_strategy)
+    strategy, resolved_max_len = resolve_inference_config(
+        model_dir, truncation_strategy=truncation_strategy, max_len=max_len
+    )
     device = get_device()
     tokenizer = AutoTokenizer.from_pretrained(str(model_dir), use_fast=True)
     model = AutoModelForSequenceClassification.from_pretrained(str(model_dir)).to(
@@ -432,7 +477,7 @@ def predict_proba(
                 batch,
                 [0] * len(batch),
                 tokenizer,
-                MAX_LEN,
+                resolved_max_len,
                 strategy,
             )
             enc = tokenizer.pad(

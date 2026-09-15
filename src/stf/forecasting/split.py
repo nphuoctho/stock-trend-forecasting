@@ -103,12 +103,13 @@ def walk_forward_windows(
     expanding: bool = True,
     date_col: str = "target_date",
 ) -> list[TimeSplit]:
-    """Build chronological walk-forward windows over unique dates.
+    """Build exactly ``n_windows`` chronological walk-forward windows.
 
     Each window's train dates precede its validation dates, which precede its test dates;
     successive test blocks step forward by ``test_size`` dates and never overlap. With
     ``expanding=True`` the train window grows from the start; otherwise it rolls with a
-    fixed length of ``min_train`` dates. Sizes are counted in unique trading dates.
+    fixed length of ``min_train`` dates. Sizes are counted in unique trading dates. The
+    function raises instead of silently returning fewer windows than requested.
     """
     if n_windows < 1 or test_size < 1 or val_size < 0:
         raise ValueError("Require n_windows>=1, test_size>=1, val_size>=0.")
@@ -133,6 +134,9 @@ def walk_forward_windows(
             )
         )
         train_end += test_size
-    if not windows:
-        raise ValueError("Not enough dates to build a single walk-forward window.")
+    if len(windows) != n_windows:
+        raise ValueError(
+            f"Not enough dates to build {n_windows} walk-forward windows; "
+            f"built {len(windows)}."
+        )
     return windows

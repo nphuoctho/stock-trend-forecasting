@@ -305,3 +305,30 @@ def fit_lstm(
         optimizer.step()
         history.append(float(loss.detach()))
     return history
+
+
+def evaluate_predictions(y_true, y_pred) -> dict:
+    """Accuracy, macro-F1, and balanced accuracy over the DOWN/FLAT/UP classes.
+
+    A minimal evaluation helper for the LSTM/baseline forecasting models. Scores are
+    computed from real predictions only; nothing here is claimed as a benchmark or
+    scientific result on its own.
+    """
+    from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
+
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+    if y_true.ndim != 1 or y_pred.ndim != 1 or len(y_true) != len(y_pred):
+        raise ValueError("y_true and y_pred must be one-dimensional arrays of equal length.")
+    if len(y_true) == 0:
+        raise ValueError("Cannot evaluate an empty set.")
+    labels = list(range(NUM_TREND_CLASSES))
+    if not np.isin(y_true, labels).all() or not np.isin(y_pred, labels).all():
+        raise ValueError(f"Labels must use the fixed ids {labels}.")
+    return {
+        "accuracy": float(accuracy_score(y_true, y_pred)),
+        "macro_f1": float(
+            f1_score(y_true, y_pred, average="macro", labels=labels, zero_division=0)
+        ),
+        "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
+    }

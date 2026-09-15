@@ -48,9 +48,9 @@ __all__ = [
     "align_news_to_sessions",
     "alignment_report",
     "session_as_of",
-    "trading_sessions",
+    "MA_WINDOW",
+    "VOL_WINDOW",
     "FeatureScaler",
-    "price_feature_columns",
     "price_features",
     "SENTIMENT_COLUMNS",
     "daily_sentiment",
@@ -81,6 +81,7 @@ def __getattr__(name: str):
         "make_two_branch_sequences",
         "fit_lstm",
         "set_seed",
+        "evaluate_predictions",
         "NUM_TREND_CLASSES",
     }
     if name in model_exports:

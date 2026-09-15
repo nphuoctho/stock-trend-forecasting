@@ -70,14 +70,19 @@ def build_panel(
     empty (``pd.NA``); fill them with :mod:`stf.forecasting.labels` and
     :mod:`stf.forecasting.split` after fitting on training rows only.
     """
-    feats = price_features(prices, ma_window=ma_window, vol_window=vol_window)
+    feats = price_features(prices, ma_window=ma_window, vol_window=vol_window, tz=tz)
     feats = add_target(feats)
 
     as_of = cal.session_as_of(feats["observation_date"], cutoff, tz)
     feats = feats.assign(as_of=as_of)
 
     if daily is not None and not daily.empty:
-        merged = feats.merge(daily, on=["ticker", "observation_date"], how="left")
+        merged = feats.merge(
+            daily,
+            on=["ticker", "observation_date"],
+            how="left",
+            validate="many_to_one",
+        )
     else:
         merged = feats.copy()
         for col in SENTIMENT_COLUMNS:

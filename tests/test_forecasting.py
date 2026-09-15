@@ -18,6 +18,7 @@ from stf.forecasting.models import (
     PriceLSTM,
     PriceSentimentLSTM,
     RandomBaseline,
+    evaluate_predictions,
     fit_lstm,
     make_sequences,
     make_two_branch_sequences,
@@ -181,6 +182,18 @@ def test_early_rows_lack_history_and_are_nan():
     assert np.isfinite(feats.iloc[4][f"ma_ratio_5"])
 
 
+
+def test_feature_scaler_standardizes_constant_and_integer_columns():
+    frame = pd.DataFrame({"count": [0, 1, 2], "constant": [5.0, 5.0, 5.0]})
+    scaler = FeatureScaler.fit(frame, ["count", "constant"])
+    transformed = scaler.transform(frame)
+    assert transformed[["count", "constant"]].dtypes.tolist() == [
+        np.dtype("float64"),
+        np.dtype("float64"),
+    ]
+    assert transformed["count"].tolist() == pytest.approx([-1.22474487, 0.0, 1.22474487])
+    assert transformed["constant"].tolist() == pytest.approx([0.0, 0.0, 0.0])
+
 def test_target_return_matches_next_session_close_ratio():
     prices = _prices(n=6)
     feats = price_features(prices)
@@ -309,6 +322,12 @@ def test_walk_forward_windows_are_chronological_and_expanding():
         prev_train = len(tr)
 
 
+
+def test_walk_forward_windows_rejects_partial_request():
+    panel = build_panel(_prices(n=20))
+    with pytest.raises(ValueError, match="build 5 walk-forward windows"):
+        walk_forward_windows(panel, n_windows=5, test_size=4, val_size=2, min_train=10)
+
 # --- models ---------------------------------------------------------------------------
 
 
@@ -411,3 +430,69 @@ def test_session_as_of_is_timezone_aware_even_with_nat():
     values = cal.session_as_of([pd.Timestamp("2021-01-05"), pd.NaT])
     assert str(values.dt.tz) == "Asia/Ho_Chi_Minh"
     assert pd.isna(values.iloc[1])
+
+
+# --- timezone-unified point-in-time alignment ------------------------------------------
+
+
+def test_trading_sessions_normalizes_naive_and_aware_prices_to_same_calendar():
+    naive = _prices("FPT", n=5)
+    aware = naive.copy()
+    aware["time"] = aware["time"].dt.tz_localize("Asia/Ho_Chi_Minh")
+    naive_sessions = cal.trading_sessions(naive)
+    aware_sessions = cal.trading_sessions(aware)
+    np.testing.assert_array_equal(naive_sessions["FPT"], aware_sessions["FPT"])
+
+
+def test_trading_sessions_rejects_duplicate_normalized_dates():
+    prices = _prices("FPT", n=3)
+    dup = pd.concat([prices, prices.iloc[[0]]], ignore_index=True)
+    with pytest.raises(ValueError, match="Duplicate normalized"):
+        cal.trading_sessions(dup)
+
+
+def test_price_features_rejects_duplicate_normalized_session_dates():
+    prices = _prices("FPT", n=6)
+    dup = pd.concat([prices, prices.iloc[[2]]], ignore_index=True)
+    with pytest.raises(ValueError, match="duplicate normalized session dates"):
+        price_features(dup)
+
+
+# --- probability boundary validation ---------------------------------------------------
+
+
+def test_daily_sentiment_rejects_out_of_bounds_and_bad_sum_probabilities():
+    aligned = pd.DataFrame(
+        {
+            "ticker": ["FPT", "FPT", "FPT", "FPT"],
+            "observation_date": [pd.Timestamp("2021-01-05")] * 4,
+            "mapping_status": ["same_session"] * 4,
+            "prob_negative": [1.5, -0.1, 0.5, 0.2],
+            "prob_neutral": [0.2, 0.5, 0.5, 0.3],
+            "prob_positive": [0.3, 0.6, 0.5, 0.5],
+        }
+    )
+    daily = daily_sentiment(aligned)
+    assert len(daily) == 1
+    assert daily.iloc[0]["news_count"] == 1
+    assert daily.iloc[0]["sent_prob_negative_mean"] == pytest.approx(0.2)
+
+
+# --- forecasting model evaluation --------------------------------------------------------
+
+
+def test_evaluate_predictions_perfect_predictions_score_one():
+    result = evaluate_predictions([0, 1, 2, 1], [0, 1, 2, 1])
+    assert result["accuracy"] == pytest.approx(1.0)
+    assert result["macro_f1"] == pytest.approx(1.0)
+    assert result["balanced_accuracy"] == pytest.approx(1.0)
+
+
+def test_evaluate_predictions_rejects_mismatched_lengths():
+    with pytest.raises(ValueError, match="length"):
+        evaluate_predictions([0, 1], [0])
+
+
+def test_evaluate_predictions_rejects_labels_outside_fixed_ids():
+    with pytest.raises(ValueError, match="fixed ids"):
+        evaluate_predictions([0, 5], [0, 1])

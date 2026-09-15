@@ -13,6 +13,9 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from stf import config
+from stf.forecasting.calendar import to_local
+
 # Default rolling window lengths (trading days).
 MA_WINDOW = 5
 VOL_WINDOW = 5
@@ -36,6 +39,7 @@ def price_features(
     *,
     ma_window: int = MA_WINDOW,
     vol_window: int = VOL_WINDOW,
+    tz: str = config.TIMEZONE,
 ) -> pd.DataFrame:
     """Build per-``(ticker, observation_date)`` causal price features.
 
@@ -54,6 +58,11 @@ def price_features(
 
     Returns a frame sorted by ``(ticker, observation_date)`` with the ``close`` retained
     for downstream target construction. Insufficient-history rows hold ``NaN``.
+    Session dates are routed through the same study-timezone policy as news alignment
+    (:func:`stf.forecasting.calendar.to_local`) before being normalized, so naive and
+    timezone-aware price feeds land on the same calendar; a ticker with more than one
+    row on the same normalized date raises rather than silently corrupting the
+    rolling-window calculations.
     """
     missing = [c for c in _REQUIRED if c not in prices.columns]
     if missing:
@@ -66,6 +75,15 @@ def price_features(
     frames: list[pd.DataFrame] = []
     for ticker, group in prices.groupby("ticker", sort=True):
         g = group.sort_values("time")
+        local_dates = to_local(g["time"], tz).dt.tz_localize(None).dt.normalize()
+        if local_dates.duplicated().any():
+            dupes = sorted(
+                local_dates[local_dates.duplicated()]
+                .dt.strftime("%Y-%m-%d")
+                .unique()
+                .tolist()
+            )
+            raise ValueError(f"{ticker}: duplicate normalized session dates {dupes}.")
         close = g["close"].astype(float).reset_index(drop=True)
         volume = g["volume"].astype(float).reset_index(drop=True)
         ret = close.pct_change(fill_method=None)
@@ -78,7 +96,7 @@ def price_features(
             pd.DataFrame(
                 {
                     "ticker": str(ticker),
-                    "observation_date": g["time"].dt.normalize().to_numpy(),
+                    "observation_date": local_dates.to_numpy(),
                     "close": close.to_numpy(),
                     "ret_1d": ret.to_numpy(),
                     "log_ret_1d": log_ret.to_numpy(),
@@ -113,7 +131,7 @@ class FeatureScaler:
             raise ValueError("Feature scaler needs at least one finite training row.")
         mean = values[finite].mean(axis=0)
         scale = values[finite].std(axis=0)
-        scale = np.where(scale > 0, scale, 1.0)
+        scale = np.where(scale > 1e-12, scale, 1.0)
         return cls(names, mean, scale)
 
     def transform(self, frame: pd.DataFrame) -> pd.DataFrame:
@@ -122,5 +140,7 @@ class FeatureScaler:
             raise ValueError("Frame is missing one or more scaler columns.")
         out = frame.copy()
         values = out.loc[:, self.columns].to_numpy(dtype=float)
-        out.loc[:, self.columns] = (values - self.mean) / self.scale
+        scaled = (values - self.mean) / self.scale
+        for index, column in enumerate(self.columns):
+            out[column] = scaled[:, index]
         return out

@@ -28,9 +28,10 @@ See `training-guide.md` for the detailed walkthrough.
 
 - **CafeF seed** (999 pre-labeled headlines): the notebook downloads it from the public
   repo `209sontung/Vietnamese-stock-article-classification`.
-- **In-domain (optional):** if you have labeled the in-domain sample (from
-  `stf.sentiment.make_indomain_sample`), save it as `indomain_labeled.csv`
-  (`text`, `label` columns) and upload it. The notebook merges it in automatically.
+- **In-domain (required for the thesis matrix):** run
+  `stf.sentiment.make_indomain_sample`, have one human reviewer label at least 301
+  articles, and provide `to_label_r1.csv` with `title`, `body_preview`, `published_at`,
+  `url`, and final `label` columns. Do not upload preliminary labels.
 
 ## Version notes (avoid breakage)
 

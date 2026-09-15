@@ -50,7 +50,9 @@ def daily_sentiment(aligned: pd.DataFrame) -> pd.DataFrame:
         whose argmax class is POS / NEG), ``sent_pos_minus_neg`` (mean POS minus mean NEG)
         and ``sent_dispersion`` (population std of the per-article POS-minus-NEG polarity).
 
-    Rows with an unmapped status or a non-finite probability vector are dropped explicitly.
+    Rows with an unmapped status, a non-finite probability vector, a probability outside
+    ``[0, 1]``, or a probability vector that does not sum to ~1 (within ``1e-3``) are
+    dropped explicitly rather than silently aggregated.
     """
     if aligned.empty or not {"ticker", "observation_date", "mapping_status"} <= set(aligned.columns):
         return _empty()
@@ -60,10 +62,14 @@ def daily_sentiment(aligned: pd.DataFrame) -> pd.DataFrame:
         if col not in df.columns:
             df[col] = np.nan
     probs = df[list(PROB_COLS)].apply(pd.to_numeric, errors="coerce")
+    in_bounds = probs.ge(0).all(axis=1) & probs.le(1).all(axis=1)
+    sums_to_one = np.isclose(probs.sum(axis=1), 1.0, atol=1e-3)
     usable = (
         df["mapping_status"].isin(MAPPED_STATUSES)
         & df["observation_date"].notna()
         & probs.notna().all(axis=1)
+        & in_bounds
+        & sums_to_one
     )
     if not usable.any():
         return _empty()
@@ -73,27 +79,27 @@ def daily_sentiment(aligned: pd.DataFrame) -> pd.DataFrame:
     use["_neg"] = p["prob_negative"].to_numpy()
     use["_neu"] = p["prob_neutral"].to_numpy()
     use["_pos"] = p["prob_positive"].to_numpy()
-    use["_pred"] = p[list(PROB_COLS)].to_numpy().argmax(axis=1)  # 0=NEG,1=NEU,2=POS
+    pred = p[list(PROB_COLS)].to_numpy().argmax(axis=1)  # 0=NEG,1=NEU,2=POS
+    use["_is_pos"] = (pred == 2).astype(float)
+    use["_is_neg"] = (pred == 0).astype(float)
     use["_score"] = use["_pos"] - use["_neg"]
 
-    rows: list[dict] = []
-    for (ticker, date), g in use.groupby(["ticker", "observation_date"], sort=True):
-        n = len(g)
-        neg_mean = float(g["_neg"].mean())
-        pos_mean = float(g["_pos"].mean())
-        rows.append(
-            {
-                "ticker": str(ticker),
-                "observation_date": date,
-                "news_count": int(n),
-                "has_news": 1,
-                "sent_prob_negative_mean": neg_mean,
-                "sent_prob_neutral_mean": float(g["_neu"].mean()),
-                "sent_prob_positive_mean": pos_mean,
-                "sent_pos_ratio": float((g["_pred"] == 2).mean()),
-                "sent_neg_ratio": float((g["_pred"] == 0).mean()),
-                "sent_pos_minus_neg": pos_mean - neg_mean,
-                "sent_dispersion": float(g["_score"].std(ddof=0)) if n > 1 else 0.0,
-            }
-        )
-    return pd.DataFrame(rows, columns=["ticker", "observation_date", *SENTIMENT_COLUMNS])
+    grouped = use.groupby(["ticker", "observation_date"], sort=True)
+    agg = grouped.agg(
+        news_count=("_neg", "size"),
+        sent_prob_negative_mean=("_neg", "mean"),
+        sent_prob_neutral_mean=("_neu", "mean"),
+        sent_prob_positive_mean=("_pos", "mean"),
+        sent_pos_ratio=("_is_pos", "mean"),
+        sent_neg_ratio=("_is_neg", "mean"),
+    )
+    # Population std (ddof=0), fully vectorized; a single-article group yields 0.0.
+    agg["sent_dispersion"] = grouped["_score"].std(ddof=0)
+    agg["sent_pos_minus_neg"] = (
+        agg["sent_prob_positive_mean"] - agg["sent_prob_negative_mean"]
+    )
+    agg["news_count"] = agg["news_count"].astype("int64")
+    agg["has_news"] = np.int64(1)
+    agg = agg.reset_index()
+    agg["ticker"] = agg["ticker"].astype(str)
+    return agg[["ticker", "observation_date", *SENTIMENT_COLUMNS]]
