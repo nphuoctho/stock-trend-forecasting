@@ -134,10 +134,8 @@ def deduplicate_labeled(df: pd.DataFrame) -> pd.DataFrame:
     text columns form a stable exact-match key shared by title/context variants.
     """
     out = df.copy()
-    if "url" in out.columns:
-        key = out["url"].astype("string").str.strip()
-    elif "text" in out.columns:
-        key = out["text"].astype("string").str.strip()
+    if "text" in out.columns:
+        text_key = out["text"].fillna("").astype("string").str.strip()
     else:
         key_parts = []
         for column in ("title", "body", "body_preview"):
@@ -145,9 +143,14 @@ def deduplicate_labeled(df: pd.DataFrame) -> pd.DataFrame:
                 key_parts.append(out[column].fillna("").astype("string").str.strip())
         if not key_parts:
             return out.reset_index(drop=True)
-        key = key_parts[0]
+        text_key = key_parts[0]
         for part in key_parts[1:]:
-            key = key + "\n" + part
+            text_key = text_key + "\n" + part
+    if "url" in out.columns:
+        url_key = out["url"].fillna("").astype("string").str.strip()
+        key = url_key.where(url_key.ne(""), text_key)
+    else:
+        key = text_key
     keep = key.notna() & key.ne("") & ~key.duplicated()
     return out.loc[keep].reset_index(drop=True)
 
