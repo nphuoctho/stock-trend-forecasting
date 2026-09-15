@@ -248,6 +248,13 @@ def test_annotation_loader_rejects_unlabeled_rows(tmp_path):
     with pytest.raises(ValueError, match="no label"):
         load_annotation_file(path)
 
+def test_annotation_loader_rejects_empty_files(tmp_path):
+    path = tmp_path / "empty.csv"
+    pd.DataFrame(columns=["sample_id", "label"]).to_csv(path, index=False)
+
+    with pytest.raises(ValueError, match="empty"):
+        load_annotation_file(path)
+
 
 def test_predict_proba_handles_empty_input_without_loading_model():
     result = model.predict_proba([])

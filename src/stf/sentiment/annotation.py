@@ -18,6 +18,10 @@ def load_annotation_file(path: str | Path) -> pd.DataFrame:
     missing_columns = required - set(frame.columns)
     if missing_columns:
         raise ValueError(f"Missing annotation columns: {sorted(missing_columns)}")
+    if frame.empty:
+        raise ValueError(f"{path}: annotation file is empty.")
+    if frame["sample_id"].isna().any():
+        raise ValueError(f"{path}: sample_id values cannot be empty.")
     if frame["sample_id"].duplicated().any():
         raise ValueError(f"Duplicate sample_id values in {path}.")
 
