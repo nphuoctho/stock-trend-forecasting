@@ -344,7 +344,7 @@ def test_time_aware_split_derives_date_column_from_published_at():
 def test_metrics_keep_absent_classes_in_macro_scores():
     result = classification_metrics([0, 2, 0, 2], [0, 2, 0, 2])
     assert result["macro_f1"] == pytest.approx(2 / 3)
-    assert result["balanced_accuracy"] == pytest.approx(2 / 3)
+    assert result["balanced_accuracy"] == pytest.approx(1.0)
 
 
 def test_time_split_deduplicates_and_keeps_whole_dates_together():

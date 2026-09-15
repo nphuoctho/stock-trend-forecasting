@@ -300,6 +300,8 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
     df = pd.DataFrame(recs)
     _log(f"[listings] done: {len(df)} rows, {df['url'].nunique()} unique urls")
     return df
+
+
 def join_listings_articles(
     listings: pd.DataFrame, articles: pd.DataFrame
 ) -> pd.DataFrame:

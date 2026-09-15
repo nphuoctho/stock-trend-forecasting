@@ -132,6 +132,21 @@ def test_out_of_calendar_and_invalid_are_reported_not_kept():
     assert aligned["observation_date"].isna().all()
 
 
+def test_assemble_retains_alignment_report():
+    prices = _prices(n=5)
+    news = pd.DataFrame(
+        {
+            "ticker": ["FPT"],
+            "published_at": ["2021-01-05T14:00:00+07:00"],
+            "prob_negative": [0.1],
+            "prob_neutral": [0.2],
+            "prob_positive": [0.7],
+        }
+    )
+    panel = assemble(prices, news)
+    assert panel.attrs["alignment_report"]["mapped"] == 1
+
+
 # --- price feature causality (leakage guard) ------------------------------------------
 
 

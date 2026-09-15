@@ -5,6 +5,9 @@ Label sources:
   2. In-domain add-on: model prelabels reviewed by one human under a fixed guideline.
 
 Expected label CSV/parquet format: a `text` column (str) and a `label` column
+(NEGATIVE/NEUTRAL/POSITIVE or 0/1/2). A time-aware split requires a valid `date` or
+`published_at` column and assigns whole normalized dates to train, validation and test.
+Missing or invalid timestamps raise instead of silently falling back to random splitting.
 
 PhoBERT ideally takes word-segmented input (VnCoreNLP). Here we tokenize raw text for
 simplicity/reproducibility; to improve quality, add a segmentation step before the tokenizer.
@@ -263,3 +266,24 @@ def make_split(
     if any(result[name].empty for name in ("train", "val", "test")):
         raise ValueError("Stratified splitting produced an empty partition.")
     return Split(result["train"], result["val"], result["test"])
+
+
+def synthetic_dataset(n: int = 120, seed: int = 42) -> pd.DataFrame:
+    """Build a balanced fake dataset for offline smoke tests only."""
+    rng = np.random.default_rng(seed)
+    pools = {
+        0: ["cổ phiếu tăng mạnh", "lợi nhuận vượt kỳ vọng"],
+        1: ["công bố thông tin định kỳ", "họp đại hội cổ đông"],
+        2: ["cổ phiếu lao dốc", "thua lỗ nặng"],
+    }
+    rows = []
+    for i in range(n):
+        label_id = i % 3
+        rows.append(
+            {
+                "text": rng.choice(pools[label_id]) + f" phiên {i}",
+                "label_id": label_id,
+                "date": pd.Timestamp("2020-01-01") + pd.Timedelta(days=i),
+            }
+        )
+    return pd.DataFrame(rows)

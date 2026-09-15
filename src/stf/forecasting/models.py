@@ -164,9 +164,10 @@ def make_sequences(
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Build per-ticker sliding windows for the LSTM models.
 
-    For each ticker (sorted by date), emit windows of ``seq_len`` consecutive rows whose
-    features are all finite and whose target label is present. Windows never cross tickers
-    and never read past the observation date, so no lookahead enters the inputs.
+    For each ticker (sorted by date), emit windows of ``seq_len`` consecutive observed
+    trading-session rows whose features are all finite and whose target label is present.
+    Calendar gaps such as exchange holidays are intentionally treated as adjacent trading
+    sessions; windows never cross tickers and never read past the observation date.
 
     Returns ``(X, y, meta)`` where ``X`` has shape ``(n, seq_len, len(feature_cols))``,
     ``y`` holds trend class ids, and ``meta`` records ticker/observation_date/target_date.
