@@ -74,6 +74,38 @@ Mỗi fold dùng 80% dữ liệu làm outer holdout; 10% của phần huấn luy
 lại để chọn checkpoint tốt nhất. Chỉ số chính là `macro_f1`; kết quả từng fold
 được lưu trong `cv_results.csv` và tổng hợp trong `cv_results.json`.
 
+Khi dữ liệu huấn luyện bị lệch lớp, có thể dùng trọng số nghịch đảo tần suất.
+Trọng số được tính riêng từ phần huấn luyện của từng fold; tập đánh giá không
+bị lấy mẫu lại:
+
+```bash
+uv run python -m stf.cli sentiment-cv \
+  --data data/labeled/indomain/labeled.csv \
+  --input-variant title_context \
+  --truncation-strategy head_tail \
+  --class-weighting inverse_frequency \
+  --epochs 3 --folds 5 \
+  --output models/experiments/title_context__head_tail__weighted
+```
+
+Chỉ bật tùy chọn này sau khi nhãn đã được con người rà soát. Nhãn sơ bộ do hệ
+thống tạo chỉ dùng để chẩn đoán, không dùng làm số liệu chính.
+
+### Kiểm tra chất lượng gán nhãn
+
+Sau khi hai người hoàn tất hai tệp CSV độc lập, kiểm tra nhãn thiếu/sai và
+tính Cohen's kappa:
+
+```bash
+uv run python -m stf.cli sentiment-annotation-check \
+  --files data/labeled/indomain/to_label_r1.csv \
+          data/labeled/indomain/to_label_r2.csv \
+  --disagreements data/labeled/indomain/disagreements.csv
+```
+
+Tệp gán nhãn sơ bộ của hệ thống không thay thế nhãn người và không dùng để
+tính mức độ đồng thuận.
+
 Chạy toàn bộ ma trận 3 phương án đầu vào (`title`, `context`, `title_context`)
 nhân 3 cách cắt (`head`, `tail`, `head_tail`) tuần tự:
 
