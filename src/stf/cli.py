@@ -102,6 +102,20 @@ def cmd_verify(_args: argparse.Namespace) -> int:
         print("[map] listings.parquet missing")
         ok = False
 
+    if (
+        "articles" in locals()
+        and "listings" in locals()
+        and {"url", "published_at", "title", "body"} <= set(articles.columns)
+        and {"ticker", "url"} <= set(listings.columns)
+    ):
+        from stf.data.news import join_listings_articles
+
+        joined = join_listings_articles(listings, articles)
+        print(
+            f"[map] joined {len(joined)} ticker-article links, "
+            f"{joined['url'].nunique()} unique article urls"
+        )
+
     print("\nResult:", "OK" if ok else "MISSING OR INVALID DATA")
     return 0 if ok else 1
 

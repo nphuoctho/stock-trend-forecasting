@@ -87,7 +87,7 @@ def align_news_to_sessions(
     *,
     cutoff: str = config.SESSION_CUTOFF,
     tz: str = config.TIMEZONE,
-    max_rollforward_days: int = 7,
+    max_rollforward_days: int = 12,
 ) -> pd.DataFrame:
     """Anchor each news row to the trading session it may first inform.
 

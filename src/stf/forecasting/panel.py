@@ -106,11 +106,16 @@ def assemble(
     cutoff: str = config.SESSION_CUTOFF,
     tz: str = config.TIMEZONE,
 ) -> pd.DataFrame:
-    """End-to-end convenience: align news, aggregate daily, then build the panel."""
+    """End-to-end convenience with alignment coverage retained in ``attrs``."""
     daily = None
+    report: dict[str, int] | None = None
     if news is not None and not news.empty:
         aligned = cal.align_news_to_sessions(news, prices, cutoff=cutoff, tz=tz)
+        report = cal.alignment_report(aligned)
         daily = daily_sentiment(aligned)
-    return build_panel(
+    panel = build_panel(
         prices, daily, ma_window=ma_window, vol_window=vol_window, cutoff=cutoff, tz=tz
     )
+    if report is not None:
+        panel.attrs["alignment_report"] = report
+    return panel

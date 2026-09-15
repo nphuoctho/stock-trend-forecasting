@@ -1,7 +1,9 @@
-"""Sentiment evaluation metrics and annotation agreement.
+"""Sentiment evaluation metrics and annotation agreement utilities.
 
-macro-F1 is the PRIMARY metric (class-imbalanced corpus). Plus accuracy, balanced
-accuracy, per-class precision/recall/F1. Cohen's/Fleiss' κ for reporting annotation agreement.
+Macro-F1 is the primary fixed-three-class metric. Balanced accuracy keeps its
+standard definition over classes present in the evaluation targets. Agreement
+helpers remain available for generic annotation tooling but are not used by the
+single-reviewer thesis protocol.
 """
 
 from __future__ import annotations
@@ -42,7 +44,7 @@ def classification_metrics(y_true, y_pred) -> dict:
             )
         ),
         "accuracy": float(accuracy_score(y_true, y_pred)),
-        "balanced_accuracy": float(np.mean(r)),
+        "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
         "per_class_f1": {i: float(v) for i, v in enumerate(f1)},
         "per_class_precision": {i: float(v) for i, v in enumerate(p)},
         "per_class_recall": {i: float(v) for i, v in enumerate(r)},

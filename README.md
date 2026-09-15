@@ -17,14 +17,15 @@ Transformer (PhoBERT) sentiment branch with a time-series price branch. Market: 
 ```
 src/stf/                 main package
   config.py              central config: tickers, date window, paths
-  cli.py                 CLI: prices | news | verify | sentiment-* commands
+  cli.py                 CLI: prices | news | verify | sentiment-* | forecast-smoke
   data/
     prices.py            adjusted OHLCV loader (vnstock/VCI)
     news.py              Vietstock scraper: timestamp + title + body
   sentiment/
-    labels.py            the 3 classes NEGATIVE/NEUTRAL/POSITIVE
-    metrics.py           macro-F1 fixed over NEG/NEU/POS
-    model.py             fine-tune PhoBERT + 3-class probabilities
+    dataset.py            labels, deduplication and time-aware split
+    labels.py             the 3 classes NEGATIVE/NEUTRAL/POSITIVE
+    metrics.py            macro-F1 fixed over NEG/NEU/POS
+    model.py              fine-tune PhoBERT + 3-class probabilities
   forecasting/
     calendar.py          cutoff-safe news/session alignment
     features.py          causal price features and train-only scaler
