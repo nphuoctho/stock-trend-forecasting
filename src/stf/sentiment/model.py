@@ -11,9 +11,9 @@ from __future__ import annotations
 import json
 import math
 import random
+import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
-
 import numpy as np
 
 from stf import config
@@ -279,7 +279,7 @@ def fine_tune(
     source_path: str | Path | None = None,
 ) -> dict:
     """Fine-tune PhoBERT on split.train, pick the best by macro-F1 on val,
-    evaluate on test. Return a result dict and save checkpoint + manifest.
+    evaluate on test. Return a result dict and save the best model + manifest.
 
     ``source_path``, when given, is hashed (never copied) into the manifest's
     provenance block alongside deterministic fingerprints of the train/val/test
@@ -293,9 +293,10 @@ def fine_tune(
         TrainingArguments,
     )
 
-    cfg = cfg or TrainConfig()
     out_dir = out_dir or config.SENTIMENT_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_dir = out_dir / "checkpoints"
+    shutil.rmtree(checkpoint_dir, ignore_errors=True)
     set_seed(cfg.seed)
     device = get_device()
     if cfg.class_weighting not in ("none", "inverse_frequency"):
@@ -341,7 +342,7 @@ def fine_tune(
     )
 
     args = TrainingArguments(
-        output_dir=str(out_dir / "checkpoints"),
+        output_dir=str(checkpoint_dir),
         num_train_epochs=cfg.epochs,
         per_device_train_batch_size=cfg.batch_size,
         per_device_eval_batch_size=cfg.batch_size,
@@ -350,6 +351,8 @@ def fine_tune(
         warmup_steps=warmup_steps,
         eval_strategy="epoch",
         save_strategy="epoch",
+        save_total_limit=1,
+        save_only_model=True,
         load_best_model_at_end=True,
         metric_for_best_model="macro_f1",
         greater_is_better=True,
@@ -404,9 +407,10 @@ def fine_tune(
     y_pred = np.argmax(pred.predictions, axis=-1)
     test_metrics = classification_metrics(pred.label_ids, y_pred)
 
-    # Save model + tokenizer + manifest.
+    # Save the selected model; per-epoch checkpoints are transient for CV.
     trainer.save_model(str(out_dir / "best"))
     tokenizer.save_pretrained(str(out_dir / "best"))
+    shutil.rmtree(out_dir / "checkpoints", ignore_errors=True)
     manifest = {
         "config": asdict(cfg),
         "device": device,

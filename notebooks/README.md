@@ -35,10 +35,21 @@ See `training-guide.md` for the detailed walkthrough.
 
 ## Version notes (avoid breakage)
 
-The notebook pins `transformers==4.46.3`, `numpy<2`, `pandas<2.3` for stable compatibility
-with the torch+CUDA already on Colab/Kaggle. It does NOT reinstall torch. If Kaggle reports
-a dependency conflict, turn Internet on and re-run the install cell, or use `--no-deps` for
-transformers.
+The fine-tuning notebook pins `transformers==4.46.3`, `numpy<2`, and `pandas<2.3`
+for stable compatibility with the torch+CUDA already on Colab/Kaggle. The
+`sentiment_cv.ipynb` bootstrap uses the project-compatible text-training stack
+(`transformers==5.15.1`, `tokenizers>=0.22,<=0.23.0`) and does not reinstall
+torch. If Kaggle's `torchvision` import is broken, it removes `torchvision` and
+`timm`, which are not needed for text-only PhoBERT training. If Kaggle reports a
+dependency conflict, turn Internet on and run the bootstrap cell in a fresh
+session.
+The CV runner keeps only the final `best/` model and manifest for each fold;
+transient per-epoch checkpoints are removed after evaluation to fit Kaggle's
+working-disk limit. The notebook includes the epoch count in each output
+directory name, so smoke-test and final runs do not share artifacts.
+The bootstrap also verifies that the cloned `develop` branch contains the
+disk-safe checkpoint settings before starting CV; update that branch before
+running the uploaded notebook.
 
 ## Output
 

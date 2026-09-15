@@ -105,6 +105,8 @@ save a new notebook version after the run.
 | Section 8 "newly initialized weights" warning | Normal (fresh classification head) | Ignore, that's expected when fine-tuning |
 | Training very slow (>30 min) | Running on CPU, not GPU | Section 3 must print "CUDA: True" |
 | `wget` fails in section 4 | Kaggle Internet off | Turn Internet on in Settings |
+| `operator torchvision::nms does not exist` or `Trainer` import fails | Kaggle's `torchvision` is incompatible with the installed `torch` | Start a fresh session and rerun the `sentiment_cv.ipynb` bootstrap cell; it pins the text-training stack and removes broken `torchvision` |
+| `No space left on device` while saving a model | Each fold temporarily writes model checkpoints, and reruns can reuse the same output directory | Start a fresh Kaggle session or delete the previous CV output directory, then rerun; CV now keeps only `best/` and includes the epoch count in its output path |
 | Low macro-F1 (<0.5) | Normal for a small, imbalanced seed | Add in-domain labels, or accept it and report honestly |
 
 ---
