@@ -20,9 +20,9 @@ TICKERS: tuple[str, ...] = (
     "VNM",
 )
 
-# Data window: Jan 2020 -> Mar 31 2026
+# Data window: Jan 2020 -> Dec 31 2025
 DATE_START = "2020-01-01"
-DATE_END = "2026-03-31"
+DATE_END = "2025-12-31"
 
 # HOSE session cutoff
 SESSION_CUTOFF = "15:00"
