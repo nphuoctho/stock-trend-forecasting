@@ -300,6 +300,33 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
     df = pd.DataFrame(recs)
     _log(f"[listings] done: {len(df)} rows, {df['url'].nunique()} unique urls")
     return df
+def join_listings_articles(
+    listings: pd.DataFrame, articles: pd.DataFrame
+) -> pd.DataFrame:
+    """Attach article content to every listed ticker without collapsing mappings.
+
+    An article may be listed under multiple tickers. The returned frame therefore
+    keeps one row per ``(ticker, url)`` and only deduplicates article storage rows.
+    """
+    required_listings = {"ticker", "url"}
+    required_articles = {"url", "published_at", "title", "body"}
+    if not required_listings <= set(listings.columns):
+        raise ValueError("listings needs 'ticker' and 'url' columns.")
+    if not required_articles <= set(articles.columns):
+        raise ValueError("articles needs url, published_at, title and body columns.")
+    links = listings.loc[:, ["ticker", "url"]].drop_duplicates(["ticker", "url"])
+    content = articles.drop_duplicates("url", keep="last")
+    return links.merge(content, on="url", how="inner", validate="many_to_one")
+
+
+def load_ticker_articles() -> pd.DataFrame:
+    """Load the persisted listing/content join used by the forecasting panel."""
+    if not config.LISTINGS_PQ.exists() or not config.ARTICLES_PQ.exists():
+        raise FileNotFoundError("Both listings.parquet and articles.parquet are required.")
+    return join_listings_articles(
+        pd.read_parquet(config.LISTINGS_PQ),
+        pd.read_parquet(config.ARTICLES_PQ),
+    )
 
 
 # Article content

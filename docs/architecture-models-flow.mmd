@@ -6,8 +6,7 @@ config:
     rankSpacing: 48
 ---
 %% Tổng quan kiến trúc và pipeline của đồ án tốt nghiệp.
-%% Bản chi tiết về protocol, cổng chất lượng và cổng chống rò rỉ:
-%% thesis-end-to-end-flow.mmd
+%% Bản chi tiết trực quan được lưu trong architecture-models-flow.drawio.
 flowchart TB
   start([Bắt đầu]) --> protocol[Khóa protocol nghiên cứu<br/>10 mã HOSE/VN30 · 2020–2025<br/>next-session · 3 lớp · cutoff 15:00 · seed]
 
@@ -25,15 +24,15 @@ flowchart TB
     subgraph SENT[Nhánh cảm xúc — PhoBERT]
       direction LR
       annotate[Seed CafeF<br/>+ gán nhãn in-domain]
-      agreement[Cohen/Fleiss κ<br/>kiểm tra phân bố lớp]
+      review[Con người rà soát toàn bộ nhãn<br/>LLM chỉ tạo nhãn sơ bộ]
       sent_split[Tách theo thời gian<br/>fine-tune / val / test]
       phobert[PhoBERT-base<br/>vinai/phobert-base<br/>fine-tune 3 lớp]
-      infer[Linear head chính<br/>BiLSTM head so sánh<br/>→ xác suất NEG / NEU / POS]
-      annotate --> agreement --> sent_split --> phobert --> infer
+      infer[Linear head<br/>→ xác suất NEG / NEU / POS]
+      annotate --> review --> sent_split --> phobert --> infer
     end
     subgraph MARKET[Nhánh giá — chuỗi thời gian]
       direction LR
-      technical[Lợi suất, khối lượng<br/>MA · RSI · MACD · OBV · volatility]
+      technical[Lợi suất, khối lượng<br/>MA · volatility]
       price_features[Đặc trưng thị trường<br/>theo mã-ngày]
       technical --> price_features
     end
@@ -42,7 +41,7 @@ flowchart TB
   subgraph S2[3. Căn chỉnh, ghép đặc trưng và gán nhãn]
     direction LR
     cutoff[Cutoff 15:00<br/>tin sau giờ / cuối tuần<br/>→ phiên kế]
-    daily[Tổng hợp sentiment mã-ngày<br/>count · tỷ lệ lớp · mean probability<br/>pos−neg · std · window 1/3/5 · has_news]
+      daily[Tổng hợp sentiment mã-ngày<br/>count · tỷ lệ lớp · mean probability<br/>pos−neg · độ phân tán · has_news]
     panel[Bảng panel mã × ngày<br/>sentiment + market features]
     target[Target<br/>lợi suất phiên kế]
     label[Nhãn UP / FLAT / DOWN<br/>threshold fit trên train từng cửa sổ]
@@ -118,6 +117,6 @@ flowchart TB
   class phobert,infer,technical,price_features,majority,classical,price_lstm,metrics,ablation,ci,robustness,report,demo model;
   class fusion_lstm floor;
   class tft,cross_attention stretch;
-  class annotate,agreement,sent_split,cutoff,label,split,leak_fix proc;
+  class annotate,review,sent_split,cutoff,label,split,leak_fix proc;
   class quality,leak_gate proc;
   class legend note;

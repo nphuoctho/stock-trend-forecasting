@@ -50,9 +50,9 @@ def _tag(frame: pd.DataFrame, name: str) -> pd.DataFrame:
 def _sorted_dates(panel: pd.DataFrame, date_col: str) -> np.ndarray:
     if date_col not in panel.columns:
         raise ValueError(f"panel missing time column '{date_col}'.")
-    dates = pd.to_datetime(panel[date_col], errors="coerce")
-    if dates.isna().any():
-        raise ValueError("Chronological split requires a valid date in every row.")
+    dates = pd.to_datetime(panel[date_col], errors="coerce").dropna()
+    if dates.empty:
+        raise ValueError("Chronological split requires at least one valid target date.")
     return np.sort(np.unique(dates.to_numpy("datetime64[ns]")))
 
 
@@ -66,7 +66,7 @@ def chronological_split(
     *,
     val_frac: float = 0.15,
     test_frac: float = 0.15,
-    date_col: str = "observation_date",
+    date_col: str = "target_date",
 ) -> TimeSplit:
     """Split by date into train < val < test with a locked holdout, no overlap.
 
@@ -101,7 +101,7 @@ def walk_forward_windows(
     val_size: int = 0,
     min_train: int | None = None,
     expanding: bool = True,
-    date_col: str = "observation_date",
+    date_col: str = "target_date",
 ) -> list[TimeSplit]:
     """Build chronological walk-forward windows over unique dates.
 

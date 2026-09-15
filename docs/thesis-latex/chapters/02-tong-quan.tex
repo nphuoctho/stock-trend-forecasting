@@ -237,11 +237,11 @@ của đề tài.
 
 Đánh giá cảm xúc cần được tách khỏi đánh giá dự báo xu hướng. Ở tầng phân loại văn
 bản, mô hình được đánh giá bằng độ chính xác, độ chính xác dương tính, độ bao phủ và F1 theo từng lớp.
-F1 vĩ mô nên được ưu tiên khi số lượng mẫu tích cực, trung tính và tiêu cực không cân
-bằng. Độ chính xác khoảng 93\% của một tập nhỏ không thể được dùng thay thế cho phân tích
-theo lớp hoặc kiểm tra trên thời gian khác. Nếu có nhiều người gán nhãn, độ đồng thuận
-có thể được báo cáo bằng Cohen's kappa hoặc Fleiss' kappa. Các mẫu bất đồng cần được
-ghi nhận và giải thích, không chỉ loại bỏ cho đến khi điểm số tăng.
+F1 vĩ mô nên được ưu tiên khi số lượng mẫu tích cực, trung tính và tiêu cực không cân bằng.
+Độ tin cậy của bộ nhãn được kiểm soát bằng hướng dẫn thống nhất, lưu vết phiên bản,
+kiểm tra nhãn thiếu và rà soát thủ công toàn bộ mẫu bởi một người. Nếu dùng mô hình
+ngôn ngữ lớn để tạo nhãn sơ bộ, các nhãn đó chỉ là đầu vào hỗ trợ và không thay thế
+nhãn đã được con người kiểm tra; không tính độ đồng thuận liên người gán nhãn.
 
 Đầu ra đưa sang nhánh dự báo cũng không nên chỉ là nhãn có xác suất cao nhất. Với mỗi
 bài viết, mô hình tạo vector:

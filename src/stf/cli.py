@@ -13,6 +13,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from stf import config
@@ -213,6 +214,88 @@ def cmd_annotation_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _forecast_smoke_prices(n: int) -> pd.DataFrame:
+    dates = pd.bdate_range("2024-01-02", periods=n)
+    close = pd.Series(
+        100.0 + np.cumsum(np.where(np.arange(n) % 3 == 0, 1.5, -0.4)),
+        dtype="float64",
+    )
+    return pd.DataFrame(
+        {
+            "ticker": "FPT",
+            "time": dates,
+            "open": close - 0.5,
+            "high": close + 1.0,
+            "low": close - 1.0,
+            "close": close,
+            "volume": 1_000_000 + pd.Series(range(n), dtype="int64") * 10_000,
+        }
+    )
+
+
+def cmd_forecast_smoke(args: argparse.Namespace) -> int:
+    """Run the forecasting panel and LSTM path on deterministic local data."""
+
+    from stf.forecasting import (
+        TREND_LABELS,
+        FeatureScaler,
+        assemble,
+        chronological_split,
+        fit_thresholds,
+        label_panel,
+        make_sequences,
+        price_feature_columns,
+    )
+    from stf.forecasting.models import PriceLSTM, fit_lstm
+
+    if args.n < 12:
+        print("forecast-smoke: --n must be at least 12.", file=sys.stderr)
+        return 2
+    if args.window < 1 or args.epochs < 1:
+        print("forecast-smoke: --window and --epochs must be positive.", file=sys.stderr)
+        return 2
+    prices = _forecast_smoke_prices(args.n)
+    dates = prices["time"]
+    news = pd.DataFrame(
+        {
+            "ticker": "FPT",
+            "published_at": dates.dt.strftime("%Y-%m-%d") + " 14:00:00+07:00",
+            "title": "Tin thử nghiệm",
+            "prob_negative": 0.2,
+            "prob_neutral": 0.3,
+            "prob_positive": 0.5,
+        }
+    )
+    panel = assemble(prices, news)
+    split = chronological_split(panel, val_frac=0.2, test_frac=0.2)
+    train_returns = panel.iloc[split.train]["target_return"].dropna().to_numpy()
+    thresholds = fit_thresholds(train_returns)
+    labeled = label_panel(panel, thresholds)
+    feature_cols = price_feature_columns()
+    scaler = FeatureScaler.fit(labeled.iloc[split.train], feature_cols)
+    scaled = scaler.transform(labeled)
+    X, y, meta = make_sequences(scaled, feature_cols, seq_len=args.window)
+    if len(X) == 0:
+        raise RuntimeError("Forecast smoke test produced no finite labeled sequences.")
+    train_dates = set(pd.to_datetime(panel.iloc[split.train]["target_date"]).dropna())
+    val_dates = set(pd.to_datetime(panel.iloc[split.val]["target_date"]).dropna())
+    test_dates = set(pd.to_datetime(panel.iloc[split.test]["target_date"]).dropna())
+    train_mask = meta["target_date"].isin(train_dates).to_numpy()
+    val_mask = meta["target_date"].isin(val_dates).to_numpy()
+    test_mask = meta["target_date"].isin(test_dates).to_numpy()
+    if not train_mask.any():
+        raise RuntimeError("Forecast smoke test produced no training sequences.")
+    net = PriceLSTM(len(feature_cols), hidden=8, num_layers=1, num_classes=len(TREND_LABELS))
+    history = fit_lstm(net, X[train_mask], y[train_mask], epochs=args.epochs, seed=args.seed)
+    print(
+        f"Forecast smoke: panel={len(labeled)} rows | "
+        f"train={len(split.train)} val={len(split.val)} test={len(split.test)} | "
+        f"sequences=train:{train_mask.sum()} val:{val_mask.sum()} test:{test_mask.sum()} | "
+        f"final_loss={history[-1]:.6f}"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="stf", description="Stock Trend Forecasting CLI"
@@ -347,6 +430,16 @@ def main(argv: list[str] | None = None) -> int:
         help="optional CSV path for rows with rater disagreement",
     )
     p_annotation.set_defaults(func=cmd_annotation_check)
+
+    p_forecast_smoke = sub.add_parser(
+        "forecast-smoke",
+        help="run the point-in-time panel and LSTM path on deterministic data",
+    )
+    p_forecast_smoke.add_argument("--n", type=int, default=40)
+    p_forecast_smoke.add_argument("--window", type=int, default=5)
+    p_forecast_smoke.add_argument("--epochs", type=int, default=2)
+    p_forecast_smoke.add_argument("--seed", type=int, default=42)
+    p_forecast_smoke.set_defaults(func=cmd_forecast_smoke)
 
     args = parser.parse_args(argv)
     return args.func(args)

@@ -36,13 +36,19 @@ def parse_cutoff(cutoff: str = config.SESSION_CUTOFF) -> tuple[int, int]:
 def to_local(values, tz: str = config.TIMEZONE) -> pd.Series:
     """Coerce timestamps to a tz-aware Series in the study timezone.
 
-    Naive inputs are localized to ``tz``; tz-aware inputs are converted. Unparseable
-    timestamps become ``NaT`` rather than raising, so callers can report them.
+    Naive inputs are interpreted in ``tz``; aware inputs are converted. Mixed
+    offsets are handled row by row instead of raising.
     """
-    parsed = pd.to_datetime(pd.Series(values).reset_index(drop=True), errors="coerce", utc=False)
-    if parsed.dt.tz is None:
-        return parsed.dt.tz_localize(tz, nonexistent="shift_forward", ambiguous="NaT")
-    return parsed.dt.tz_convert(tz)
+    converted = []
+    for value in pd.Series(values).reset_index(drop=True):
+        parsed = pd.to_datetime(value, errors="coerce")
+        if pd.isna(parsed):
+            converted.append(pd.NaT)
+        elif parsed.tzinfo is None:
+            converted.append(parsed.tz_localize(tz))
+        else:
+            converted.append(parsed.tz_convert(tz))
+    return pd.Series(pd.array(converted, dtype=f"datetime64[ns, {tz}]"))
 
 
 def trading_sessions(prices: pd.DataFrame) -> dict[str, np.ndarray]:
@@ -62,18 +68,17 @@ def trading_sessions(prices: pd.DataFrame) -> dict[str, np.ndarray]:
     return out
 
 
-def session_as_of(dates, cutoff: str = config.SESSION_CUTOFF, tz: str = config.TIMEZONE) -> pd.Series:
-    """Map trading dates to their tz-aware point-in-time anchor (the session's cutoff)."""
+def session_as_of(
+    dates, cutoff: str = config.SESSION_CUTOFF, tz: str = config.TIMEZONE
+) -> pd.Series:
+    """Map trading dates to a tz-aware point-in-time anchor."""
     hour, minute = parse_cutoff(cutoff)
     base = pd.to_datetime(pd.Series(dates).reset_index(drop=True), errors="coerce")
-    stamped = base + pd.Timedelta(hours=hour, minutes=minute)
-    mask = stamped.notna()
-    out = pd.Series(pd.NaT, index=stamped.index, dtype="datetime64[ns]")
-    if mask.any():
-        localized = stamped[mask].dt.tz_localize(tz, nonexistent="shift_forward", ambiguous="NaT")
-        out = out.astype(object)
-        out[mask] = localized
-    return out
+    if base.dt.tz is None:
+        base = base.dt.tz_localize(tz)
+    else:
+        base = base.dt.tz_convert(tz)
+    return base + pd.Timedelta(hours=hour, minutes=minute)
 
 
 def align_news_to_sessions(
@@ -82,43 +87,32 @@ def align_news_to_sessions(
     *,
     cutoff: str = config.SESSION_CUTOFF,
     tz: str = config.TIMEZONE,
+    max_rollforward_days: int = 7,
 ) -> pd.DataFrame:
     """Anchor each news row to the trading session it may first inform.
 
-    Parameters
-    ----------
-    news:
-        Rows with ``ticker`` and ``published_at`` plus any payload columns (title/body,
-        the :data:`PROB_COLS`). Rows are preserved; original columns pass through.
-    prices:
-        Either raw price rows or a prebuilt calendar from :func:`trading_sessions`.
-
-    Returns
-    -------
-    DataFrame
-        The input rows with three added columns:
-
-        ``observation_date``
-            Normalized trading session the row is anchored to (``NaT`` when unmapped).
-        ``as_of``
-            tz-aware cutoff datetime of that session; the earliest moment the row is usable.
-        ``mapping_status``
-            One of ``same_session`` / ``next_session`` (mapped), or ``invalid`` (bad
-            timestamp), ``no_calendar`` (unknown ticker), ``unmapped`` (past last session).
+    Rows that require more than ``max_rollforward_days`` before the first
+    available session are marked ``stale`` and excluded from aggregation.
     """
     if not {"ticker", "published_at"} <= set(news.columns):
         raise ValueError("news must have 'ticker' and 'published_at' columns.")
+    if max_rollforward_days < 0:
+        raise ValueError("max_rollforward_days must be non-negative.")
     calendar = prices if isinstance(prices, dict) else trading_sessions(prices)
     hour, minute = parse_cutoff(cutoff)
-    cutoff_minutes = hour * 60 + minute
+    cutoff_seconds = hour * 3600 + minute * 60
 
     df = news.reset_index(drop=True).copy()
     local = to_local(df["published_at"], tz)
     naive = local.dt.tz_localize(None)
     local_date = naive.dt.normalize()
-    after_cutoff = (naive.dt.hour * 60 + naive.dt.minute) > cutoff_minutes
+    after_cutoff = (
+        naive.dt.hour * 3600
+        + naive.dt.minute * 60
+        + naive.dt.second
+        > cutoff_seconds
+    )
     effective = local_date + pd.to_timedelta(after_cutoff.fillna(False).astype(int), unit="D")
-
     observation = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns]")
     status = pd.Series("invalid", index=df.index, dtype=object)
     valid = local.notna().to_numpy()
@@ -136,8 +130,16 @@ def align_news_to_sessions(
         mapped = row_valid & in_range
         status.iloc[idx[row_valid & ~in_range]] = "unmapped"
         if mapped.any():
-            observation.iloc[idx[mapped]] = sessions[pos[mapped]]
-            status.iloc[idx[mapped]] = "mapped"
+            roll_days = (
+                sessions[pos[mapped]] - eff[mapped]
+            ).astype("timedelta64[D]").astype(int)
+            fresh = mapped.copy()
+            fresh[mapped] = roll_days <= max_rollforward_days
+            stale = mapped & ~fresh
+            status.iloc[idx[stale]] = "stale"
+            if fresh.any():
+                observation.iloc[idx[fresh]] = sessions[pos[fresh]]
+                status.iloc[idx[fresh]] = "mapped"
 
     obs_present = observation.notna()
     same = obs_present & (observation == local_date)
@@ -151,11 +153,26 @@ def align_news_to_sessions(
 
 
 def alignment_report(aligned: pd.DataFrame) -> dict[str, int]:
-    """Summarize mapping outcomes as ``{status: count}`` for coverage/leakage auditing."""
+    """Summarize mapping outcomes for coverage and leakage auditing."""
     counts = aligned["mapping_status"].value_counts().to_dict()
-    report = {status: 0 for status in ("same_session", "next_session", "invalid", "no_calendar", "unmapped")}
+    report = {
+        status: 0
+        for status in (
+            "same_session",
+            "next_session",
+            "invalid",
+            "no_calendar",
+            "unmapped",
+            "stale",
+        )
+    }
     for key, value in counts.items():
         report[str(key)] = int(value)
     report["mapped"] = report["same_session"] + report["next_session"]
-    report["dropped"] = report["invalid"] + report["no_calendar"] + report["unmapped"]
+    report["dropped"] = (
+        report["invalid"]
+        + report["no_calendar"]
+        + report["unmapped"]
+        + report["stale"]
+    )
     return report

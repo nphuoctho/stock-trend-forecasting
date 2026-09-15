@@ -174,10 +174,10 @@ vẫn có thể lệch. Vì vậy, F1 vĩ mô và độ chính xác cân bằng 
 
 \subsection{Chất lượng nhãn trong miền dữ liệu}
 
-Trước khi dùng đầu ra cảm xúc cho dự báo, cần báo cáo quy trình gán nhãn gồm số người
-gán, tiêu chí, số mẫu bất đồng, cách giải quyết bất đồng, Cohen's hoặc Fleiss' kappa và
-phân bố ba lớp. Nếu kappa thấp, phần thảo luận cần chỉ ra những trường hợp ngôn ngữ
-mơ hồ hoặc bài có nhiều sự kiện, không chỉ giữ lại các mẫu dễ gán.
+Trước khi dùng đầu ra cảm xúc cho dự báo, báo cáo phải ghi số người rà soát, tiêu chí,
+số mẫu được rà soát, các trường hợp cần chỉnh sửa và phân bố ba lớp. Mô hình ngôn ngữ
+lớn chỉ tạo nhãn sơ bộ; một người duy nhất kiểm tra toàn bộ mẫu. Do không có người gán
+nhãn thứ hai, quy trình không tính Cohen's hoặc Fleiss' kappa.
 
 \begin{table}[H]
   \centering
@@ -187,12 +187,12 @@ mơ hồ hoặc bài có nhiều sự kiện, không chỉ giữ lại các mẫ
     \toprule
     Chỉ tiêu & Giá trị \\
     \midrule
-    Số người gán nhãn & \textit{Chưa điền} \\
+    Số người rà soát & 1 \\
     Số mẫu được gán & \textit{Chưa điền} \\
     Tỷ lệ NEGATIVE & \textit{Chưa điền} \\
     Tỷ lệ NEUTRAL & \textit{Chưa điền} \\
     Tỷ lệ POSITIVE & \textit{Chưa điền} \\
-    Cohen's hoặc Fleiss' kappa & \textit{Chưa điền} \\
+    Số mẫu cần chỉnh sửa sau nhãn sơ bộ & \textit{Chưa điền} \\
     \bottomrule
   \end{tabular}
 \noindent\textit{Nguồn: Tác giả xây dựng.}

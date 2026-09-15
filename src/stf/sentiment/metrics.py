@@ -30,10 +30,19 @@ def classification_metrics(y_true, y_pred) -> dict:
     p, r, f1, support = precision_recall_fscore_support(
         y_true, y_pred, labels=[0, 1, 2], zero_division=0
     )
+    fixed_labels = [0, 1, 2]
     return {
-        "macro_f1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+        "macro_f1": float(
+            f1_score(
+                y_true,
+                y_pred,
+                average="macro",
+                labels=fixed_labels,
+                zero_division=0,
+            )
+        ),
         "accuracy": float(accuracy_score(y_true, y_pred)),
-        "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
+        "balanced_accuracy": float(np.mean(r)),
         "per_class_f1": {i: float(v) for i, v in enumerate(f1)},
         "per_class_precision": {i: float(v) for i, v in enumerate(p)},
         "per_class_recall": {i: float(v) for i, v in enumerate(r)},
