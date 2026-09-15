@@ -32,7 +32,7 @@ Về kiến trúc, các mô hình được xếp theo từng tầng để tách 
 hỏi về độ phức tạp. Tầng đầu gồm mô hình luôn chọn lớp phổ biến nhất và mô hình ngẫu
 nhiên theo phân bố lớp. Tầng tiếp theo gồm các mô hình cổ điển và LSTM chỉ sử dụng giá.
 Cấu hình cơ sở là LSTM hai nhánh, trong đó nhánh thị trường và nhánh cảm xúc được xử lý
-riêng trước khi ghép biểu diễn và phân loại. Temporal Fusion Transformer được xem là
+riêng trước khi ghép biểu diễn và phân loại. Bộ biến đổi hợp nhất theo thời gian được xem là
 phương án mở rộng khi dữ liệu, tài nguyên và kết quả của cấu hình cơ sở cho phép.
 
 Về phương pháp, đồ án xây dựng quy trình xử lý từ khảo sát tài liệu, thu thập và làm sạch
@@ -43,7 +43,7 @@ mã liên quan. Những bài đề cập nhiều mã được lưu theo quan h�
 thiếu thời điểm hoặc không xác định được mã được đánh dấu và không đưa trực tiếp vào
 bảng đặc trưng chính.
 
-Dữ liệu được chia theo thứ tự thời gian bằng kiểm định cuốn chiếu (walk-forward), có tập
+Dữ liệu được chia theo thứ tự thời gian bằng kiểm định cuốn chiếu (cuốn chiếu theo thời gian), có tập
 kiểm tra cuối được khóa sau khi lựa chọn cấu hình. Bộ chuẩn hóa, bộ điền khuyết, ngưỡng
 tạo nhãn, lựa chọn đặc trưng và các tham số khác chỉ được học từ phần huấn luyện của
 từng cửa sổ. Mô hình có cảm xúc được so sánh với mô hình chỉ dùng giá trên cùng ngày
@@ -59,11 +59,11 @@ PhoBERT và mô hình dự báo chỉ được công bố sau khi hoàn thành h
 giao thức.
 
 Kết quả được tổ chức thành hai tầng. Tầng thứ nhất báo cáo chất lượng phân loại cảm xúc
-bằng accuracy, precision, recall, F1 theo lớp, macro-F1 và ma trận nhầm lẫn. Tầng thứ
-hai báo cáo macro-F1, balanced accuracy, macro OvR-AUC và các chỉ số theo lớp cho bài
+bằng độ chính xác, độ chính xác dương tính, độ bao phủ, F1 theo lớp, F1 vĩ mô và ma trận nhầm lẫn. Tầng thứ
+hai báo cáo F1 vĩ mô, độ chính xác cân bằng, AUC-ROC một-chống-còn-lại và các chỉ số theo lớp cho bài
 toán dự báo, cùng chênh lệch giữa hai cấu hình loại bỏ đặc trưng. Khi số cửa sổ đủ lớn,
-độ không chắc chắn của chênh lệch có thể được ước lượng bằng bootstrap theo khối ngày
-hoặc theo fold.
+độ không chắc chắn của chênh lệch có thể được ước lượng bằng lấy mẫu lặp theo khối ngày
+hoặc theo phần chia.
 
 Đồ án không đặt trước giả định rằng tín hiệu cảm xúc chắc chắn cải thiện dự báo. Tin
 tức có thể yếu, xuất hiện trễ, đã được thị trường biết trước, phản ánh lại biến động
