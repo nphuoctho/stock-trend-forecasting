@@ -125,6 +125,7 @@ def run_cross_validation(
         "train_config": asdict(cfg),
         "fold_results": fold_results,
         "aggregate": aggregate,
+        "reproducibility": model.reproducibility_metadata(),
     }
     metrics.to_csv(out_dir / "cv_results.csv", index=False)
     (out_dir / "cv_results.json").write_text(
