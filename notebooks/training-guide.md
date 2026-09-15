@@ -3,11 +3,11 @@
 Có hai notebook cho hai mục đích:
 
 - `phobert_finetune.ipynb`: huấn luyện PhoBERT cơ bản và xuất checkpoint.
-- `sentiment_cv_colab.ipynb`: chạy so sánh biến thể đầu vào/cắt token với 5-fold
+- `sentiment_cv.ipynb`: chạy so sánh biến thể đầu vào/cắt token với 5-fold
   cross-validation và lưu kết quả vào Google Drive.
 
 Phần dưới đây hướng dẫn notebook huấn luyện cơ bản; khi cần lấy kết quả so sánh
-theo góp ý GVHD, dùng `sentiment_cv_colab.ipynb`.
+theo góp ý GVHD, dùng `sentiment_cv.ipynb`.
 
 ---
 
@@ -15,7 +15,7 @@ theo góp ý GVHD, dùng `sentiment_cv_colab.ipynb`.
 
 ### Step 1: Open the notebook
 1. Go to https://colab.research.google.com.
-2. Upload `sentiment_cv_colab.ipynb` for the 5-fold input/truncation experiments,
+2. Upload `sentiment_cv.ipynb` for the 5-fold input/truncation experiments,
    or `phobert_finetune.ipynb` for the basic single-split training run.
 ### Step 2: Enable the GPU (required)
 1. Menu **Runtime > Change runtime type**.
@@ -77,7 +77,7 @@ If the session dies during training (free-tier timeout, lost network), you don't
 
 ### Step 1: Create or import the notebook
 1. Go to https://www.kaggle.com/code > New Notebook.
-2. Import `sentiment_cv_colab.ipynb` for the cross-validation experiment, or
+2. Import `sentiment_cv.ipynb` for the cross-validation experiment, or
    `phobert_finetune.ipynb` for the basic training run.
 3. In the notebook, attach the dataset
    `phuocthoai/stock-trend-forecasting`; the code finds `labeled.csv` and
