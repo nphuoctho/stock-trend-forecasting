@@ -17,7 +17,7 @@ Transformer (PhoBERT) sentiment branch with a time-series price branch. Market: 
 ```
 src/stf/                 main package
   config.py              central config: tickers, date window, paths
-  cli.py                 CLI: prices | news | verify | sentiment-smoke | sentiment-train
+  cli.py                 CLI: prices | news | verify | sentiment-* commands
   data/
     prices.py            adjusted OHLCV loader (vnstock/VCI)
     news.py              Vietstock scraper: timestamp + title + body

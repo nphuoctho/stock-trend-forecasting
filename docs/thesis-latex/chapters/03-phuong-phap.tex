@@ -57,7 +57,7 @@ $K$ và giá trị $V$, phép chú ý tích vô hướng có điều chỉnh đ�
 \end{equation}
 
 trong đó $d_k$ là số chiều của khóa. Phép chia cho $\sqrt{d_k}$ giúp giữ độ lớn của
-tích vô hướng trong khoảng ổn định trước khi áp dụng softmax. Multi-tầng phân loại chú ý
+tích vô hướng trong khoảng ổn định trước khi áp dụng softmax. Chú ý nhiều đầu
 thực hiện nhiều phép chiếu song song rồi ghép kết quả, nhờ đó mô hình có thể học các
 kiểu quan hệ khác nhau giữa các token. Trong mô hình ngôn ngữ, mỗi token được biểu diễn
 theo ngữ cảnh của toàn bộ câu. Điều này đặc biệt hữu ích với tin tài chính, vì ý nghĩa
@@ -555,7 +555,7 @@ luật từ dữ liệu, nhưng cần thiết để kiểm tra một kiến trú
 
 \subsection{Tầng mô hình cổ điển chỉ giá}
 
-hồi quy logistic, Đối chứng ngẫu nhiên Forest và XGBoost chỉ nhận vector đặc trưng giá. Các mô
+hồi quy logistic, rừng ngẫu nhiên và XGBoost chỉ nhận vector đặc trưng giá. Các mô
 hình này tạo mốc phi tuần tự để kiểm tra đặc trưng engineering và cho biết dữ liệu có tín
 hiệu đủ rõ trước khi dùng mô hình sâu hay không. Chúng không được nhận bất kỳ cột
 cảm xúc nào, kể cả số tin, cờ có tin hoặc siêu dữ liệu phát sinh từ văn bản. Siêu tham số

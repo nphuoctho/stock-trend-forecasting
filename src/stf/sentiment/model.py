@@ -9,6 +9,7 @@ manifest for reproducibility.
 from __future__ import annotations
 
 import json
+import math
 import random
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -35,7 +36,7 @@ class TrainConfig:
     batch_size: int = 16
     lr: float = 2e-5
     weight_decay: float = 0.01
-    warmup_steps: int = 50
+    warmup_ratio: float = 0.1
     seed: int = 42
     class_weighting: str = "none"
 
@@ -71,6 +72,95 @@ def get_device() -> str:
     import torch
 
     return "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def bounded_warmup_steps(
+    num_examples: int,
+    batch_size: int,
+    epochs: float,
+    warmup_ratio: float,
+) -> int:
+    """Warmup steps as a fraction of total optimizer steps, capped at the total.
+
+    Replaces a fixed ``warmup_steps`` that could silently exceed the number of
+    optimizer steps on small datasets (producing a warmup that never ends).
+    Returns an integer in ``[0, total_steps]``.
+    """
+    if not 0.0 <= warmup_ratio <= 1.0:
+        raise ValueError("warmup_ratio must be between 0 and 1.")
+    if num_examples < 1 or batch_size < 1:
+        raise ValueError("num_examples and batch_size must be at least 1.")
+    if epochs <= 0:
+        raise ValueError("epochs must be positive.")
+    steps_per_epoch = math.ceil(num_examples / batch_size)
+    total_steps = max(1, math.ceil(steps_per_epoch * epochs))
+    warmup = round(total_steps * warmup_ratio)
+    return max(0, min(warmup, total_steps))
+
+
+def _load_manifest(model_dir: Path) -> dict | None:
+    """Load the training manifest for a checkpoint, if one exists.
+
+    ``fine_tune`` saves the model under ``<out_dir>/best`` and the manifest at
+    ``<out_dir>/manifest.json``, so both the checkpoint dir and its parent are
+    checked.
+    """
+    model_dir = Path(model_dir)
+    for candidate in (model_dir / "manifest.json", model_dir.parent / "manifest.json"):
+        if candidate.is_file():
+            try:
+                return json.loads(candidate.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                return None
+    return None
+
+
+def resolve_truncation_strategy(
+    model_dir: Path, override: str | None = None
+) -> str:
+    """Pick the truncation strategy for inference on a checkpoint.
+
+    An explicit, valid ``override`` always wins. Otherwise the strategy saved in
+    the checkpoint manifest is used, so inference matches training. Falls back to
+    ``"head"`` only when no manifest strategy is available.
+    """
+    if override is not None:
+        if override not in TRUNCATION_STRATEGIES:
+            raise ValueError(
+                f"Unknown truncation strategy {override!r}; "
+                f"expected one of {TRUNCATION_STRATEGIES}."
+            )
+        return override
+    manifest = _load_manifest(model_dir)
+    if manifest:
+        saved = manifest.get("config", {}).get("truncation_strategy")
+        if saved in TRUNCATION_STRATEGIES:
+            return saved
+    return "head"
+
+
+def reproducibility_metadata() -> dict:
+    """Data-independent environment metadata for manifests.
+
+    Records the interpreter and key library versions so a run can be
+    reconstructed. Contains no secrets, paths, or fabricated hashes; unavailable
+    optional libraries are simply omitted.
+    """
+    import platform
+
+    meta: dict = {
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "numpy": np.__version__,
+    }
+    for name, module in (("transformers", "transformers"), ("torch", "torch")):
+        try:
+            meta[name] = __import__(module).__version__
+        except Exception:  # noqa: BLE001 - optional at metadata time
+            pass
+    return meta
+
+
 def truncate_token_ids(
     token_ids: list[int], max_len: int, strategy: str
 ) -> list[int]:
@@ -214,6 +304,10 @@ def fine_tune(
         cfg.truncation_strategy,
     )
 
+    warmup_steps = bounded_warmup_steps(
+        len(split.train), cfg.batch_size, cfg.epochs, cfg.warmup_ratio
+    )
+
     args = TrainingArguments(
         output_dir=str(out_dir / "checkpoints"),
         num_train_epochs=cfg.epochs,
@@ -221,7 +315,7 @@ def fine_tune(
         per_device_eval_batch_size=cfg.batch_size,
         learning_rate=cfg.lr,
         weight_decay=cfg.weight_decay,
-        warmup_steps=cfg.warmup_steps,
+        warmup_steps=warmup_steps,
         eval_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
@@ -284,6 +378,7 @@ def fine_tune(
     manifest = {
         "config": asdict(cfg),
         "device": device,
+        "warmup_steps": warmup_steps,
         "class_weights": class_weights.tolist() if class_weights is not None else None,
         "split_sizes": {
             "train": len(split.train),
@@ -291,6 +386,7 @@ def fine_tune(
             "test": len(split.test),
         },
         "test_metrics": test_metrics,
+        "reproducibility": reproducibility_metadata(),
     }
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -303,9 +399,14 @@ def predict_proba(
     model_dir: Path | None = None,
     *,
     batch_size: int = 32,
-    truncation_strategy: str = "head",
+    truncation_strategy: str | None = None,
 ) -> np.ndarray:
-    """Return one probability row per input text."""
+    """Return one probability row per input text.
+
+    When ``truncation_strategy`` is ``None`` the strategy saved in the
+    checkpoint manifest is used so inference matches training; pass an explicit
+    strategy to override it.
+    """
     if batch_size < 1:
         raise ValueError("batch_size must be at least 1.")
     texts = list(texts)
@@ -315,6 +416,7 @@ def predict_proba(
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
     model_dir = model_dir or (config.SENTIMENT_DIR / "best")
+    strategy = resolve_truncation_strategy(model_dir, truncation_strategy)
     device = get_device()
     tokenizer = AutoTokenizer.from_pretrained(str(model_dir), use_fast=True)
     model = AutoModelForSequenceClassification.from_pretrained(str(model_dir)).to(
@@ -331,7 +433,7 @@ def predict_proba(
                 [0] * len(batch),
                 tokenizer,
                 MAX_LEN,
-                truncation_strategy,
+                strategy,
             )
             enc = tokenizer.pad(
                 tokenized.enc,

@@ -1,0 +1,359 @@
+"""Forecasting core tests - offline, deterministic, no model downloads.
+
+Focus: point-in-time correctness. The feature causality tests fail if any future price
+value leaks into a feature column.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from stf.forecasting import calendar as cal
+from stf.forecasting.features import price_feature_columns, price_features
+from stf.forecasting.labels import add_target, apply_labels, fit_thresholds, label_panel
+from stf.forecasting.models import (
+    MajorityBaseline,
+    PriceLSTM,
+    PriceSentimentLSTM,
+    RandomBaseline,
+    fit_lstm,
+    make_sequences,
+    make_two_branch_sequences,
+)
+from stf.forecasting.panel import assemble, build_panel
+from stf.forecasting.sentiment_agg import daily_sentiment
+from stf.forecasting.split import chronological_split, walk_forward_windows
+
+# --- fixtures -------------------------------------------------------------------------
+
+
+def _prices(ticker: str = "FPT", n: int = 40, start: str = "2021-01-04") -> pd.DataFrame:
+    """Business-day OHLCV with a deterministic drifting close."""
+    dates = pd.bdate_range(start=start, periods=n)
+    close = 100.0 + np.arange(n, dtype=float) + np.sin(np.arange(n)) * 2.0
+    return pd.DataFrame(
+        {
+            "ticker": ticker,
+            "time": dates,
+            "open": close - 0.5,
+            "high": close + 1.0,
+            "low": close - 1.0,
+            "close": close,
+            "volume": 1_000_000 + np.arange(n) * 1_000,
+        }
+    )
+
+
+# --- calendar / cutoff mapping --------------------------------------------------------
+
+
+def test_before_cutoff_maps_to_same_session():
+    prices = _prices(n=10)  # starts Mon 2021-01-04
+    news = pd.DataFrame(
+        {
+            "ticker": ["FPT"],
+            "published_at": ["2021-01-05T14:00:00+07:00"],  # Tuesday, before 15:00
+            "prob_negative": [0.1],
+            "prob_neutral": [0.2],
+            "prob_positive": [0.7],
+        }
+    )
+    aligned = cal.align_news_to_sessions(news, prices)
+    assert aligned.loc[0, "mapping_status"] == "same_session"
+    assert aligned.loc[0, "observation_date"] == pd.Timestamp("2021-01-05")
+
+
+def test_after_cutoff_rolls_to_next_session():
+    prices = _prices(n=10)
+    news = pd.DataFrame(
+        {
+            "ticker": ["FPT"],
+            "published_at": ["2021-01-05T16:00:00+07:00"],  # Tuesday, after 15:00
+            "prob_negative": [0.1],
+            "prob_neutral": [0.2],
+            "prob_positive": [0.7],
+        }
+    )
+    aligned = cal.align_news_to_sessions(news, prices)
+    assert aligned.loc[0, "mapping_status"] == "next_session"
+    assert aligned.loc[0, "observation_date"] == pd.Timestamp("2021-01-06")  # Wednesday
+
+
+def test_weekend_news_maps_to_next_trading_session():
+    prices = _prices(n=10)
+    news = pd.DataFrame(
+        {
+            "ticker": ["FPT"],
+            "published_at": ["2021-01-09T10:00:00+07:00"],  # Saturday
+            "prob_negative": [0.1],
+            "prob_neutral": [0.2],
+            "prob_positive": [0.7],
+        }
+    )
+    aligned = cal.align_news_to_sessions(news, prices)
+    assert aligned.loc[0, "mapping_status"] == "next_session"
+    assert aligned.loc[0, "observation_date"] == pd.Timestamp("2021-01-11")  # Monday
+
+
+def test_out_of_calendar_and_invalid_are_reported_not_kept():
+    prices = _prices(n=5)  # last session 2021-01-08
+    news = pd.DataFrame(
+        {
+            "ticker": ["FPT", "FPT", "ZZZ"],
+            "published_at": ["2021-06-01T09:00:00+07:00", "not-a-date", "2021-01-05T09:00:00+07:00"],
+            "prob_negative": [0.3, 0.3, 0.3],
+            "prob_neutral": [0.4, 0.4, 0.4],
+            "prob_positive": [0.3, 0.3, 0.3],
+        }
+    )
+    aligned = cal.align_news_to_sessions(news, prices)
+    statuses = aligned["mapping_status"].tolist()
+    assert statuses == ["unmapped", "invalid", "no_calendar"]
+    report = cal.alignment_report(aligned)
+    assert report["mapped"] == 0
+    assert report["dropped"] == 3
+    # None of the dropped rows carry an observation date.
+    assert aligned["observation_date"].isna().all()
+
+
+# --- price feature causality (leakage guard) ------------------------------------------
+
+
+def test_rolling_features_use_only_current_and_past_rows():
+    prices = _prices(n=20)
+    base = price_features(prices, ma_window=5, vol_window=5)
+
+    # Mutate ONLY the last close far into the future direction.
+    tampered = prices.copy()
+    tampered.loc[tampered.index[-1], "close"] = 10_000.0
+    after = price_features(tampered, ma_window=5, vol_window=5)
+
+    feat_cols = price_feature_columns(5, 5)
+    # Every row except the final one must be untouched: a future close cannot change them.
+    head_base = base.iloc[:-1][feat_cols].to_numpy()
+    head_after = after.iloc[:-1][feat_cols].to_numpy()
+    np.testing.assert_allclose(np.nan_to_num(head_base), np.nan_to_num(head_after))
+    # The final row's features DO change (it legitimately depends on that close).
+    assert not np.allclose(
+        np.nan_to_num(base.iloc[-1][feat_cols].to_numpy(dtype=float)),
+        np.nan_to_num(after.iloc[-1][feat_cols].to_numpy(dtype=float)),
+    )
+
+
+def test_early_rows_lack_history_and_are_nan():
+    prices = _prices(n=10)
+    feats = price_features(prices, ma_window=5, vol_window=5)
+    # First row has no prior close -> return/log/vol_change NaN; rolling needs 5 rows.
+    assert np.isnan(feats.iloc[0]["ret_1d"])
+    assert np.isnan(feats.iloc[0]["log_ret_1d"])
+    assert np.isnan(feats.iloc[3][f"ma_ratio_5"])
+    assert np.isfinite(feats.iloc[4][f"ma_ratio_5"])
+
+
+def test_target_return_matches_next_session_close_ratio():
+    prices = _prices(n=6)
+    feats = price_features(prices)
+    with_target = add_target(feats)
+    close = prices.sort_values("time")["close"].to_numpy()
+    expected = close[1] / close[0] - 1.0
+    assert with_target.iloc[0]["target_return"] == pytest.approx(expected)
+    assert with_target.iloc[0]["target_date"] == pd.Timestamp(
+        prices.sort_values("time")["time"].iloc[1]
+    ).normalize()
+    # Last row has no next session.
+    assert np.isnan(with_target.iloc[-1]["target_return"])
+
+
+# --- train-only thresholds ------------------------------------------------------------
+
+
+def test_thresholds_fit_on_train_only_and_apply_without_refit():
+    train_returns = np.linspace(-0.05, 0.05, 61)  # symmetric, deterministic
+    q_low, q_high = fit_thresholds(train_returns, low_q=1 / 3, high_q=2 / 3)
+    assert q_low == pytest.approx(np.quantile(train_returns, 1 / 3))
+    assert q_high == pytest.approx(np.quantile(train_returns, 2 / 3))
+
+    # Applying to unrelated test returns must reuse the fitted thresholds, not refit.
+    test_returns = np.array([q_low - 1.0, 0.0, q_high + 1.0, np.nan])
+    labels = apply_labels(test_returns, (q_low, q_high))
+    assert labels[0] == "DOWN"
+    assert labels[1] == "FLAT"
+    assert labels[2] == "UP"
+    assert labels[3] is None
+
+
+def test_label_panel_keeps_missing_target_as_na():
+    prices = _prices(n=8)
+    panel = build_panel(prices)
+    thresholds = fit_thresholds(panel["target_return"].dropna().to_numpy())
+    labeled = label_panel(panel, thresholds)
+    # Last row per ticker has NaN target_return -> label stays NA.
+    assert pd.isna(labeled.iloc[-1]["target_label"])
+    assert labeled["target_label"].notna().sum() == panel["target_return"].notna().sum()
+
+
+# --- sentiment aggregation / no-news distinction --------------------------------------
+
+
+def test_no_news_day_is_distinguishable_from_neutral_news_day():
+    prices = _prices(n=12)
+    # One neutral-news article on 2021-01-06 (before cutoff).
+    news = pd.DataFrame(
+        {
+            "ticker": ["FPT"],
+            "published_at": ["2021-01-06T09:00:00+07:00"],
+            "prob_negative": [0.2],
+            "prob_neutral": [0.6],
+            "prob_positive": [0.2],
+        }
+    )
+    panel = assemble(prices, news)
+    news_row = panel[panel["observation_date"] == pd.Timestamp("2021-01-06")].iloc[0]
+    quiet_row = panel[panel["observation_date"] == pd.Timestamp("2021-01-07")].iloc[0]
+
+    assert news_row["has_news"] == 1 and news_row["news_count"] == 1
+    assert news_row["sent_prob_neutral_mean"] == pytest.approx(0.6)
+
+    # No-news day: neutral prior, zeroed counts, has_news 0 -> clearly distinct.
+    assert quiet_row["has_news"] == 0 and quiet_row["news_count"] == 0
+    assert quiet_row["sent_prob_neutral_mean"] == pytest.approx(1.0)
+    assert quiet_row["sent_prob_positive_mean"] == pytest.approx(0.0)
+
+
+def test_daily_sentiment_drops_unmapped_and_invalid_rows():
+    aligned = pd.DataFrame(
+        {
+            "ticker": ["FPT", "FPT"],
+            "observation_date": [pd.NaT, pd.Timestamp("2021-01-05")],
+            "mapping_status": ["unmapped", "same_session"],
+            "prob_negative": [0.1, 0.1],
+            "prob_neutral": [0.1, 0.2],
+            "prob_positive": [0.8, 0.7],
+        }
+    )
+    daily = daily_sentiment(aligned)
+    assert len(daily) == 1
+    assert daily.iloc[0]["observation_date"] == pd.Timestamp("2021-01-05")
+    assert daily.iloc[0]["sent_pos_ratio"] == pytest.approx(1.0)
+
+
+# --- chronological / walk-forward splits ----------------------------------------------
+
+
+def test_chronological_split_is_ordered_and_non_overlapping():
+    prices = _prices(n=30)
+    panel = build_panel(prices)
+    split = chronological_split(panel, val_frac=0.2, test_frac=0.2)
+    train, val, test = split.frames(panel)
+
+    assert train["observation_date"].max() < val["observation_date"].min()
+    assert val["observation_date"].max() < test["observation_date"].min()
+    # Positional indices are disjoint and cover every row exactly once.
+    idx = np.concatenate([split.train, split.val, split.test])
+    assert len(idx) == len(np.unique(idx)) == len(panel)
+
+
+def test_split_keeps_same_day_rows_together():
+    prices = pd.concat([_prices("FPT", n=20), _prices("VNM", n=20)], ignore_index=True)
+    panel = build_panel(prices)
+    split = chronological_split(panel, val_frac=0.2, test_frac=0.2)
+    tagged = split.assign_split(panel)
+    # Every observation_date belongs to exactly one split partition.
+    per_date = tagged.groupby("observation_date")["split"].nunique()
+    assert (per_date == 1).all()
+
+
+def test_walk_forward_windows_are_chronological_and_expanding():
+    prices = _prices(n=40)
+    panel = build_panel(prices)
+    windows = walk_forward_windows(
+        panel, n_windows=3, test_size=4, val_size=2, min_train=10, expanding=True
+    )
+    assert len(windows) == 3
+    prev_train = -1
+    for w in windows:
+        tr, va, te = w.frames(panel)
+        assert tr["observation_date"].max() < va["observation_date"].min()
+        assert va["observation_date"].max() < te["observation_date"].min()
+        # Expanding: each window's train set is at least as large as the previous.
+        assert len(tr) >= prev_train
+        prev_train = len(tr)
+
+
+# --- models ---------------------------------------------------------------------------
+
+
+def _labeled_panel(n: int = 40) -> pd.DataFrame:
+    prices = _prices(n=n)
+    panel = build_panel(prices)
+    thresholds = fit_thresholds(panel["target_return"].dropna().to_numpy())
+    return label_panel(panel, thresholds)
+
+
+def test_make_sequences_shapes_and_no_cross_ticker_mixing():
+    prices = pd.concat([_prices("FPT", n=30), _prices("VNM", n=30)], ignore_index=True)
+    panel = build_panel(prices)
+    thresholds = fit_thresholds(panel["target_return"].dropna().to_numpy())
+    panel = label_panel(panel, thresholds)
+    cols = price_feature_columns()
+    X, y, meta = make_sequences(panel, cols, seq_len=5)
+    assert X.shape[1:] == (5, len(cols))
+    assert X.shape[0] == y.shape[0] == len(meta)
+    assert np.isfinite(X).all()  # no NaN windows leak through
+    assert set(meta["ticker"]) <= {"FPT", "VNM"}
+
+
+def test_price_lstm_output_shape():
+    cols = price_feature_columns()
+    panel = _labeled_panel()
+    X, y, _ = make_sequences(panel, cols, seq_len=5)
+    model = PriceLSTM(n_features=len(cols), hidden=8)
+    logits = model(__import__("torch").as_tensor(X))
+    assert logits.shape == (X.shape[0], 3)
+
+
+def test_two_branch_lstm_output_shape():
+    import torch
+
+    price_cols = price_feature_columns()
+    sent_cols = ["sent_prob_negative_mean", "sent_prob_positive_mean", "sent_pos_minus_neg"]
+    panel = _labeled_panel()
+    Xp, Xs, y, meta = make_two_branch_sequences(panel, price_cols, sent_cols, seq_len=5)
+    assert Xp.shape[0] == Xs.shape[0] == y.shape[0] == len(meta)
+    model = PriceSentimentLSTM(n_price=len(price_cols), n_sent=len(sent_cols), hidden=8)
+    logits = model(torch.as_tensor(Xp), torch.as_tensor(Xs))
+    assert logits.shape == (Xp.shape[0], 3)
+
+
+def test_two_branch_forward_rejects_mismatched_windows():
+    import torch
+
+    model = PriceSentimentLSTM(n_price=2, n_sent=2, hidden=4)
+    price = torch.zeros((3, 5, 2))
+    sent = torch.zeros((3, 4, 2))  # wrong seq_len
+    with pytest.raises(ValueError, match="seq_len"):
+        model(price, sent)
+
+
+def test_baselines_are_deterministic():
+    labels = ["UP", "UP", "UP", "FLAT", "DOWN"]
+    majority = MajorityBaseline().fit(labels)
+    assert majority.predict(4).tolist() == [2, 2, 2, 2]  # UP == id 2
+
+    rand_a = RandomBaseline(seed=7).fit(labels).predict(10)
+    rand_b = RandomBaseline(seed=7).fit(labels).predict(10)
+    np.testing.assert_array_equal(rand_a, rand_b)  # same seed -> same draws
+
+
+def test_fit_lstm_runs_real_gradient_steps():
+    cols = price_feature_columns()
+    panel = _labeled_panel()
+    X, y, _ = make_sequences(panel, cols, seq_len=5)
+    model = PriceLSTM(n_features=len(cols), hidden=8)
+    history = fit_lstm(model, X, y, epochs=6, lr=0.05, seed=0)
+    assert len(history) == 6
+    assert all(np.isfinite(history))
+    # A real optimizer on separable-ish synthetic data reduces the loss.
+    assert history[-1] < history[0]

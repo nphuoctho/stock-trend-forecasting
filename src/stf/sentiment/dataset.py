@@ -20,6 +20,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from stf import config
 from stf.sentiment.labels import LABEL2ID
 
 INPUT_VARIANTS: tuple[str, ...] = ("title", "context", "title_context")
@@ -155,6 +156,35 @@ def load_labeled(path: str | Path) -> pd.DataFrame:
     return normalize_labels(df)
 
 
+def resolve_time_column(df: pd.DataFrame) -> pd.Series:
+    """Return timezone-aware timestamps to drive a time-aware split.
+
+    Prefers an existing ``date`` column, otherwise normalizes ``published_at``
+    into the study timezone. Raises loudly when neither column yields a valid
+    timestamp for every row, so a requested time-aware split never silently
+    degrades into a random split (a look-ahead leakage risk).
+    """
+    if "date" in df.columns:
+        source, name = df["date"], "date"
+    elif "published_at" in df.columns:
+        source, name = df["published_at"], "published_at"
+    else:
+        raise ValueError(
+            "Time-aware split requires a 'date' or 'published_at' column; "
+            "pass time_aware=False to request a random split explicitly."
+        )
+    dates = pd.to_datetime(source, errors="coerce")
+    if dates.isna().any():
+        raise ValueError(
+            f"Time-aware split requires a valid timestamp in every '{name}' row."
+        )
+    if dates.dt.tz is None:
+        dates = dates.dt.tz_localize(config.TIMEZONE)
+    else:
+        dates = dates.dt.tz_convert(config.TIMEZONE)
+    return dates
+
+
 def make_split(
     df: pd.DataFrame,
     *,
@@ -180,12 +210,12 @@ def make_split(
     if n - n_val - n_test < 1:
         raise ValueError("Dataset is too small for train, validation and test splits.")
 
-    if time_aware and "date" in df.columns:
-        dates = pd.to_datetime(df["date"], errors="coerce")
-        if dates.isna().any():
-            raise ValueError("Time-aware splits require valid dates in every row.")
-        df = df.assign(_split_date=dates).sort_values("_split_date").drop(
-            columns="_split_date"
+    if time_aware:
+        dates = resolve_time_column(df)
+        df = (
+            df.assign(date=dates)
+            .sort_values("date", kind="stable")
+            .reset_index(drop=True)
         )
         train_end = n - n_val - n_test
         val_end = n - n_test

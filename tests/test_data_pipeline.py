@@ -5,6 +5,8 @@ uv run pytest tests/test_data_pipeline.py -q
 
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 import pytest
 
@@ -15,6 +17,7 @@ from stf.sentiment.dataset import (
     build_input_text,
     make_split,
     normalize_labels,
+    resolve_time_column,
 )
 from stf.sentiment.experiments import make_stratified_folds
 from stf.sentiment.metrics import classification_metrics, fleiss_kappa
@@ -69,6 +72,54 @@ def test_truncation_strategies_preserve_requested_regions():
     assert model.truncate_token_ids(tokens, 4, "head") == [0, 1, 2, 3]
     assert model.truncate_token_ids(tokens, 4, "tail") == [6, 7, 8, 9]
     assert model.truncate_token_ids(tokens, 4, "head_tail") == [0, 1, 8, 9]
+
+
+def test_resolve_truncation_strategy_reads_checkpoint_manifest(tmp_path):
+    out_dir = tmp_path / "run"
+    model_dir = out_dir / "best"
+    model_dir.mkdir(parents=True)
+    (out_dir / "manifest.json").write_text(
+        json.dumps({"config": {"truncation_strategy": "tail"}}), encoding="utf-8"
+    )
+    assert model.resolve_truncation_strategy(model_dir) == "tail"
+
+
+def test_resolve_truncation_strategy_override_wins_over_manifest(tmp_path):
+    out_dir = tmp_path / "run"
+    model_dir = out_dir / "best"
+    model_dir.mkdir(parents=True)
+    (out_dir / "manifest.json").write_text(
+        json.dumps({"config": {"truncation_strategy": "tail"}}), encoding="utf-8"
+    )
+    assert model.resolve_truncation_strategy(model_dir, "head_tail") == "head_tail"
+
+
+def test_resolve_truncation_strategy_defaults_to_head_without_manifest(tmp_path):
+    model_dir = tmp_path / "best"
+    model_dir.mkdir()
+    assert model.resolve_truncation_strategy(model_dir) == "head"
+
+
+def test_resolve_truncation_strategy_rejects_invalid_override(tmp_path):
+    model_dir = tmp_path / "best"
+    model_dir.mkdir()
+    with pytest.raises(ValueError, match="Unknown truncation strategy"):
+        model.resolve_truncation_strategy(model_dir, "middle")
+
+
+def test_bounded_warmup_steps_scales_with_ratio():
+    # 100 examples, batch 10 -> 10 steps/epoch * 5 epochs = 50 total steps.
+    assert model.bounded_warmup_steps(100, 10, 5, 0.1) == 5
+
+
+def test_bounded_warmup_steps_caps_at_total_when_ratio_is_one():
+    # 5 examples, batch 2 -> 3 steps/epoch * 1 epoch = 3 total steps.
+    assert model.bounded_warmup_steps(5, 2, 1, 1.0) == 3
+
+
+def test_bounded_warmup_steps_rejects_out_of_range_ratio():
+    with pytest.raises(ValueError, match="warmup_ratio"):
+        model.bounded_warmup_steps(100, 10, 1, 1.5)
 def test_compute_class_weights_uses_training_class_frequencies():
     weights = model.compute_class_weights([0, 0, 1, 2, 2, 2])
     assert weights.tolist() == pytest.approx([1.0, 2.0, 2.0 / 3.0])
@@ -170,6 +221,31 @@ def test_extract_body_handles_nested_markup_and_attribute_order():
     assert news.extract_body(html) == "Nội dung lồng nhau ."
 
 
+def test_clean_html_strips_style_and_script_blocks():
+    html = (
+        "<style>.pTitle{color:red}</style>"
+        "<script>trackClick();</script>"
+        "<p>N\u1ed9i dung s\u1ea1ch.</p>"
+    )
+    assert news.clean_html(html) == "N\u1ed9i dung s\u1ea1ch."
+
+
+def test_clean_html_returns_none_for_markup_only_input():
+    assert news.clean_html("<style>.a{color:red}</style>") is None
+    assert news.clean_html(None) is None
+
+
+def test_extract_body_drops_inline_style_block_from_vst_detail():
+    html = (
+        "<html><body>"
+        '<div itemprop="articleBody" id="vst_detail">'
+        "<style>.pBody{font-size:14px}</style>"
+        "<p>Tin t\u1ee9c kh\u00f4ng d\u00ednh CSS.</p>"
+        "</div></body></html>"
+    )
+    assert news.extract_body(html) == "Tin t\u1ee9c kh\u00f4ng d\u00ednh CSS."
+
+
 
 def test_normalize_labels_accepts_numeric_strings():
     normalized = normalize_labels(pd.DataFrame({"label": ["0", "NEUTRAL", 2]}))
@@ -194,6 +270,53 @@ def test_time_split_keeps_chronological_order():
     split = make_split(frame, time_aware=True)
     assert split.train["date"].max() < split.val["date"].min()
     assert split.val["date"].max() < split.test["date"].min()
+
+
+def test_time_aware_split_fails_loudly_without_date_or_published_at():
+    frame = pd.DataFrame(
+        {
+            "text": [f"tin {i}" for i in range(20)],
+            "label_id": [i % 3 for i in range(20)],
+        }
+    )
+    with pytest.raises(ValueError, match="Time-aware split requires"):
+        make_split(frame, time_aware=True)
+
+
+def test_time_aware_split_fails_loudly_on_unparseable_dates():
+    frame = pd.DataFrame(
+        {
+            "text": [f"tin {i}" for i in range(5)],
+            "label_id": [i % 3 for i in range(5)],
+            "date": ["2024-01-01", "not-a-date", "2024-01-03", "2024-01-04", "2024-01-05"],
+        }
+    )
+    with pytest.raises(ValueError, match="valid timestamp"):
+        make_split(frame, time_aware=True)
+
+
+def test_resolve_time_column_normalizes_published_at_to_study_timezone():
+    frame = pd.DataFrame(
+        {
+            "published_at": pd.date_range("2024-01-01", periods=3, tz="UTC"),
+        }
+    )
+    dates = resolve_time_column(frame)
+    assert str(dates.dt.tz) == "Asia/Ho_Chi_Minh"
+
+
+def test_time_aware_split_derives_date_column_from_published_at():
+    frame = pd.DataFrame(
+        {
+            "text": [f"tin {i}" for i in range(20)],
+            "label_id": [i % 3 for i in range(20)],
+            "published_at": pd.date_range("2024-01-01", periods=20, tz="UTC"),
+        }
+    )
+    split = make_split(frame, time_aware=True)
+    assert "date" in split.train.columns
+    assert str(split.train["date"].dt.tz) == "Asia/Ho_Chi_Minh"
+    assert split.train["date"].max() < split.test["date"].min()
 
 
 def test_price_normalize_sorts_rows_and_adds_ticker():

@@ -24,6 +24,7 @@ import re
 import time
 from datetime import datetime
 from hashlib import sha256
+from html import unescape
 from html.parser import HTMLParser
 from zoneinfo import ZoneInfo
 
@@ -77,6 +78,7 @@ class _ArticleParser(HTMLParser):
         self._body_depth = 0
         self._capture: str | None = None
         self._capture_depth = 0
+        self._skip_depth = 0  # inside <style>/<script>: drop CSS/JS payload
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attr_map = {name.lower(): value or "" for name, value in attrs}
@@ -88,6 +90,15 @@ class _ArticleParser(HTMLParser):
                 self.og_title = attr_map.get("content")
             elif prop == "og:description":
                 self.og_description = attr_map.get("content")
+
+        if self._skip_depth:
+            if tag not in _VOID_TAGS:
+                self._skip_depth += 1
+            return
+
+        if tag in ("style", "script"):
+            self._skip_depth = 1
+            return
 
         if self._body_depth:
             if tag not in _VOID_TAGS:
@@ -125,6 +136,9 @@ class _ArticleParser(HTMLParser):
         tag = tag.lower()
         if tag in _VOID_TAGS:
             return
+        if self._skip_depth:
+            self._skip_depth -= 1
+            return
         if self._body_depth:
             self._body_depth -= 1
             return
@@ -134,12 +148,40 @@ class _ArticleParser(HTMLParser):
                 self._capture = None
 
     def handle_data(self, data: str) -> None:
+        if self._skip_depth:
+            return
         if self._body_depth:
             self.body_parts.append(data)
         if self._capture == "title":
             self.title_parts.append(data)
         elif self._capture == "published":
             self.published_parts.append(data)
+
+
+# <style>/<script> blocks (with their CSS/JS payload), HTML comments, and any
+# residual tags are removed deterministically. Ordering matters: strip comments
+# and style/script bodies before generic tags so their inner text never leaks.
+_HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+_STYLE_SCRIPT = re.compile(r"<(style|script)\b[^>]*>.*?</\1\s*>", re.IGNORECASE | re.DOTALL)
+_HTML_TAG = re.compile(r"<[^>]+>")
+
+
+def clean_html(value: str | None) -> str | None:
+    """Strip HTML/CSS markup from a text fragment, keeping readable words.
+
+    Deterministically removes HTML comments, ``<style>``/``<script>`` blocks
+    (including their CSS/JS payload), and any remaining tags, then unescapes
+    entities and collapses whitespace. Only markup is discarded; title and body
+    word content is preserved. Returns ``None`` when nothing readable remains.
+    """
+    if not value:
+        return None
+    text = _HTML_COMMENT.sub(" ", value)
+    text = _STYLE_SCRIPT.sub(" ", text)
+    text = _HTML_TAG.sub(" ", text)
+    text = unescape(text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text or None
 
 
 def _clean_text(value: str | None) -> str | None:
@@ -271,22 +313,27 @@ def _parse_article_html(html: str) -> _ArticleParser:
 
 
 def extract_body(html: str) -> str | None:
-    """Return the full article body, falling back to the page description."""
+    """Return the full article body, falling back to the page description.
+
+    The joined body/description passes through :func:`clean_html`, the
+    HTML/CSS normalization boundary, so any residual markup or entities are
+    removed without altering the readable body semantics.
+    """
     parser = _parse_article_html(html)
-    body = _clean_text(" ".join(parser.body_parts))
-    return body or _clean_text(parser.og_description)
+    body = clean_html(" ".join(parser.body_parts))
+    return body or clean_html(parser.og_description)
 
 
 def parse_article(html: str) -> dict[str, str | None]:
     """Extract the timestamp, title and body stored for one article."""
     parser = _parse_article_html(html)
-    title = parser.og_title or _clean_text(" ".join(parser.title_parts))
+    title = clean_html(parser.og_title) or clean_html(" ".join(parser.title_parts))
     timestamp = _clean_text(" ".join(parser.published_parts))
     return {
         "published_at_str": timestamp,
-        "title": _clean_text(title),
-        "body": _clean_text(" ".join(parser.body_parts))
-        or _clean_text(parser.og_description),
+        "title": title,
+        "body": clean_html(" ".join(parser.body_parts))
+        or clean_html(parser.og_description),
     }
 
 
