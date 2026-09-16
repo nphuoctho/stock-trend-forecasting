@@ -105,6 +105,8 @@ save a new notebook version after the run.
 | Section 8 "newly initialized weights" warning | Normal (fresh classification head) | Ignore, that's expected when fine-tuning |
 | Training very slow (>30 min) | Running on CPU, not GPU | Section 3 must print "CUDA: True" |
 | `wget` fails in section 4 | Kaggle Internet off | Turn Internet on in Settings |
+| `operator torchvision::nms does not exist` or `Trainer` import fails | Kaggle's `torchvision` is incompatible with the installed `torch` | Start a fresh session and rerun the `sentiment_cv.ipynb` bootstrap cell; it pins the text-training stack and removes broken `torchvision` |
+| `No space left on device` while saving a model | Old runs or full ablation output retain model copies | Start a fresh Kaggle session or delete the previous output directory, then rerun; ablation now removes fold models after saving metrics, while the selected configuration should be rerun with `sentiment-cv` to keep a checkpoint |
 | Low macro-F1 (<0.5) | Normal for a small, imbalanced seed | Add in-domain labels, or accept it and report honestly |
 
 ---

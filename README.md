@@ -74,6 +74,9 @@ uv run python -m stf.cli sentiment-train --data data/labeled/seed.csv --epochs 3
 ```
 
 ### So sánh đầu vào và cắt độ dài
+Kết quả lần chạy Kaggle và quyết định nghiên cứu được ghi tại
+[`docs/sentiment-experiment-results.md`](docs/sentiment-experiment-results.md).
+
 
 Khi tệp nhãn có các cột `title`, `body` (hoặc `body_preview`) và `label`, có thể
 chạy một cấu hình với 5-fold cross-validation:
@@ -132,6 +135,11 @@ uv run python -m stf.cli sentiment-ablation \
   --epochs 3 --folds 5 \
   --output models/experiments/ablation
 ```
+
+Lệnh `sentiment-ablation` chỉ giữ các tệp số liệu và bản kê nguồn của từng cấu hình;
+để tránh đầy đĩa, không lưu các thư mục mô hình `best/` của từng fold. Sau khi
+chọn cấu hình có `macro_f1` cao nhất, chạy lại `sentiment-cv` cho cấu hình đó để
+giữ checkpoint dùng cho bước suy luận.
 
 Không dùng nhãn hoặc giá tương lai để tạo đầu vào cảm xúc. Tập CafeF chỉ có
 tiêu đề nên không đủ để kết luận riêng về `context`; cần dùng tệp Vietstock đã

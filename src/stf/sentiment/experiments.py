@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import asdict, replace
 from pathlib import Path
 
@@ -71,6 +72,7 @@ def run_cross_validation(
     out_dir: Path,
     allow_preliminary: bool = False,
     source_path: str | Path | None = None,
+    save_models: bool = True,
 ) -> dict:
     """Train/evaluate one input configuration with outer stratified K-fold CV.
 
@@ -80,6 +82,7 @@ def run_cross_validation(
     preliminary rows are rejected unless ``allow_preliminary=True`` (diagnostics
     only). ``source_path``, when given, is fingerprinted into each fold's manifest
     and the top-level result for provenance.
+    Set ``save_models`` to ``False`` when the run is used only for comparison.
     """
     if input_variant not in INPUT_VARIANTS:
         raise ValueError(f"Unknown input variant {input_variant!r}.")
@@ -97,7 +100,11 @@ def run_cross_validation(
         fold_cfg = replace(cfg, seed=seed + fold_number)
         fold_dir = out_dir / f"fold-{fold_number:02d}"
         manifest = model.fine_tune(
-            split, fold_cfg, out_dir=fold_dir, source_path=source_path
+            split,
+            fold_cfg,
+            out_dir=fold_dir,
+            source_path=source_path,
+            save_model=save_models,
         )
         fold_results.append(
             {
@@ -141,6 +148,16 @@ def run_cross_validation(
     return result
 
 
+def _remove_model_artifacts(root: Path) -> None:
+    """Remove persisted model directories owned by an ablation run."""
+    if not root.exists():
+        return
+    for artifact_name in ("best", "checkpoints"):
+        for artifact_dir in root.rglob(artifact_name):
+            if artifact_dir.is_dir():
+                shutil.rmtree(artifact_dir, ignore_errors=True)
+
+
 def run_ablation(
     df: pd.DataFrame,
     *,
@@ -153,22 +170,28 @@ def run_ablation(
     allow_preliminary: bool = False,
     source_path: str | Path | None = None,
 ) -> pd.DataFrame:
-    """Run the full input-by-truncation matrix sequentially and rank it."""
+    """Run the full matrix while retaining metrics, not model copies."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _remove_model_artifacts(out_dir)
     rows = []
     for input_variant in input_variants:
         for truncation_strategy in truncation_strategies:
             combo_dir = out_dir / f"{input_variant}__{truncation_strategy}"
-            result = run_cross_validation(
-                df,
-                input_variant=input_variant,
-                truncation_strategy=truncation_strategy,
-                cfg=cfg,
-                folds=folds,
-                seed=seed,
-                out_dir=combo_dir,
-                allow_preliminary=allow_preliminary,
-                source_path=source_path,
-            )
+            try:
+                result = run_cross_validation(
+                    df,
+                    input_variant=input_variant,
+                    truncation_strategy=truncation_strategy,
+                    cfg=cfg,
+                    folds=folds,
+                    seed=seed,
+                    out_dir=combo_dir,
+                    allow_preliminary=allow_preliminary,
+                    source_path=source_path,
+                    save_models=False,
+                )
+            finally:
+                _remove_model_artifacts(combo_dir)
             row = {
                 "input_variant": input_variant,
                 "truncation_strategy": truncation_strategy,
@@ -180,6 +203,5 @@ def run_ablation(
             rows.append(row)
 
     summary = pd.DataFrame(rows).sort_values("macro_f1_mean", ascending=False)
-    out_dir.mkdir(parents=True, exist_ok=True)
     summary.to_csv(out_dir / "ablation_summary.csv", index=False)
     return summary

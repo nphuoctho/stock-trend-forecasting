@@ -244,7 +244,8 @@ def cmd_score_news(args: argparse.Namespace) -> int:
 
     Loads the persisted listing/article join, builds the selected model input
     variant, and writes per-article sentiment probabilities to a parquet file.
-    Requires a checkpoint already produced by sentiment-train/-cv/-ablation.
+    Requires a checkpoint produced by sentiment-train or sentiment-cv; ablation
+    outputs metrics for selection and removes its fold models to limit disk use.
     """
     from stf.data.news import load_ticker_articles
     from stf.sentiment.dataset import build_input_text
