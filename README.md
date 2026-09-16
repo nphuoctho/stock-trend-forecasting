@@ -74,10 +74,6 @@ uv run python -m stf.cli sentiment-train --data data/labeled/seed.csv --epochs 3
 ```
 
 ### So sánh đầu vào và cắt độ dài
-Kết quả lần chạy Kaggle và quyết định nghiên cứu được ghi tại
-[`docs/sentiment-experiment-results.md`](docs/sentiment-experiment-results.md).
-
-
 Khi tệp nhãn có các cột `title`, `body` (hoặc `body_preview`) và `label`, có thể
 chạy một cấu hình với 5-fold cross-validation:
 
