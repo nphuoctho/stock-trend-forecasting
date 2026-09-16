@@ -12,6 +12,7 @@ import pytest
 
 from stf.data import news, prices
 from stf.sentiment import model
+from stf.sentiment import experiments
 from stf.sentiment.dataset import (
     build_input_text,
     file_fingerprint,
@@ -619,3 +620,63 @@ def test_price_normalize_rejects_non_finite_values():
     )
     with pytest.raises(ValueError, match="non-finite"):
         prices._normalize(frame, "FPT")
+
+
+def test_run_ablation_removes_model_artifacts_and_keeps_metrics(
+    monkeypatch, tmp_path
+):
+    output = tmp_path / "ablation"
+    stale_best = output / "old-run" / "fold-01" / "best"
+    stale_best.mkdir(parents=True)
+
+    def fake_run_cross_validation(_df, *, out_dir, **_kwargs):
+        (out_dir / "fold-01" / "best").mkdir(parents=True)
+        (out_dir / "fold-01" / "checkpoints").mkdir(parents=True)
+        (out_dir / "cv_results.json").write_text("{}", encoding="utf-8")
+        return {
+            "data_size": 3,
+            "aggregate": {
+                "macro_f1": {"mean": 0.4, "std": 0.1},
+                "accuracy": {"mean": 0.5, "std": 0.1},
+                "balanced_accuracy": {"mean": 0.3, "std": 0.1},
+            },
+        }
+
+    monkeypatch.setattr(experiments, "run_cross_validation", fake_run_cross_validation)
+    summary = experiments.run_ablation(
+        pd.DataFrame(),
+        out_dir=output,
+        input_variants=("title",),
+        truncation_strategies=("head",),
+    )
+
+    combo_dir = output / "title__head"
+    assert not stale_best.exists()
+    assert not (combo_dir / "fold-01" / "best").exists()
+    assert not (combo_dir / "fold-01" / "checkpoints").exists()
+    assert (combo_dir / "cv_results.json").exists()
+    assert (output / "ablation_summary.csv").exists()
+    assert summary.iloc[0]["macro_f1_mean"] == pytest.approx(0.4)
+
+
+def test_run_ablation_cleans_partial_models_when_training_fails(
+    monkeypatch, tmp_path
+):
+    output = tmp_path / "ablation"
+
+    def failing_run_cross_validation(_df, *, out_dir, **_kwargs):
+        (out_dir / "fold-01" / "best").mkdir(parents=True)
+        (out_dir / "fold-01" / "checkpoints").mkdir(parents=True)
+        raise RuntimeError("training failed")
+
+    monkeypatch.setattr(experiments, "run_cross_validation", failing_run_cross_validation)
+    with pytest.raises(RuntimeError, match="training failed"):
+        experiments.run_ablation(
+            pd.DataFrame(),
+            out_dir=output,
+            input_variants=("title",),
+            truncation_strategies=("head",),
+        )
+
+    assert not (output / "title__head" / "fold-01" / "best").exists()
+    assert not (output / "title__head" / "fold-01" / "checkpoints").exists()

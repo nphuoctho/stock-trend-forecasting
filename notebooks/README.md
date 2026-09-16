@@ -43,13 +43,17 @@ torch. If Kaggle's `torchvision` import is broken, it removes `torchvision` and
 `timm`, which are not needed for text-only PhoBERT training. If Kaggle reports a
 dependency conflict, turn Internet on and run the bootstrap cell in a fresh
 session.
-The CV runner keeps only the final `best/` model and manifest for each fold;
-transient per-epoch checkpoints are removed after evaluation to fit Kaggle's
-working-disk limit. The notebook includes the epoch count in each output
-directory name, so smoke-test and final runs do not share artifacts.
-The bootstrap also verifies that the cloned `develop` branch contains the
-disk-safe checkpoint settings before starting CV; update that branch before
-running the uploaded notebook.
+The `sentiment-cv` runner keeps only the final `best/` model and manifest for
+each fold; transient per-epoch checkpoints are removed after evaluation to fit
+Kaggle's working-disk limit. The `sentiment-ablation` runner additionally
+removes every fold model after saving its metrics, so the full 9-configuration
+matrix does not accumulate 45 PhoBERT copies. Run `sentiment-cv` again for the
+selected configuration when a checkpoint is needed for inference. The notebook
+includes the epoch count in each output directory name, so smoke-test and final
+runs do not share artifacts.
+The bootstrap also verifies that the configured source branch contains the
+disk-safe checkpoint settings before starting CV; keep the notebook's branch
+pointing at the repaired source.
 
 ## Output
 
