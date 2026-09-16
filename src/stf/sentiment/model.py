@@ -296,6 +296,7 @@ def fine_tune(
         TrainingArguments,
     )
 
+    cfg = cfg or TrainConfig()
     out_dir = out_dir or config.SENTIMENT_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_dir = out_dir / "checkpoints"
