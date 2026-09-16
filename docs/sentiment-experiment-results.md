@@ -72,8 +72,8 @@ Bảng xếp hạng đầy đủ nằm tại [`outputs/ablation_summary.csv`](..
 
 Kết quả có trọng số được lưu trong hai tệp nén:
 
-- [`outputs/title_context__head_tail__cw-inverse_frequency__e3.zip`](../outputs/title_context__head_tail__cw-inverse_frequency__e3.zip): chạy riêng cấu hình `title_context + head_tail`, có đầy đủ `fold-*/best/`.
-- [`outputs/ablation__cw-inverse_frequency__e3.zip`](../outputs/ablation__cw-inverse_frequency__e3.zip): ma trận chín cấu hình, chỉ lưu số liệu và manifest.
+- `outputs/title_context__head_tail__cw-inverse_frequency__e3.zip`: chạy riêng cấu hình `title_context + head_tail`, có đầy đủ `fold-*/best/`.
+- `outputs/ablation__cw-inverse_frequency__e3.zip`: ma trận chín cấu hình, chỉ lưu số liệu và manifest.
 
 ## 4. Kết quả tổng hợp
 
