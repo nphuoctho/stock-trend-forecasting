@@ -72,6 +72,7 @@ def run_cross_validation(
     out_dir: Path,
     allow_preliminary: bool = False,
     source_path: str | Path | None = None,
+    save_models: bool = True,
 ) -> dict:
     """Train/evaluate one input configuration with outer stratified K-fold CV.
 
@@ -81,6 +82,7 @@ def run_cross_validation(
     preliminary rows are rejected unless ``allow_preliminary=True`` (diagnostics
     only). ``source_path``, when given, is fingerprinted into each fold's manifest
     and the top-level result for provenance.
+    Set ``save_models`` to ``False`` when the run is used only for comparison.
     """
     if input_variant not in INPUT_VARIANTS:
         raise ValueError(f"Unknown input variant {input_variant!r}.")
@@ -98,7 +100,11 @@ def run_cross_validation(
         fold_cfg = replace(cfg, seed=seed + fold_number)
         fold_dir = out_dir / f"fold-{fold_number:02d}"
         manifest = model.fine_tune(
-            split, fold_cfg, out_dir=fold_dir, source_path=source_path
+            split,
+            fold_cfg,
+            out_dir=fold_dir,
+            source_path=source_path,
+            save_model=save_models,
         )
         fold_results.append(
             {
@@ -164,7 +170,7 @@ def run_ablation(
     allow_preliminary: bool = False,
     source_path: str | Path | None = None,
 ) -> pd.DataFrame:
-    """Run the full matrix while retaining metrics, not 45 model copies."""
+    """Run the full matrix while retaining metrics, not model copies."""
     out_dir.mkdir(parents=True, exist_ok=True)
     _remove_model_artifacts(out_dir)
     rows = []
@@ -182,6 +188,7 @@ def run_ablation(
                     out_dir=combo_dir,
                     allow_preliminary=allow_preliminary,
                     source_path=source_path,
+                    save_models=False,
                 )
             finally:
                 _remove_model_artifacts(combo_dir)

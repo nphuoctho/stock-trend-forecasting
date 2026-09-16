@@ -277,13 +277,16 @@ def fine_tune(
     *,
     out_dir: Path | None = None,
     source_path: str | Path | None = None,
+    save_model: bool = True,
 ) -> dict:
     """Fine-tune PhoBERT on split.train, pick the best by macro-F1 on val,
-    evaluate on test. Return a result dict and save the best model + manifest.
+    evaluate on test. Return a result dict and optionally save the best model
+    and manifest.
 
     ``source_path``, when given, is hashed (never copied) into the manifest's
     provenance block alongside deterministic fingerprints of the train/val/test
-    frames, for reproducibility without embedding raw text.
+    frames, for reproducibility without embedding raw text. Set ``save_model`` to
+    ``False`` when only evaluation metrics are needed.
     """
     from transformers import (
         AutoModelForSequenceClassification,
@@ -407,9 +410,9 @@ def fine_tune(
     y_pred = np.argmax(pred.predictions, axis=-1)
     test_metrics = classification_metrics(pred.label_ids, y_pred)
 
-    # Save the selected model; per-epoch checkpoints are transient for CV.
-    trainer.save_model(str(out_dir / "best"))
-    tokenizer.save_pretrained(str(out_dir / "best"))
+    if save_model:
+        trainer.save_model(str(out_dir / "best"))
+        tokenizer.save_pretrained(str(out_dir / "best"))
     shutil.rmtree(out_dir / "checkpoints", ignore_errors=True)
     manifest = {
         "config": asdict(cfg),

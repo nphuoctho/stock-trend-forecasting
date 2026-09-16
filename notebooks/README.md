@@ -45,10 +45,10 @@ dependency conflict, turn Internet on and run the bootstrap cell in a fresh
 session.
 The `sentiment-cv` runner keeps only the final `best/` model and manifest for
 each fold; transient per-epoch checkpoints are removed after evaluation to fit
-Kaggle's working-disk limit. The `sentiment-ablation` runner additionally
-removes every fold model after saving its metrics, so the full 9-configuration
-matrix does not accumulate 45 PhoBERT copies. Run `sentiment-cv` again for the
-selected configuration when a checkpoint is needed for inference. The notebook
+Kaggle's working-disk limit. The `sentiment-ablation` runner does not retain
+fold models while saving metrics, so the full 9-configuration matrix does not
+accumulate 45 PhoBERT copies. Run `sentiment-cv` again for the selected
+configuration when a checkpoint is needed for inference. The notebook
 includes the epoch count in each output directory name, so smoke-test and final
 runs do not share artifacts.
 The bootstrap also verifies that the configured source branch contains the

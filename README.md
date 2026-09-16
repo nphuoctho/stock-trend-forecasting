@@ -134,9 +134,9 @@ uv run python -m stf.cli sentiment-ablation \
 ```
 
 Lệnh `sentiment-ablation` chỉ giữ các tệp số liệu và bản kê nguồn của từng cấu hình;
-để tránh đầy đĩa, các thư mục mô hình `best/` của từng fold được xóa sau khi
-hoàn tất. Sau khi chọn cấu hình có `macro_f1` cao nhất, chạy lại `sentiment-cv`
-cho cấu hình đó để giữ các checkpoint dùng cho bước suy luận.
+để tránh đầy đĩa, không lưu các thư mục mô hình `best/` của từng fold. Sau khi
+chọn cấu hình có `macro_f1` cao nhất, chạy lại `sentiment-cv` cho cấu hình đó để
+giữ checkpoint dùng cho bước suy luận.
 
 Không dùng nhãn hoặc giá tương lai để tạo đầu vào cảm xúc. Tập CafeF chỉ có
 tiêu đề nên không đủ để kết luận riêng về `context`; cần dùng tệp Vietstock đã

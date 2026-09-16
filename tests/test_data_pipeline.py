@@ -629,7 +629,10 @@ def test_run_ablation_removes_model_artifacts_and_keeps_metrics(
     stale_best = output / "old-run" / "fold-01" / "best"
     stale_best.mkdir(parents=True)
 
-    def fake_run_cross_validation(_df, *, out_dir, **_kwargs):
+    seen = {}
+
+    def fake_run_cross_validation(_df, *, out_dir, save_models, **_kwargs):
+        seen["save_models"] = save_models
         (out_dir / "fold-01" / "best").mkdir(parents=True)
         (out_dir / "fold-01" / "checkpoints").mkdir(parents=True)
         (out_dir / "cv_results.json").write_text("{}", encoding="utf-8")
@@ -651,6 +654,7 @@ def test_run_ablation_removes_model_artifacts_and_keeps_metrics(
     )
 
     combo_dir = output / "title__head"
+    assert seen["save_models"] is False
     assert not stale_best.exists()
     assert not (combo_dir / "fold-01" / "best").exists()
     assert not (combo_dir / "fold-01" / "checkpoints").exists()
