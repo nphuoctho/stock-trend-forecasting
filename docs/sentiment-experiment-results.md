@@ -1,6 +1,6 @@
 # Bản ghi thực nghiệm phân loại cảm xúc
 
-> **Trạng thái:** Bản ghi bằng chứng cho hai lần chạy trên Kaggle, chưa phải kết quả cuối cùng để đưa vào báo cáo.
+> **Trạng thái:** Bản ghi bằng chứng cho ba lần chạy trên Kaggle, chưa phải kết quả cuối cùng để đưa vào báo cáo.
 >
 > **Nguồn số liệu:** Các tệp JSON/CSV và tệp nén trong [`../outputs/`](../outputs/), được tải về sau khi chạy `sentiment-cv` và `sentiment-ablation`.
 
@@ -11,10 +11,10 @@ Lần chạy không trọng số và lần chạy có trọng số kiểm tra �
 - dạng đầu vào: `title`, `context`, `title_context`;
 - chiến lược cắt: `head`, `tail`, `head_tail`;
 - năm fold xác thực chéo phân tầng;
-- ba epoch cho mỗi fold;
+- ba và năm epoch cho mỗi fold;
 - hạt giống ngẫu nhiên `42`.
 
-Mục tiêu của lần chạy không trọng số là kiểm tra quy trình và tạo đường cơ sở. Lần chạy có trọng số cho thấy cải thiện rõ ở Macro-F1 và balanced accuracy, nhưng vẫn chưa đủ điều kiện để chọn mô hình cảm xúc cuối cùng vì lớp `NEGATIVE` còn được nhận diện rất yếu.
+Mục tiêu của lần chạy không trọng số là kiểm tra quy trình và tạo đường cơ sở. Hai lần chạy có trọng số cho thấy cải thiện rõ ở Macro-F1 và balanced accuracy, nhưng vẫn chưa đủ điều kiện để chọn mô hình cảm xúc cuối cùng vì lớp `NEGATIVE` còn được nhận diện rất yếu.
 
 ## 2. Bằng chứng đầu vào và khả năng tái lập
 
@@ -72,8 +72,8 @@ Bảng xếp hạng đầy đủ nằm tại [`outputs/ablation_summary.csv`](..
 
 Kết quả có trọng số được lưu trong hai tệp nén:
 
-- `outputs/title_context__head_tail__cw-inverse_frequency__e3.zip`: chạy riêng cấu hình `title_context + head_tail`, có đầy đủ `fold-*/best/`.
-- `outputs/ablation__cw-inverse_frequency__e3.zip`: ma trận chín cấu hình, chỉ lưu số liệu và manifest.
+- `outputs/title_context__head_tail__cw-inverse_frequency__e5.zip`: chạy riêng cấu hình `title_context + head_tail`, có đầy đủ `fold-*/best/`.
+- `outputs/ablation__cw-inverse_frequency__e5.zip`: ma trận chín cấu hình, chỉ lưu số liệu và manifest.
 
 ## 4. Kết quả tổng hợp
 
@@ -101,7 +101,7 @@ Khi tạo đầu vào, mã chọn văn bản cuối rồi khử trùng lặp tr�
 
 `ablation_summary.csv` đặt `context + tail` ở dòng đầu vì các cấu hình có cùng `macro_f1_mean` và việc sắp xếp cần một thứ tự phá hòa. Đây không phải bằng chứng rằng `context + tail` tốt hơn `context + head`, `context + head_tail` hoặc các cấu hình `title_context`.
 
-### 4.4. Kết quả có trọng số lớp
+### 4.4. Kết quả có trọng số lớp — 3 epoch
 
 Lần chạy này dùng `--class-weighting inverse_frequency`, với trọng số được tính riêng từ phần huấn luyện của từng fold. Các cấu hình đều dùng 5 fold, 3 epoch, kích thước lô 16 và hạt giống `42`.
 
@@ -114,6 +114,22 @@ Lần chạy này dùng `--class-weighting inverse_frequency`, với trọng s�
 | `context + tail` | 306 | 0.476660 | 0.069313 | 0.715547 | 0.509866 |
 
 Ba chiến lược cắt token của `title_context` cho cùng kết quả trong lần chạy này. Cấu hình `title_context + head_tail` được giữ làm cấu hình đại diện vì đã có checkpoint tốt nhất cho từng fold.
+
+### 4.5. Kết quả có trọng số lớp — 5 epoch
+
+Lần chạy này giữ nguyên dữ liệu, hạt giống và cơ chế tính trọng số của lần chạy 3 epoch, chỉ tăng số epoch từ 3 lên 5.
+
+| Dạng đầu vào | Số mẫu | Macro-F1 trung bình | Độ lệch chuẩn | Accuracy trung bình | Balanced accuracy |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `title` | 301 | 0.529995 | 0.096751 | 0.724044 | 0.535977 |
+| `title_context + head` | 306 | 0.517616 | 0.070196 | 0.735325 | 0.547288 |
+| `title_context + head_tail` | 306 | 0.517616 | 0.070196 | 0.735325 | 0.547288 |
+| `title_context + tail` | 306 | 0.516692 | 0.071090 | 0.732047 | 0.545662 |
+| `context + head` | 306 | 0.495236 | 0.063874 | 0.732047 | 0.533041 |
+| `context + head_tail` | 306 | 0.495236 | 0.063874 | 0.732047 | 0.533041 |
+| `context + tail` | 306 | 0.493463 | 0.062131 | 0.725595 | 0.529232 |
+
+So với lần chạy 3 epoch, cấu hình đại diện `title_context + head_tail` chỉ tăng nhẹ Macro-F1 từ `0.506284` lên `0.517616` và balanced accuracy từ `0.544866` lên `0.547288`. `title` có Macro-F1 cao hơn, nhưng hai dạng đầu vào dùng số lượng mẫu khác nhau nên không được so sánh như một kết luận chắc chắn.
 
 ## 5. Phân tích theo lớp của baseline không trọng số
 
@@ -133,7 +149,7 @@ Mô hình đang dự đoán toàn bộ mẫu kiểm tra là `NEUTRAL`. Kết lu�
 
 Do đó, `accuracy` hiện tại không thể được dùng làm chỉ số đại diện cho chất lượng mô hình. Chỉ số cần ưu tiên là `macro_f1`, `balanced_accuracy` và F1/recall từng lớp.
 
-### 5.2. Phân tích lần chạy có trọng số
+### 5.2. Phân tích lần chạy có trọng số — 3 epoch
 
 Ở cấu hình đại diện `title_context + head_tail`, F1 và recall trung bình qua 5 fold là:
 
@@ -145,6 +161,18 @@ Do đó, `accuracy` hiện tại không thể được dùng làm chỉ số đ�
 
 So với baseline, hai lớp thiểu số không còn bị bỏ qua hoàn toàn. Tuy nhiên, recall của `NEGATIVE` vẫn quá thấp để dùng mô hình cho suy luận toàn bộ kho tin.
 
+### 5.3. Phân tích lần chạy có trọng số — 5 epoch
+
+Ở cấu hình đại diện `title_context + head_tail`, F1 và recall trung bình qua 5 fold là:
+
+| Lớp | F1 trung bình | Recall trung bình |
+| --- | ---: | ---: |
+| `NEGATIVE` | 0.0767 | 0.0619 |
+| `NEUTRAL` | 0.8625 | 0.8333 |
+| `POSITIVE` | 0.6136 | 0.7467 |
+
+Recall `NEGATIVE` theo từng fold là `0.1429`, `0.0000`, `0.0000`, `0.0000`, `0.1667`; ba trên năm fold không nhận diện đúng mẫu `NEGATIVE` nào. Vì chỉ có 31 mẫu `NEGATIVE`, một mẫu đúng hoặc sai đã làm recall của một fold thay đổi khoảng 16–17 điểm phần trăm.
+
 ## 6. Đánh giá trạng thái thực nghiệm
 
 ### Đã xác nhận
@@ -155,30 +183,29 @@ So với baseline, hai lớp thiểu số không còn bị bỏ qua hoàn toàn.
 - Tất cả cấu hình dùng cùng hạt giống, siêu tham số và mã băm tệp nhãn.
 - Các chiến lược cắt token không tạo khác biệt quan sát được trong lần chạy này.
 - Cơ chế lưu trữ mới không làm ma trận ablation đầy đĩa.
+- Lần chạy 5 epoch đã hoàn thành đủ chín cấu hình và lần chạy riêng cấu hình đại diện đã lưu các thư mục `fold-*/best/`.
 
 ### Chưa được xác nhận
 
-- Chưa có cấu hình nào cho thấy khả năng phân loại cân bằng cả ba lớp; lớp `NEGATIVE` vẫn có recall trung bình chỉ `0.0333`.
+- Chưa có cấu hình nào cho thấy khả năng phân loại cân bằng cả ba lớp; ở cấu hình đại diện 5 epoch, lớp `NEGATIVE` vẫn có recall trung bình chỉ `0.0619` và bằng 0 ở ba trên năm fold.
 - Chưa thể kết luận `context` tốt hơn `title`, vì số lượng mẫu sau chuẩn bị đầu vào khác nhau.
 - Chưa nên dùng các kết quả này để sinh đặc trưng cảm xúc cho nhánh dự báo giá.
 - Chưa có mô hình cuối được chọn cho suy luận toàn bộ kho tin.
 
 ## 7. Quyết định nghiên cứu
 
-Không chọn mô hình cuối từ baseline không trọng số. Baseline cho thấy mất cân bằng nhãn khiến mô hình dự đoán gần như toàn bộ là `NEUTRAL`.
+Không chọn mô hình cuối để gán nhãn toàn bộ kho tin. Lần chạy 5 epoch chỉ cải thiện nhẹ so với 3 epoch:
 
-Lần chạy `inverse_frequency` đã cải thiện đáng kể:
+- Cấu hình `title_context + head_tail`: Macro-F1 từ `0.506284` lên `0.517616`;
+- Balanced accuracy từ `0.544866` lên `0.547288`;
+- F1 `NEGATIVE` từ `0.0444` lên `0.0767`;
+- Recall `NEGATIVE` đạt `0.0619`, nhưng bằng 0 ở ba trên năm fold.
 
-- Macro-F1 tăng từ `0.2667` lên `0.5063`;
-- balanced accuracy tăng từ `0.3333` lên `0.5449`;
-- F1 của `POSITIVE` đạt `0.6194`;
-- F1 của `NEGATIVE` đã khác 0 nhưng chỉ đạt `0.0444`.
+Tập dữ liệu hiện có 306 mẫu, gồm `31 NEGATIVE`, `204 NEUTRAL` và `71 POSITIVE`. Với 5 fold, mỗi fold chỉ có khoảng sáu mẫu `NEGATIVE`, nên các ước lượng recall của lớp này có độ biến động rất lớn.
 
-Vì lớp `NEGATIVE` vẫn chưa được nhận diện đáng tin cậy, chưa dùng mô hình này để gán nhãn toàn bộ kho tin hoặc tạo đặc trưng cho nhánh dự báo giá.
+Ưu tiên tiếp theo là kiểm tra thủ công 31 mẫu `NEGATIVE` và mở rộng tập dữ liệu, đặc biệt bổ sung các mẫu `NEGATIVE` và `POSITIVE`. Không nên tiếp tục tăng epoch trước khi giải quyết giới hạn về số lượng và độ ổn định của nhãn.
 
-Bước tiếp theo là chạy lại cấu hình đại diện `title_context + head_tail` với `inverse_frequency` và `5 epoch`, giữ nguyên 5 fold và hạt giống `42`. Kết quả mới cần được so sánh theo Macro-F1, balanced accuracy, F1/recall từng lớp và biến thiên giữa các fold.
-
-Chỉ sau khi lớp `NEGATIVE` có kết quả ổn định hơn mới chọn mô hình để chạy `score-news`. Khi đó cần dùng lần chạy `sentiment-cv` riêng có lưu các thư mục `fold-*/best/`; ma trận `sentiment-ablation` chỉ phục vụ so sánh.
+Sau khi có thêm dữ liệu, chạy lại cấu hình `title_context + head_tail` với `inverse_frequency`, giữ nguyên hạt giống và quy trình xác thực chéo. Chỉ sau khi recall `NEGATIVE` ổn định hơn mới chọn mô hình để chạy `score-news`; các đặc trưng cảm xúc chưa được đưa vào nhánh dự báo giá ở thời điểm này.
 
 ## 8. Tệp cần lưu trữ
 
@@ -191,9 +218,9 @@ Chỉ sau khi lớp `NEGATIVE` có kết quả ổn định hơn mới chọn m�
 - mã nguồn ở nhánh có cơ chế lưu checkpoint an toàn;
 - tệp nhãn gốc hoặc mã băm của tệp nhãn.
 
-Tệp `title_context__head_tail__cw-inverse_frequency__e3.zip` đã chứa các thư mục `fold-*/best/` dùng cho suy luận thử nghiệm. Tệp `ablation__cw-inverse_frequency__e3.zip` không chứa mô hình tốt nhất vì ma trận ablation chỉ lưu số liệu.
+Tệp `title_context__head_tail__cw-inverse_frequency__e5.zip` đã chứa các thư mục `fold-*/best/` dùng cho suy luận thử nghiệm. Tệp `ablation__cw-inverse_frequency__e5.zip` không chứa mô hình tốt nhất vì ma trận ablation chỉ lưu số liệu.
 
-Các kết quả 5 epoch sắp tới cần được lưu thành hai tệp nén riêng, không ghi đè lên hai tệp hiện tại, để giữ lại khả năng so sánh với lần chạy 3 epoch.
+Các tệp nén của lần chạy 3 epoch đã được thay thế sau khi lưu kết quả mới; số liệu 3 epoch vẫn được ghi lại trong các bảng so sánh ở trên.
 
 ## 9. Tài liệu và mã thực thi liên quan
 
