@@ -33,17 +33,26 @@ PRELIMINARY_STATUS = "PRELIMINARY_REVIEW_REQUIRED"
 PRELIMINARY_SOURCE = "assistant_prelabel"
 
 
-def build_input_text(df: pd.DataFrame, variant: str) -> pd.DataFrame:
+def build_input_text(
+    df: pd.DataFrame, variant: str, *, context_chars: int | None = None
+) -> pd.DataFrame:
     """Create the selected model input from title/context columns.
 
     Label files from CafeF contain only ``text`` (headline), while in-domain
     files may retain separate ``title`` and ``body`` columns. Missing columns
     therefore fall back to ``text`` so both sources use one code path.
+
+    ``context_chars`` truncates the context before it is combined with the
+    title. Annotation files carry a pre-truncated ``body_preview`` while the
+    crawl keeps the full ``body``; passing the annotation cap at inference time
+    keeps the served input length in the range the checkpoint was trained on.
     """
     if variant not in INPUT_VARIANTS:
         raise ValueError(
             f"Unknown input variant {variant!r}; expected one of {INPUT_VARIANTS}."
         )
+    if context_chars is not None and context_chars < 1:
+        raise ValueError("context_chars must be >= 1 when provided.")
 
     out = df.copy()
     empty = pd.Series("", index=out.index, dtype="string")
@@ -65,6 +74,8 @@ def build_input_text(df: pd.DataFrame, variant: str) -> pd.DataFrame:
         context = out["body_preview"].fillna("").astype("string").str.strip()
     else:
         context = text
+    if context_chars is not None:
+        context = context.str.slice(0, context_chars).str.strip()
 
     if variant == "title":
         selected = title.mask(title.eq(""), text)

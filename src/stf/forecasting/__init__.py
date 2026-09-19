@@ -35,7 +35,12 @@ from stf.forecasting.labels import (
     label_panel,
 )
 from stf.forecasting.panel import assemble, build_panel, panel_columns
-from stf.forecasting.sentiment_agg import SENTIMENT_COLUMNS, daily_sentiment
+from stf.forecasting.sentiment_agg import (
+    ROLLING_SENTIMENT_COLUMNS,
+    SENTIMENT_COLUMNS,
+    add_rolling_sentiment,
+    daily_sentiment,
+)
 from stf.forecasting.split import (
     TimeSplit,
     chronological_split,
@@ -53,6 +58,8 @@ __all__ = [
     "FeatureScaler",
     "price_features",
     "SENTIMENT_COLUMNS",
+    "ROLLING_SENTIMENT_COLUMNS",
+    "add_rolling_sentiment",
     "daily_sentiment",
     "ID2TREND",
     "TREND2ID",
@@ -77,9 +84,11 @@ def __getattr__(name: str):
         "PriceSentimentLSTM",
         "MajorityBaseline",
         "RandomBaseline",
+        "ClassicalBaseline",
         "make_sequences",
         "make_two_branch_sequences",
         "fit_lstm",
+        "predict_lstm",
         "set_seed",
         "evaluate_predictions",
         "NUM_TREND_CLASSES",
@@ -88,4 +97,15 @@ def __getattr__(name: str):
         from stf.forecasting import models
 
         return getattr(models, name)
+    experiment_exports = {
+        "ForecastConfig",
+        "SENTIMENT_FEATURES",
+        "LADDER",
+        "run_experiment",
+        "frame_hash",
+    }
+    if name in experiment_exports:
+        from stf.forecasting import experiment
+
+        return getattr(experiment, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

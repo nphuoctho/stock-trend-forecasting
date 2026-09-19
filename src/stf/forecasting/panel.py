@@ -15,7 +15,12 @@ from stf import config
 from stf.forecasting import calendar as cal
 from stf.forecasting.features import MA_WINDOW, VOL_WINDOW, price_feature_columns, price_features
 from stf.forecasting.labels import add_target
-from stf.forecasting.sentiment_agg import SENTIMENT_COLUMNS, daily_sentiment
+from stf.forecasting.sentiment_agg import (
+    ROLLING_SENTIMENT_COLUMNS,
+    SENTIMENT_COLUMNS,
+    add_rolling_sentiment,
+    daily_sentiment,
+)
 
 # No-news days: neutral prior for the probability vector, zeroed counts/ratios.
 NO_NEWS_FILL: dict[str, float] = {
@@ -41,6 +46,7 @@ def panel_columns(ma_window: int = MA_WINDOW, vol_window: int = VOL_WINDOW) -> l
         "close",
         *price_feature_columns(ma_window, vol_window),
         *SENTIMENT_COLUMNS,
+        *ROLLING_SENTIMENT_COLUMNS,
         "target_return",
         "target_label",
         "split",
@@ -94,6 +100,7 @@ def build_panel(
     merged["has_news"] = merged["has_news"].astype("int64")
     float_sentiment = [col for col in SENTIMENT_COLUMNS if col not in {"news_count", "has_news"}]
     merged[float_sentiment] = merged[float_sentiment].astype("float64")
+    merged = add_rolling_sentiment(merged)
 
     merged["target_label"] = pd.array([pd.NA] * len(merged), dtype="string")
     merged["split"] = pd.array([pd.NA] * len(merged), dtype="string")

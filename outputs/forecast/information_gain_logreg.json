@@ -1,0 +1,104 @@
+{
+  "arm": "logreg_price_sentiment",
+  "price_arm": "logreg_price",
+  "config": {
+    "seq_len": 5,
+    "n_windows": 5,
+    "test_size": 60,
+    "val_size": 60,
+    "expanding": true,
+    "hidden": 32,
+    "num_layers": 1,
+    "epochs": 40,
+    "batch_size": 128,
+    "lr": 0.001,
+    "patience": 6,
+    "seeds": [
+      42,
+      43,
+      44
+    ],
+    "bootstrap_samples": 2000,
+    "bootstrap_seed": 7
+  },
+  "effects": {
+    "macro_f1": {
+      "price_only": 0.3550477651887895,
+      "two_branch_neutral_prior": 0.3550477651887895,
+      "two_branch_real_sentiment": 0.36267209709832077,
+      "architecture_effect": 0.0,
+      "information_gain": 0.007624331909531268,
+      "naive_delta": 0.007624331909531268,
+      "information_gain_per_window": [
+        -0.0009396649748633634,
+        0.001092062348565015,
+        0.0161856457592523,
+        0.023947310022450263,
+        -0.002163693607747874
+      ],
+      "information_gain_window_bootstrap": {
+        "mean": 0.007624331909531268,
+        "low": -0.0008613912252227185,
+        "high": 0.01717277644377104
+      },
+      "information_gain_date_bootstrap": {
+        "mean": 0.006644550521562653,
+        "low": -0.00519399986004872,
+        "high": 0.019019200304611353,
+        "n_blocks": 300
+      }
+    },
+    "balanced_accuracy": {
+      "price_only": 0.3789236172909538,
+      "two_branch_neutral_prior": 0.3789236172909538,
+      "two_branch_real_sentiment": 0.3811712044517033,
+      "architecture_effect": 0.0,
+      "information_gain": 0.00224758716074952,
+      "naive_delta": 0.00224758716074952,
+      "information_gain_per_window": [
+        -0.01166947832171672,
+        -0.001787664287664359,
+        0.0076315445880663635,
+        0.022114038875566955,
+        -0.0050505050505050275
+      ],
+      "information_gain_window_bootstrap": {
+        "mean": 0.0022475871607494425,
+        "low": -0.007045526206421571,
+        "high": 0.012460836578610102
+      },
+      "information_gain_date_bootstrap": {
+        "mean": 0.0021598918294210567,
+        "low": -0.008262033553953902,
+        "high": 0.012929715184734734,
+        "n_blocks": 300
+      }
+    },
+    "accuracy": {
+      "price_only": 0.42199999999999993,
+      "two_branch_neutral_prior": 0.42199999999999993,
+      "two_branch_real_sentiment": 0.4223333333333333,
+      "architecture_effect": 0.0,
+      "information_gain": 0.00033333333333335213,
+      "naive_delta": 0.00033333333333335213,
+      "information_gain_per_window": [
+        -0.025000000000000022,
+        -0.0050000000000000044,
+        0.009999999999999953,
+        0.023333333333333373,
+        -0.0016666666666665941
+      ],
+      "information_gain_window_bootstrap": {
+        "mean": 0.000333333333333341,
+        "low": -0.014000000000000023,
+        "high": 0.013000000000000012
+      },
+      "information_gain_date_bootstrap": {
+        "mean": 0.0003333333333332966,
+        "low": -0.009999999999999898,
+        "high": 0.010999999999999954,
+        "n_blocks": 300
+      }
+    }
+  }
+}

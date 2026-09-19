@@ -13,6 +13,7 @@ import pytest
 from stf.data import news, prices
 from stf.sentiment import model
 from stf.sentiment import experiments
+from stf.sentiment import sampling
 from stf.sentiment.dataset import (
     build_input_text,
     file_fingerprint,
@@ -48,6 +49,32 @@ def test_build_input_text_selects_title_context_variants():
         "Tiêu đề tốt\n\nNội dung dài",
         "Chỉ có tiêu đề",
     ]
+
+
+def test_build_input_text_caps_context_before_joining_the_title():
+    """The cap must trim the body only, leaving the title intact."""
+    frame = pd.DataFrame(
+        {
+            "title": ["Tiêu đề giữ nguyên"],
+            "body": ["A" * 900],
+            "label": ["NEUTRAL"],
+        }
+    )
+    capped = build_input_text(frame, "title_context", context_chars=400)["text"].iloc[0]
+    assert capped == "Tiêu đề giữ nguyên" + "\n\n" + "A" * 400
+
+    # Without the cap the full body survives, so the cap is what shortens the input.
+    full = build_input_text(frame, "title_context")["text"].iloc[0]
+    assert len(full) > len(capped)
+
+    context_only = build_input_text(frame, "context", context_chars=50)["text"].iloc[0]
+    assert context_only == "A" * 50
+
+
+def test_build_input_text_rejects_a_non_positive_context_cap():
+    frame = pd.DataFrame({"title": ["x"], "body": ["y"], "label": ["NEUTRAL"]})
+    with pytest.raises(ValueError, match="context_chars"):
+        build_input_text(frame, "title_context", context_chars=0)
 
 
 def test_text_dataset_truncates_before_adding_special_tokens():
@@ -684,3 +711,242 @@ def test_run_ablation_cleans_partial_models_when_training_fails(
 
     assert not (output / "title__head" / "fold-01" / "best").exists()
     assert not (output / "title__head" / "fold-01" / "checkpoints").exists()
+
+
+# --- annotation batch sampling -------------------------------------------------------
+
+
+def _sampling_articles(n: int = 60) -> pd.DataFrame:
+    """Synthetic ticker/article join; every third article carries negative cues."""
+    rows = []
+    for i in range(n):
+        if i % 3 == 0:
+            title = f"Doanh nghiệp {i} báo lỗ"
+            body = f"Công ty số {i} ghi nhận lợi nhuận giảm và nợ xấu tăng trong kỳ."
+        elif i % 3 == 1:
+            title = f"Doanh nghiệp {i} chia cổ tức"
+            body = f"Công ty số {i} công bố lợi nhuận tăng và vượt kế hoạch năm."
+        else:
+            title = f"Doanh nghiệp {i} họp cổ đông"
+            body = f"Công ty số {i} thông báo lịch họp thường niên cho cổ đông."
+        rows.append(
+            {
+                "ticker": ["AAA", "BBB", "CCC"][i % 3],
+                "url": f"https://example.test/{i}",
+                "published_at": f"2024-01-{(i % 28) + 1:02d} 09:00:00+07:00",
+                "title": title,
+                "body": body,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def test_candidate_strata_are_disjoint_and_skip_already_labelled_rows():
+    articles = _sampling_articles()
+    excluded = {"https://example.test/0", "https://example.test/1", "https://example.test/2"}
+    pool = sampling.prepare_pool(articles, exclude_urls=excluded)
+    plan = sampling.SamplingPlan(
+        quotas={"eval_random": 8, "train_negative": 6, "train_positive": 6, "train_active": 0},
+        seed=7,
+    )
+    drawn = sampling.draw_candidates(pool, plan)
+
+    assert not drawn["url"].duplicated().any()
+    assert not (set(drawn["url"]) & excluded)
+    # Every stratum must be usable exactly as its provenance claims.
+    usage = drawn.groupby("stratum")["usage"].unique().to_dict()
+    assert usage["eval_random"].tolist() == ["eval_or_train"]
+    assert usage["train_negative"].tolist() == ["train_only"]
+    # The model-free strata must be marked as such, so evaluation stays honest.
+    assert not drawn.loc[drawn["stratum"] == "eval_random", "model_informed"].any()
+
+
+def test_candidate_pool_keeps_one_row_per_article_across_tickers():
+    """An article linked to several tickers must not be annotated several times."""
+    shared = {
+        "url": "https://example.test/shared",
+        "published_at": "2024-02-01 09:00:00+07:00",
+        "title": "Tin dùng chung cho nhiều mã",
+        "body": "nội dung dùng chung",
+    }
+    articles = pd.concat(
+        [
+            _sampling_articles(12),
+            pd.DataFrame([{**shared, "ticker": t} for t in ("AAA", "BBB", "CCC")]),
+        ],
+        ignore_index=True,
+    )
+    pool = sampling.prepare_pool(articles)
+    assert (pool["url"] == shared["url"]).sum() == 1
+    assert not pool["url"].duplicated().any()
+
+
+def test_negative_stratum_respects_the_per_ticker_cap():
+    """One dense ticker must not swamp an enrichment stratum."""
+    rows = [
+        {
+            "ticker": "AAA" if i < 40 else "BBB",
+            "url": f"https://example.test/cap{i}",
+            "published_at": "2024-03-01 09:00:00+07:00",
+            "title": f"Công ty {i} báo lỗ nặng",
+            "body": f"Công ty số {i} thua lỗ, nợ xấu tăng và bị xử phạt hành chính.",
+        }
+        for i in range(50)
+    ]
+    pool = sampling.prepare_pool(pd.DataFrame(rows))
+    plan = sampling.SamplingPlan(
+        quotas={"eval_random": 0, "train_negative": 8, "train_positive": 0, "train_active": 0},
+        seed=3,
+        max_ticker_share=0.25,
+    )
+    drawn = sampling.draw_candidates(pool, plan)
+    counts = drawn["ticker"].value_counts()
+    assert len(drawn) == 8
+    # Only two tickers exist, so a literal 25% cap cannot fill 8 rows; the cap
+    # widens to the equal split (4 each) instead of being silently exceeded.
+    assert counts.max() <= 4, counts.to_dict()
+    assert set(counts.index) == {"AAA", "BBB"}
+
+
+def test_label_audit_flags_invalid_labels_and_reports_minority_power():
+    frame = pd.DataFrame(
+        {
+            "url": [f"https://example.test/a{i}" for i in range(6)],
+            "title": [f"tin {i}" for i in range(6)],
+            "stratum": ["eval_random"] * 6,
+            "label": ["NEGATIVE", "NEUTRAL", "NEUTRAL", "POSITIVE", "BOGUS", None],
+        }
+    )
+    report = sampling.audit_labels(frame, valid_labels=("NEGATIVE", "NEUTRAL", "POSITIVE"))
+    assert report["labelled"] == 5
+    assert report["pending"] == 1
+    assert report["distribution"] == {"NEGATIVE": 1, "NEUTRAL": 2, "POSITIVE": 1}
+    assert any("BOGUS" in issue for issue in report["issues"])
+    # A one-sample minority class must be reported as essentially unmeasured.
+    assert report["power_full"]["ci_half_width"] > 0.5
+
+
+def test_finalize_labels_rewrites_both_provenance_fields():
+    """Flipping only the status leaves the loader rejecting the file."""
+    frame = pd.DataFrame(
+        {
+            "url": [f"https://example.test/f{i}" for i in range(4)],
+            "title": [f"tin {i}" for i in range(4)],
+            "body_preview": [f"nội dung {i}" for i in range(4)],
+            "label": ["NEGATIVE", "NEUTRAL", "POSITIVE", None],
+            "annotation_source": ["assistant_prelabel"] * 4,
+            "annotation_status": ["PRELIMINARY_REVIEW_REQUIRED"] * 4,
+        }
+    )
+    out, report = sampling.finalize_labels(
+        frame, valid_labels=("NEGATIVE", "NEUTRAL", "POSITIVE")
+    )
+    assert report["finalized"] == 3
+    assert report["left_preliminary"] == 1
+
+    reviewed = out[out["label"].notna()]
+    assert set(reviewed["annotation_source"]) == {sampling.REVIEWED_SOURCE}
+    assert set(reviewed["annotation_status"]) == {sampling.REVIEWED_STATUS}
+    # The unlabelled row must keep its preliminary provenance.
+    pending = out[out["label"].isna()]
+    assert pending["annotation_source"].iloc[0] == "assistant_prelabel"
+
+    # The finalized rows must now pass the guard that previously rejected them.
+    accepted = reject_preliminary_labels(normalize_labels(reviewed))
+    assert len(accepted) == 3
+    with pytest.raises(ValueError):
+        reject_preliminary_labels(normalize_labels(frame.dropna(subset=["label"])))
+
+
+def test_merge_label_files_keeps_ids_unique_and_separates_usage():
+    """Both batches number rows from zero, so merged ids must be re-keyed."""
+    r1 = pd.DataFrame(
+        {
+            "sample_id": [0, 1],
+            "ticker": ["AAA", "BBB"],
+            "published_at": ["2024-01-01 09:00:00+07:00"] * 2,
+            "title": ["tin cũ 1", "tin cũ 2"],
+            "body_preview": ["nội dung cũ 1", "nội dung cũ 2"],
+            "url": ["https://example.test/old1", "https://example.test/old2"],
+            "label": ["NEGATIVE", "NEUTRAL"],
+        }
+    )
+    b2 = pd.DataFrame(
+        {
+            "sample_id": [0, 1, 2],
+            "ticker": ["AAA", "BBB", "CCC"],
+            "published_at": ["2024-02-01 09:00:00+07:00"] * 3,
+            "title": ["tin mới 1", "tin mới 2", "trùng"],
+            "body_preview": ["nội dung mới 1", "nội dung mới 2", "trùng"],
+            "url": [
+                "https://example.test/new1",
+                "https://example.test/new2",
+                "https://example.test/old1",
+            ],
+            "label": ["POSITIVE", "NEGATIVE", "POSITIVE"],
+            "stratum": ["eval_random", "train_negative", "eval_random"],
+            "usage": ["eval_or_train", "train_only", "eval_or_train"],
+        }
+    )
+    merged, report = sampling.merge_label_files(
+        {"r1": r1, "b2": b2}, valid_labels=("NEGATIVE", "NEUTRAL", "POSITIVE")
+    )
+
+    assert merged["sample_id"].is_unique
+    assert set(merged["sample_id"]) == {"r1-0", "r1-1", "b2-0", "b2-1"}
+    # The url shared with r1 must be dropped, earlier batch winning.
+    assert report["duplicate_urls_removed"] == 1
+    # Rows predating the stratified design stay evaluable.
+    assert report["evaluable_rows"] == 3
+    assert report["train_only_rows"] == 1
+    assert report["distribution"] == {"NEGATIVE": 2, "NEUTRAL": 1, "POSITIVE": 1}
+
+
+def test_stratum_aware_folds_never_evaluate_enriched_rows():
+    """Enriched rows must train only; holdouts come from the prior-preserving strata."""
+    rows = []
+    for i in range(40):
+        evaluable = i % 2 == 0
+        rows.append(
+            {
+                "text": f"tin số {i}",
+                "label_id": i % 3,
+                "stratum": "eval_random" if evaluable else "train_negative",
+            }
+        )
+    frame = pd.DataFrame(rows)
+    folds = experiments.make_stratum_aware_folds(
+        frame, n_splits=4, seed=7, eval_strata=("eval_random",)
+    )
+    enriched = set(frame.index[frame["stratum"] == "train_negative"])
+    evaluable = set(frame.index[frame["stratum"] == "eval_random"])
+
+    seen_holdout: set[int] = set()
+    for train_idx, holdout_idx in folds:
+        assert not (set(holdout_idx) & enriched), "enriched rows must never be scored"
+        assert enriched <= set(train_idx), "enriched rows must be in every train fold"
+        assert not (set(train_idx) & set(holdout_idx))
+        seen_holdout |= set(holdout_idx)
+    # Every evaluable row is scored exactly once across the folds.
+    assert seen_holdout == evaluable
+
+
+def test_stratum_aware_folds_reject_an_empty_evaluation_pool():
+    frame = pd.DataFrame(
+        {"text": [f"t{i}" for i in range(12)], "label_id": [i % 3 for i in range(12)],
+         "stratum": ["train_negative"] * 12}
+    )
+    with pytest.raises(ValueError, match="evaluation strata"):
+        experiments.make_stratum_aware_folds(
+            frame, n_splits=3, seed=1, eval_strata=("eval_random",)
+        )
+
+def test_stratum_aware_folds_reject_missing_provenance_column():
+    frame = pd.DataFrame(
+        {"text": [f"t{i}" for i in range(12)], "label_id": [i % 3 for i in range(12)]}
+    )
+
+    with pytest.raises(ValueError, match="no 'stratum' column"):
+        experiments.make_stratum_aware_folds(
+            frame, n_splits=3, seed=1, eval_strata=("eval_random",)
+        )

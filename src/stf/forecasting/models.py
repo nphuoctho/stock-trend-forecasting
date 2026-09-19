@@ -140,6 +140,55 @@ class RandomBaseline:
         return rng.choice(self.num_classes, size=int(n), p=self.probs_)
 
 
+class ClassicalBaseline:
+    """Multinomial logistic regression over the last session's flattened features.
+
+    A single-row classical learner for the price-only / price-plus-sentiment
+    contrast the method chapter requires. It consumes the final timestep of the
+    same windows the LSTMs use, so both model families are scored on identical
+    rows and identical test dates.
+    """
+
+    def __init__(self, *, seed: int = 42, max_iter: int = 2000) -> None:
+        self.seed = seed
+        self.max_iter = max_iter
+        self.model_ = None
+        self.classes_: np.ndarray | None = None
+
+    def fit(self, X, y) -> "ClassicalBaseline":
+        from sklearn.linear_model import LogisticRegression
+
+        flat = _last_step(X)
+        ids = np.asarray(y, dtype=int)
+        if flat.shape[0] == 0:
+            raise ValueError("Cannot fit ClassicalBaseline on an empty set.")
+        self.model_ = LogisticRegression(
+            max_iter=self.max_iter, random_state=self.seed
+        ).fit(flat, ids)
+        self.classes_ = np.asarray(self.model_.classes_, dtype=int)
+        return self
+
+    def predict_proba(self, X) -> np.ndarray:
+        if self.model_ is None:
+            raise RuntimeError("ClassicalBaseline is not fitted.")
+        raw = self.model_.predict_proba(_last_step(X))
+        # Re-expand to the fixed three-class layout when a train block lacked a class.
+        probs = np.zeros((raw.shape[0], NUM_TREND_CLASSES), dtype=float)
+        for col, cls in enumerate(self.classes_):
+            probs[:, int(cls)] = raw[:, col]
+        return probs
+
+
+def _last_step(X) -> np.ndarray:
+    """Flatten sequence windows to their final timestep, or pass 2-D input through."""
+    arr = np.asarray(X, dtype=float)
+    if arr.ndim == 3:
+        return arr[:, -1, :]
+    if arr.ndim == 2:
+        return arr
+    raise ValueError("Expected a 2-D or 3-D feature array.")
+
+
 def _as_ids(labels) -> np.ndarray:
     """Coerce string/int labels to trend class ids, dropping missing values."""
     arr = np.asarray(list(labels), dtype=object)
@@ -271,21 +320,52 @@ def make_two_branch_sequences(
     return X_price, X_sent, y, pd.DataFrame(meta, columns=["ticker", "observation_date", "target_date"])
 
 
+def predict_lstm(model: nn.Module, X, X_sent=None, *, batch_size: int = 512) -> np.ndarray:
+    """Return class-probability rows for ``X`` under ``model`` in eval mode."""
+    X_t = torch.as_tensor(np.asarray(X), dtype=torch.float32)
+    if X_t.size(0) == 0:
+        return np.empty((0, NUM_TREND_CLASSES), dtype=np.float64)
+    sent_t = None if X_sent is None else torch.as_tensor(np.asarray(X_sent), dtype=torch.float32)
+    model.eval()
+    chunks: list[np.ndarray] = []
+    with torch.no_grad():
+        for start in range(0, X_t.size(0), batch_size):
+            stop = start + batch_size
+            logits = (
+                model(X_t[start:stop])
+                if sent_t is None
+                else model(X_t[start:stop], sent_t[start:stop])
+            )
+            chunks.append(torch.softmax(logits, dim=1).numpy())
+    return np.concatenate(chunks, axis=0).astype(np.float64)
+
+
 def fit_lstm(
     model: nn.Module,
     X,
     y,
     *,
     X_sent=None,
-    epochs: int = 5,
+    X_val=None,
+    y_val=None,
+    X_sent_val=None,
+    epochs: int = 30,
+    batch_size: int = 128,
     lr: float = 1e-3,
+    patience: int = 5,
+    class_weights=None,
     seed: int = 42,
-) -> list[float]:
-    """Train ``model`` with full-batch Adam + cross-entropy; return the loss history.
+) -> dict:
+    """Train ``model`` with mini-batch Adam and return the training history.
 
-    Pass ``X_sent`` to train a :class:`PriceSentimentLSTM` (two-branch forward). This is a
-    real, minimal optimization loop — it does not claim any evaluation result.
+    Pass ``X_sent`` to train a :class:`PriceSentimentLSTM` (two-branch forward).
+    When a validation set is supplied, the epoch with the best validation
+    macro-F1 is restored into ``model`` and training stops after ``patience``
+    epochs without improvement; validation data never reaches a gradient step.
+    Without a validation set the final epoch is kept.
     """
+    if epochs < 1 or batch_size < 1 or patience < 1:
+        raise ValueError("Require epochs>=1, batch_size>=1, patience>=1.")
     set_seed(seed)
     X_t = torch.as_tensor(np.asarray(X), dtype=torch.float32)
     y_t = torch.as_tensor(np.asarray(y), dtype=torch.long)
@@ -293,28 +373,81 @@ def fit_lstm(
         raise ValueError("Cannot train on an empty sequence set.")
     sent_t = None if X_sent is None else torch.as_tensor(np.asarray(X_sent), dtype=torch.float32)
 
+    weight_t = (
+        None
+        if class_weights is None
+        else torch.as_tensor(np.asarray(class_weights), dtype=torch.float32)
+    )
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    criterion = nn.CrossEntropyLoss()
-    history: list[float] = []
-    model.train()
-    for _ in range(int(epochs)):
-        optimizer.zero_grad()
-        logits = model(X_t) if sent_t is None else model(X_t, sent_t)
-        loss = criterion(logits, y_t)
-        loss.backward()
-        optimizer.step()
-        history.append(float(loss.detach()))
-    return history
+    criterion = nn.CrossEntropyLoss(weight=weight_t)
+    generator = torch.Generator().manual_seed(seed)
+
+    has_val = X_val is not None and y_val is not None and len(np.asarray(y_val)) > 0
+    y_val_arr = np.asarray(y_val) if has_val else None
+    best_score = -np.inf
+    best_state: dict | None = None
+    best_epoch = 0
+    stale = 0
+    loss_history: list[float] = []
+    val_history: list[float] = []
+
+    n = X_t.size(0)
+    for epoch in range(1, int(epochs) + 1):
+        model.train()
+        order = torch.randperm(n, generator=generator)
+        epoch_loss = 0.0
+        for start in range(0, n, batch_size):
+            idx = order[start : start + batch_size]
+            optimizer.zero_grad()
+            logits = model(X_t[idx]) if sent_t is None else model(X_t[idx], sent_t[idx])
+            loss = criterion(logits, y_t[idx])
+            loss.backward()
+            optimizer.step()
+            epoch_loss += float(loss.detach()) * idx.numel()
+        loss_history.append(epoch_loss / n)
+
+        if not has_val:
+            continue
+        probs = predict_lstm(model, X_val, X_sent_val)
+        score = evaluate_predictions(y_val_arr, probs.argmax(axis=1))["macro_f1"]
+        val_history.append(score)
+        if score > best_score:
+            best_score = score
+            best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
+            best_epoch = epoch
+            stale = 0
+        else:
+            stale += 1
+            if stale >= patience:
+                break
+
+    if best_state is not None:
+        model.load_state_dict(best_state)
+    return {
+        "loss_history": loss_history,
+        "val_macro_f1_history": val_history,
+        "best_epoch": best_epoch if has_val else len(loss_history),
+        "best_val_macro_f1": float(best_score) if has_val else None,
+        "epochs_run": len(loss_history),
+    }
 
 
-def evaluate_predictions(y_true, y_pred) -> dict:
-    """Accuracy, macro-F1, and balanced accuracy over the DOWN/FLAT/UP classes.
+def evaluate_predictions(y_true, y_pred, y_proba=None) -> dict:
+    """Score forecasting predictions over the fixed DOWN/FLAT/UP class ids.
 
-    A minimal evaluation helper for the LSTM/baseline forecasting models. Scores are
-    computed from real predictions only; nothing here is claimed as a benchmark or
-    scientific result on its own.
+    Reports accuracy, macro-F1, balanced accuracy, per-class
+    precision/recall/F1/support and the confusion matrix. Supplying ``y_proba``
+    adds the macro one-vs-rest ROC-AUC; it is omitted when a test block does not
+    contain every class, because OvR-AUC is undefined for an absent class.
     """
-    from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
+    from sklearn.metrics import (
+        accuracy_score,
+        balanced_accuracy_score,
+        confusion_matrix,
+        f1_score,
+        precision_recall_fscore_support,
+        roc_auc_score,
+    )
 
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
@@ -325,10 +458,30 @@ def evaluate_predictions(y_true, y_pred) -> dict:
     labels = list(range(NUM_TREND_CLASSES))
     if not np.isin(y_true, labels).all() or not np.isin(y_pred, labels).all():
         raise ValueError(f"Labels must use the fixed ids {labels}.")
-    return {
+
+    precision, recall, f1, support = precision_recall_fscore_support(
+        y_true, y_pred, labels=labels, zero_division=0
+    )
+    metrics = {
+        "n": int(len(y_true)),
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "macro_f1": float(
             f1_score(y_true, y_pred, average="macro", labels=labels, zero_division=0)
         ),
         "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
+        "per_class_precision": {TREND_LABELS[i]: float(precision[i]) for i in labels},
+        "per_class_recall": {TREND_LABELS[i]: float(recall[i]) for i in labels},
+        "per_class_f1": {TREND_LABELS[i]: float(f1[i]) for i in labels},
+        "support": {TREND_LABELS[i]: int(support[i]) for i in labels},
+        "confusion_matrix": confusion_matrix(y_true, y_pred, labels=labels).tolist(),
+        "macro_ovr_auc": None,
     }
+    if y_proba is not None:
+        proba = np.asarray(y_proba, dtype=float)
+        if proba.shape != (len(y_true), NUM_TREND_CLASSES):
+            raise ValueError("y_proba must have shape (n_samples, n_classes).")
+        if len(np.unique(y_true)) == NUM_TREND_CLASSES:
+            metrics["macro_ovr_auc"] = float(
+                roc_auc_score(y_true, proba, multi_class="ovr", average="macro", labels=labels)
+            )
+    return metrics
