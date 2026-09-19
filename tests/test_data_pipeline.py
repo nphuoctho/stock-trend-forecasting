@@ -952,23 +952,46 @@ def test_stratum_aware_folds_reject_missing_provenance_column():
         )
 
 
-def test_outer_split_keeps_train_only_rows_out_of_validation():
+def test_outer_split_keeps_enriched_rows_out_of_stratum_aware_validation():
     rows = []
-    for i in range(45):
+    for i in range(120):
         rows.append(
             {
                 "row_id": i,
                 "text": f"tin số {i}",
                 "label_id": i % 3,
-                "usage": "eval_or_train" if i < 30 else "train_only",
+                "stratum": "eval_random" if i < 90 else "train_negative",
             }
         )
     frame = pd.DataFrame(rows)
 
     split = experiments._outer_split(
-        frame, train_idx=list(range(3, 45)), holdout_idx=[0, 1, 2], seed=7
+        frame,
+        train_idx=list(range(3, 120)),
+        holdout_idx=[0, 1, 2],
+        seed=7,
+        eval_strata=("eval_random",),
     )
 
-    train_only_ids = set(range(30, 45))
-    assert train_only_ids <= set(split.train["row_id"])
-    assert not (train_only_ids & set(split.val["row_id"]))
+    enriched_ids = set(range(90, 120))
+    assert enriched_ids <= set(split.train["row_id"])
+    assert not (enriched_ids & set(split.val["row_id"]))
+    assert len(split.val) == 12  # ceil(10% * 117 outer-train rows)
+
+
+def test_outer_split_uses_all_rows_for_ordinary_cross_validation():
+    frame = pd.DataFrame(
+        {
+            "row_id": range(60),
+            "text": [f"tin số {i}" for i in range(60)],
+            "label_id": [i % 3 for i in range(60)],
+            "stratum": ["train_negative"] * 60,
+        }
+    )
+
+    split = experiments._outer_split(
+        frame, train_idx=list(range(3, 60)), holdout_idx=[0, 1, 2], seed=7
+    )
+
+    assert len(split.val) == 6  # ceil(10% * 57 outer-train rows)
+    assert set(split.val["stratum"]) == {"train_negative"}

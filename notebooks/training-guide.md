@@ -3,11 +3,13 @@
 Có hai notebook cho hai mục đích:
 
 - `phobert_finetune.ipynb`: huấn luyện PhoBERT cơ bản và xuất checkpoint.
-- `sentiment_cv.ipynb`: chạy so sánh biến thể đầu vào/cắt token với 5-fold
-  cross-validation và lưu kết quả vào Google Drive.
+- `sentiment_cv.ipynb`: notebook GPU chính thức cho xác thực chéo 5 lượt trên
+  1.306 nhãn trong miền dữ liệu đã rà soát. Nó huấn luyện trên mọi tầng, nhưng
+  chỉ đánh giá holdout ngoài trên các tầng giữ phân phối gốc.
 
-Phần dưới đây hướng dẫn notebook huấn luyện cơ bản; khi cần lấy kết quả so sánh
-theo góp ý GVHD, dùng `sentiment_cv.ipynb`.
+Phần dưới đây hướng dẫn notebook huấn luyện cơ bản. Khi cần chạy lại thực nghiệm
+luận văn, dùng `sentiment_cv.ipynb`, bật Internet/GPU, và attach một phiên bản
+Kaggle Dataset có tệp `labeled_merged.csv` đã được rà soát.
 
 ---
 
@@ -79,9 +81,9 @@ If the session dies during training (free-tier timeout, lost network), you don't
 1. Go to https://www.kaggle.com/code > New Notebook.
 2. Import `sentiment_cv.ipynb` for the cross-validation experiment, or
    `phobert_finetune.ipynb` for the basic training run.
-3. Trong notebook, đính kèm dataset
-   `phuocthoai/stock-trend-forecasting`; mã sẽ tìm `to_label_r1.csv` và
-   `cafef_seed.csv` trong `/kaggle/input/stock-trend-forecasting`.
+3. Đính kèm phiên bản dataset `phuocthoai/stock-trend-forecasting` có tệp
+   `labeled_merged.csv`. Notebook kiểm tra đủ 1.306 nhãn đã rà soát trước khi
+   bắt đầu huấn luyện.
 
 ### Step 2: Enable GPU + Internet
 1. Open the right panel **Settings**.
@@ -119,39 +121,32 @@ save a new notebook version after the run.
    (section 12 extended): upload `articles.parquet`, run `predict_proba` on the title (or
    title+body), and save the output for Phase 3 (ticker-day features).
 
-## Thực nghiệm bắt buộc theo góp ý GVHD
+## Thực nghiệm luận văn hiện tại
 
-Không chọn cấu hình đầu vào dựa trên một lần chia ngẫu nhiên. Với tệp
-Vietstock đã được một người rà soát gán nhãn đầy đủ, chạy `sentiment-cv` cho từng cấu hình:
+Chạy đúng `sentiment_cv.ipynb`, không chạy lại ma trận 306 mẫu cũ. Cấu hình đã
+khóa là:
 
 ```bash
 uv run python -m stf.cli sentiment-cv \
-  --data data/labeled/indomain/to_label_r1.csv \
-  --input-variant title \
-  --truncation-strategy head \
-  --folds 5 --epochs 3 \
-  --output models/experiments/title__head
+  --data data/labeled/indomain/labeled_merged.csv \
+  --input-variant title_context \
+  --truncation-strategy head_tail \
+  --class-weighting inverse_frequency \
+  --folds 5 --epochs 5 --batch-size 16 --seed 42 \
+  --eval-strata eval_random baseline_random \
+  --output models/experiments/merged__title_context__head_tail
 ```
 
-Lặp lại với ba biến thể `title`, `context`, `title_context` và ba cách cắt
-`head`, `tail`, `head_tail`. PhoBERT có tối đa 256 token; phần cắt được thực
-hiện sau khi mã hóa token và trước khi thêm token đặc biệt. `head_tail` giữ
-hai vùng đầu và cuối, không phải cắt chuỗi theo số ký tự.
+Trong mỗi fold, outer holdout chỉ lấy 656 dòng thuộc các tầng bảo toàn phân phối
+gốc. Các dòng làm giàu lớp thiểu số luôn ở train; validation được rút từ tầng
+đánh giá, nhưng có kích thước bằng 10\% của toàn bộ outer train. Không dùng
+holdout hoặc các tầng làm giàu để chọn checkpoint. Báo cáo `macro_f1`,
+`balanced_accuracy`, F1 và recall từng lớp; 59 mẫu NEGATIVE ở holdout toàn bộ
+đòi hỏi diễn giải khoảng tin cậy thận trọng.
 
-Trong mỗi fold, outer holdout chỉ dùng để đánh giá. Một phần 10% của outer
-train được dùng làm validation để chọn checkpoint. Không gộp các kết quả
-holdout vào quá trình chọn mô hình. So sánh `macro-F1` trung bình và độ lệch
-chuẩn qua năm fold; báo cáo thêm accuracy, balanced accuracy và F1 từng lớp.
-
-Tập CafeF hiện chỉ có tiêu đề. Vì vậy, các cấu hình `context` và
-`title_context` trên CafeF sẽ không phải phép so sánh nội miền hợp lệ. Tệp
-Vietstock phải có ít nhất 301 bài, gồm `title`, `body_preview`,
-`published_at`, `url` và `label` cuối đã được người rà soát xác nhận. Không
-dùng bài viết hoặc nhãn phát sinh từ giai đoạn dự báo để huấn luyện mô hình
-cảm xúc.
-
-## Optional quality improvements
-- **In-domain labels:** run `stf.sentiment.make_indomain_sample --n 310` locally,
-  label at least 301 articles by the guideline, and save `to_label_r1.csv`.
-- **Word segmentation:** install `py_vncorenlp` to segment words before tokenizing (PhoBERT was
-  trained on segmented text), which usually improves macro-F1.
+## Cải thiện tùy chọn
+- Nếu mở rộng nhãn, giữ một tầng lấy mẫu ngẫu nhiên độc lập cho đánh giá và đưa
+  các tầng làm giàu chỉ vào huấn luyện; sau rà soát, hợp nhất vào
+  `labeled_merged.csv`.
+- Có thể cài `py_vncorenlp` để tách từ trước khi mã hóa, vì PhoBERT được huấn
+  luyện trên văn bản đã tách từ.

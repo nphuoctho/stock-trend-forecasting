@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import json
 import shutil
 from dataclasses import asdict, replace
@@ -96,18 +97,33 @@ def _prepare_frame(
 
 
 def _outer_split(
-    frame: pd.DataFrame, train_idx: list[int], holdout_idx: list[int], seed: int
+    frame: pd.DataFrame,
+    train_idx: list[int],
+    holdout_idx: list[int],
+    seed: int,
+    *,
+    eval_strata: tuple[str, ...] | None = None,
 ) -> Split:
-    """Create inner train/validation data and keep the outer holdout untouched."""
+    """Create an inner split without leaking train-only rows into model selection."""
     outer_train = frame.iloc[train_idx].reset_index(drop=True)
     outer_test = frame.iloc[holdout_idx].reset_index(drop=True)
-    if "usage" not in outer_train.columns:
+    if eval_strata is None:
         pool = outer_train
         train_only = outer_train.iloc[0:0]
     else:
-        train_only = outer_train[outer_train["usage"] == "train_only"]
-        pool = outer_train[outer_train["usage"] != "train_only"]
-    inner = StratifiedShuffleSplit(n_splits=1, test_size=0.1, random_state=seed)
+        stratum = outer_train["stratum"].astype("string")
+        evaluable = stratum.isna() | stratum.isin(list(eval_strata))
+        pool = outer_train[evaluable]
+        train_only = outer_train[~evaluable]
+
+    # Preserve the documented 10% validation budget of the full outer train,
+    # while drawing it only from the prior-preserving pool when strata are active.
+    validation_size = math.ceil(len(outer_train) * 0.1)
+    if validation_size >= len(pool):
+        raise ValueError("Validation pool is too small for the requested outer split.")
+    inner = StratifiedShuffleSplit(
+        n_splits=1, test_size=validation_size, random_state=seed
+    )
     train_rows, val_rows = next(inner.split(pool, pool["label_id"]))
     train = pd.concat([pool.iloc[train_rows], train_only], ignore_index=True)
     return Split(
@@ -162,7 +178,13 @@ def run_cross_validation(
 
     fold_results = []
     for fold_number, (train_idx, holdout_idx) in enumerate(fold_indices, start=1):
-        split = _outer_split(frame, train_idx, holdout_idx, seed + fold_number)
+        split = _outer_split(
+            frame,
+            train_idx,
+            holdout_idx,
+            seed + fold_number,
+            eval_strata=tuple(eval_strata) if eval_strata else None,
+        )
         fold_cfg = replace(cfg, seed=seed + fold_number)
         fold_dir = out_dir / f"fold-{fold_number:02d}"
         manifest = model.fine_tune(
