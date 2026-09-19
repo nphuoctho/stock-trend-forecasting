@@ -12,7 +12,10 @@ Lần chạy không trọng số và lần chạy có trọng số kiểm tra �
 - chiến lược cắt: `head`, `tail`, `head_tail`;
 - năm fold xác thực chéo phân tầng;
 - ba và năm epoch cho mỗi fold;
-- hạt giống ngẫu nhiên `42`.
+- hạt giống: hạt giống gốc `42`, mỗi fold dùng `42 + chỉ số fold`, nên fold 1 đến fold 5
+  của mỗi cấu hình dùng lần lượt `43, 44, 45, 46, 47` (đọc từ
+  `fold-*/manifest.json`). Lần chạy không trọng số 3 epoch ghi `seed = 42` ở cấp
+  cấu hình. Checkpoint đang dùng cho suy luận là fold 1, hạt giống `43`.
 
 Mục tiêu của lần chạy không trọng số là kiểm tra quy trình và tạo đường cơ sở. Hai lần chạy có trọng số cho thấy cải thiện rõ ở Macro-F1 và balanced accuracy, nhưng vẫn chưa đủ điều kiện để chọn mô hình cảm xúc cuối cùng vì lớp `NEGATIVE` còn được nhận diện rất yếu.
 
@@ -85,7 +88,8 @@ Sáu cấu hình `context` và `title_context` đều có cùng số liệu tổ
 | -----: | ------------------: | ------------: | ------------------: | ----------------: |
 |    306 |            0.266667 |      0.002923 |            0.666737 |          0.333333 |
 
-Không có bằng chứng cho thấy `head`, `tail` hoặc `head_tail` tốt hơn trong nhóm này.
+Ba chiến lược cắt cho cùng một con số. Nguyên nhân là cơ học, không phải bằng chứng
+tương đương: xem mục 4.3.
 
 ### 4.2. Các cấu hình chỉ dùng tiêu đề
 
@@ -97,9 +101,42 @@ Ba cấu hình `title` đều có cùng số liệu tổng hợp:
 
 Khi tạo đầu vào, mã chọn văn bản cuối rồi khử trùng lặp trên chính văn bản đó. Vì vậy, các cấu hình chỉ dùng tiêu đề được ghi nhận với 301 mẫu, trong khi các cấu hình có ngữ cảnh được ghi nhận với 306 mẫu. Hai nhóm không được đánh giá trên cùng số lượng mẫu, do đó không nên diễn giải chênh lệch nhỏ giữa chúng như một ưu thế chắc chắn của dạng đầu vào.
 
-### 4.3. Không chọn cấu hình đứng đầu một cách máy móc
+### 4.3. Chiến lược cắt token không được kích hoạt trên tệp nhãn này
 
-`ablation_summary.csv` đặt `context + tail` ở dòng đầu vì các cấu hình có cùng `macro_f1_mean` và việc sắp xếp cần một thứ tự phá hòa. Đây không phải bằng chứng rằng `context + tail` tốt hơn `context + head`, `context + head_tail` hoặc các cấu hình `title_context`.
+Ba chiến lược `head`, `tail`, `head_tail` cho kết quả trùng nhau đến từng chữ số vì
+chúng **không bao giờ được gọi** trên tệp nhãn hiện dùng. Đo bằng chính tokenizer của
+checkpoint (`models/sentiment/selected`) trên 306 mẫu của `to_label_r1.csv`:
+
+| Dạng đầu vào    | Trung vị | Phân vị 90 | Tối đa | Số mẫu > 256 token |
+| --------------- | -------: | ---------: | -----: | -----------------: |
+| `title`         |       22 |         32 |     71 |              0/306 |
+| `context`       |      109 |        132 |    206 |              0/306 |
+| `title_context` |      130 |        160 |    229 |              0/306 |
+
+Không một mẫu nào đạt tới giới hạn 256 token, nên ba chiến lược tạo ra cùng một chuỗi
+token đầu vào và bắt buộc cho cùng một kết quả. Nguyên nhân gốc là trường `body_preview`
+trong `to_label_r1.csv` bị chặn ở 400 ký tự khi tệp được sinh; `make_indomain_sample.py`
+hiện chặn ở 2000 ký tự, nên một tệp sinh lại sẽ không còn tính chất này.
+
+Vì vậy, **không được báo cáo lần chạy này như một so sánh giữa các chiến lược cắt**. Kết
+luận đúng là: ở độ dài văn bản của tệp nhãn hiện tại, việc cắt không phát sinh, nên thí
+nghiệm không có khả năng phân biệt ba chiến lược. Muốn kiểm định thật, phải gán nhãn lại
+trên nội dung bài đầy đủ; khi nối `to_label_r1.url` với `articles.parquet`, 296/306 mẫu
+có nội dung đầy đủ và khoảng **19% vượt 256 từ** — số token BPE luôn lớn hơn hoặc bằng số
+từ, nên tỷ lệ vượt 256 *token* còn cao hơn 19%. Như vậy chiến lược cắt sẽ thực sự có hiệu
+lực trên tệp gán nhãn lại, nhưng cỡ hiệu ứng dự kiến vẫn nhỏ.
+
+### 4.3.1. Sàn nhiễu của lần chạy có trọng số
+
+Trong lần chạy 5 epoch, `context + head` và `context + head_tail` cho `0.495236`, còn
+`context + tail` cho `0.493463`. Vì đầu vào token là như nhau và hạt giống mỗi fold cũng
+như nhau giữa các cấu hình, khác biệt `0.0018` này **không thể** do chiến lược cắt. Đây là
+dao động không tất định giữa các lần chạy trên GPU. Con số đó là **sàn nhiễu đo được của
+quy trình, khoảng `0.002` Macro-F1**, và mọi chênh lệch nhỏ hơn mức này không được diễn
+giải là khác biệt thực.
+
+`ablation_summary.csv` đặt `context + tail` ở dòng đầu chỉ vì cần một thứ tự phá hòa khi
+mọi cấu hình có cùng `macro_f1_mean`. Đây không phải bằng chứng rằng cấu hình đó tốt hơn.
 
 ### 4.4. Kết quả có trọng số lớp — 3 epoch
 
@@ -181,7 +218,8 @@ Recall `NEGATIVE` theo từng fold là `0.1429`, `0.0000`, `0.0000`, `0.0000`, `
 - Mỗi cấu hình đã hoàn thành năm fold.
 - Kết quả JSON và CSV có đầy đủ số liệu tổng hợp.
 - Tất cả cấu hình dùng cùng hạt giống, siêu tham số và mã băm tệp nhãn.
-- Các chiến lược cắt token không tạo khác biệt quan sát được trong lần chạy này.
+- Chiến lược cắt token không được kích hoạt trên tệp nhãn này (mục 4.3), nên lần chạy
+  không phân biệt được ba chiến lược.
 - Cơ chế lưu trữ mới không làm ma trận ablation đầy đĩa.
 - Lần chạy 5 epoch đã hoàn thành đủ chín cấu hình và lần chạy riêng cấu hình đại diện đã lưu các thư mục `fold-*/best/`.
 
@@ -189,23 +227,67 @@ Recall `NEGATIVE` theo từng fold là `0.1429`, `0.0000`, `0.0000`, `0.0000`, `
 
 - Chưa có cấu hình nào cho thấy khả năng phân loại cân bằng cả ba lớp; ở cấu hình đại diện 5 epoch, lớp `NEGATIVE` vẫn có recall trung bình chỉ `0.0619` và bằng 0 ở ba trên năm fold.
 - Chưa thể kết luận `context` tốt hơn `title`, vì số lượng mẫu sau chuẩn bị đầu vào khác nhau.
-- Chưa nên dùng các kết quả này để sinh đặc trưng cảm xúc cho nhánh dự báo giá.
-- Chưa có mô hình cuối được chọn cho suy luận toàn bộ kho tin.
+- Chưa có bằng chứng cho phép suy rộng chất lượng cảm xúc ra ngoài phạm vi 306 mẫu này.
 
 ## 7. Quyết định nghiên cứu
 
-Không chọn mô hình cuối để gán nhãn toàn bộ kho tin. Lần chạy 5 epoch chỉ cải thiện nhẹ so với 3 epoch:
+**Chốt cấu hình cảm xúc để phục vụ nhánh dự báo giá, và ghi rõ giới hạn của nó.** Lần chạy
+5 epoch chỉ cải thiện nhẹ so với 3 epoch:
 
 - Cấu hình `title_context + head_tail`: Macro-F1 từ `0.506284` lên `0.517616`;
 - Balanced accuracy từ `0.544866` lên `0.547288`;
 - F1 `NEGATIVE` từ `0.0444` lên `0.0767`;
 - Recall `NEGATIVE` đạt `0.0619`, nhưng bằng 0 ở ba trên năm fold.
 
-Tập dữ liệu hiện có 306 mẫu, gồm `31 NEGATIVE`, `204 NEUTRAL` và `71 POSITIVE`. Với 5 fold, mỗi fold chỉ có khoảng sáu mẫu `NEGATIVE`, nên các ước lượng recall của lớp này có độ biến động rất lớn.
+Tập dữ liệu hiện có 306 mẫu, gồm `31 NEGATIVE`, `204 NEUTRAL` và `71 POSITIVE`. Với 5 fold,
+mỗi fold chỉ có khoảng sáu mẫu `NEGATIVE`, nên các ước lượng recall của lớp này có độ biến
+động rất lớn. Tăng thêm epoch không giải quyết được giới hạn này.
 
-Ưu tiên tiếp theo là kiểm tra thủ công 31 mẫu `NEGATIVE` và mở rộng tập dữ liệu, đặc biệt bổ sung các mẫu `NEGATIVE` và `POSITIVE`. Không nên tiếp tục tăng epoch trước khi giải quyết giới hạn về số lượng và độ ổn định của nhãn.
+### 7.1. Checkpoint được chọn và quy tắc chọn
 
-Sau khi có thêm dữ liệu, chạy lại cấu hình `title_context + head_tail` với `inverse_frequency`, giữ nguyên hạt giống và quy trình xác thực chéo. Chỉ sau khi recall `NEGATIVE` ổn định hơn mới chọn mô hình để chạy `score-news`; các đặc trưng cảm xúc chưa được đưa vào nhánh dự báo giá ở thời điểm này.
+Nhánh dự báo giá cần một bộ sinh xác suất cảm xúc để trả lời câu hỏi trung tâm của đồ án.
+Vì vậy checkpoint dùng cho suy luận được chọn từ lần chạy có trọng số 5 epoch của cấu hình
+`title_context + head_tail`, theo quy tắc **fold có Macro-F1 gần nhất với trung bình xác
+thực chéo**:
+
+| Fold | Macro-F1 | Lệch so với trung bình `0.517616` |
+| ---: | -------: | --------------------------------: |
+|    1 | 0.553464 |                        **0.035848** |
+|    2 | 0.464726 |                          0.052890 |
+|    3 | 0.559429 |                          0.041813 |
+|    4 | 0.422852 |                          0.094764 |
+|    5 | 0.587607 |                          0.069991 |
+
+Fold 1 được chọn và giải nén vào `models/sentiment/selected/`. Quy tắc này cố ý **không**
+chọn fold có điểm cao nhất (fold 5): chọn theo điểm cao nhất trên tập holdout là chọn trên
+tập kiểm tra và sẽ cho một ước lượng lạc quan. Fold đại diện cho hiệu năng trung bình là
+lựa chọn không chệch hơn.
+
+### 7.2. Khớp độ dài đầu vào giữa huấn luyện và suy luận
+
+Checkpoint được huấn luyện trên `title` cộng `body_preview` bị chặn 400 ký tự, trong khi
+`articles.parquet` giữ nội dung đầy đủ (trung vị 429 ký tự, phân vị 90 là 2218 ký tự). Nếu
+suy luận trên nội dung đầy đủ, đầu vào sẽ dài hơn hẳn miền huấn luyện. Do đó `score-news`
+được chạy với `--context-chars 400` để giữ độ dài ngữ cảnh trong đúng miền của checkpoint.
+
+### 7.3. Giới hạn phải nêu kèm mọi kết quả dùng đặc trưng cảm xúc
+
+- Recall `NEGATIVE` là `0.0619`; tin xấu bị nhận diện rất yếu.
+- Đặc trưng đưa vào nhánh dự báo là **phân phối xác suất mềm**, không phải nhãn cứng, nên
+  nhiễu ở lớp thiểu số làm suy giảm tín hiệu thay vì tạo nhãn sai dứt khoát.
+- Mọi kết luận về đóng góp của cảm xúc phải được phát biểu kèm chất lượng bộ sinh cảm xúc
+  này; một kết quả "không cải thiện" có thể do tín hiệu yếu, do bộ sinh yếu, hoặc cả hai.
+  Đồ án không được quy kết nguyên nhân khi chưa có bằng chứng tách bạch.
+
+### 7.4. Việc còn lại để nâng chất lượng cảm xúc
+
+Mở rộng tập nhãn, đặc biệt lớp `NEGATIVE`, và bổ sung tập hạt giống CafeF (999 mẫu,
+`564 POSITIVE / 249 NEUTRAL / 186 NEGATIVE`) vào **phần huấn luyện của từng fold**, giữ 306
+mẫu in-domain làm tập đánh giá duy nhất. Nếu gộp thẳng thành một tập 1.305 mẫu rồi chia
+5-fold, phần lớn mẫu kiểm tra sẽ là tiêu đề CafeF và con số Macro-F1 sẽ bị lạc quan. CafeF
+chỉ có tiêu đề nên phải chạy ở dạng `title`, hoặc ghi rõ là đầu vào trộn độ dài. Ngoài ra,
+nhãn CafeF mô tả sắc thái tiêu đề, còn hướng dẫn gán nhãn của đồ án mô tả tác động giá kỳ
+vọng ngắn hạn; nếu dùng, phải nêu đây là một giả định chuyển miền.
 
 ## 8. Tệp cần lưu trữ
 

@@ -147,18 +147,141 @@ gán nhãn có nội dung bài viết.
 
 ### Gán nhãn cảm xúc cho tin đã crawl
 
-Sau khi có checkpoint đã huấn luyện (`models/sentiment/best` hoặc thư mục fold
-tương ứng), sinh xác suất 3 lớp cho toàn bộ tin đã crawl và lưu ra parquet:
+Checkpoint đại diện đang dùng nằm ở `models/sentiment/selected/` (fold có Macro-F1 gần
+trung bình xác thực chéo nhất; xem `docs/sentiment-experiment-results.md` mục 7.1).
+
+`--context-chars` giữ độ dài ngữ cảnh khớp với tệp nhãn đã huấn luyện. Tệp nhãn chặn
+`body_preview` ở 400 ký tự, còn `articles.parquet` giữ nội dung đầy đủ; bỏ cờ này sẽ suy
+luận trên đầu vào dài hơn miền huấn luyện.
 
 ```bash
 uv run python -m stf.cli score-news \
-  --model-dir models/sentiment/best \
-  --input-variant title \
+  --model-dir models/sentiment/selected \
+  --input-variant title_context \
+  --context-chars 400 \
+  --batch-size 64 \
   --output data/processed/news_sentiment.parquet
 ```
 
 > This machine has no GPU/CUDA. Real fine-tuning should run on a GPU (Google Colab/Kaggle).
 > See `notebooks/training-guide.md`.
+
+## Phase 4: forecasting experiment
+
+`forecast-smoke` only proves the code runs. `forecast` is the command that produces
+reportable numbers: it loads the real price parquets, optionally a `score-news` parquet,
+and runs the full ladder on walk-forward windows.
+
+```bash
+# Price-only control: every session gets the neutral prior. Same config as below,
+# so the two runs differ only in whether the sentiment branch carries information.
+uv run python -m stf.cli forecast --windows 5 --test-size 60 --val-size 60 \
+  --epochs 40 --patience 6 --seeds 42 43 44 --output outputs/forecast_price_only
+
+# Full ladder with sentiment; both arms share identical windows, seeds and test rows
+uv run python -m stf.cli forecast \
+  --news-sentiment data/processed/news_sentiment.parquet \
+  --windows 5 --test-size 60 --val-size 60 --epochs 40 --patience 6 \
+  --seeds 42 43 44 --output outputs/forecast
+
+# Split the two-branch gain into architecture effect and information gain
+uv run python -m stf.cli forecast-compare \
+  --real outputs/forecast --control outputs/forecast_price_only \
+  --output outputs/forecast/information_gain.json
+```
+
+The ladder is `majority`, `random`, `logreg_price`, `logreg_price_sentiment`,
+`lstm_price`, `lstm_price_sentiment`. Per window the command refits the trend thresholds
+and both feature scalers on training rows only, selects each LSTM checkpoint on that
+window's validation macro-F1, and scores every arm once on the same test rows. Results
+are averaged over `--seeds`. The sentiment contribution is reported twice: as a paired
+per-window delta bootstrapped over the 5 windows, and as a bootstrap over the ~300 test
+**dates** (all tickers of a date resample together). Prefer the date-block interval; the
+window interval has only 5 blocks and is coarse enough to exclude zero by accident.
+
+`forecast-compare` exists because comparing the two-branch arm against the single-branch
+price model conflates two changes: the extra branch, and the information it carries. The
+control run keeps the architecture and removes only the information, so
+`architecture_effect + information_gain = naive_delta` exactly.
+
+Artifacts written to `--output`:
+
+| File | Content |
+| --- | --- |
+| `forecast_results.json` | full record: per-window thresholds, dates, class distributions, per-seed metrics, ablation deltas with CI, news stratification, data hashes |
+| `forecast_metrics.csv` | the summary table for the report |
+| `forecast_stratified.csv` | per-window/seed metrics split by whether the row had news |
+| `forecast_predictions.csv` | test predictions for every arm and seed, for error analysis |
+
+The three trend classes are cut at the training window's return terciles, so the classes
+are balanced by construction and **the chance level is 0.333, not 0.5**. Report `macro_f1`,
+`balanced_accuracy` and macro OvR-AUC; accuracy alone is not interpretable here.
+
+## Expanding the sentiment label set
+
+`label-candidates` draws a stratified annotation batch. A uniform draw spends the budget
+on the neutral majority — the first 306-row batch yielded only 31 `NEGATIVE` — so the
+command splits the draw into one stratum that preserves the corpus prior and several that
+oversample the minority classes.
+
+```bash
+uv run python -m stf.cli label-candidates \
+  --exclude data/labeled/indomain/to_label_r1.csv \
+  --news-sentiment data/processed/news_sentiment.parquet \
+  --eval-random 350 --negative 400 --positive 250 --active 0 \
+  --output data/labeled/indomain/to_label_batch2.csv
+
+# After annotating: validate structure and report minority-class precision
+uv run python -m stf.cli label-audit --data data/labeled/indomain/to_label_batch2_ai.csv
+
+# Attest that a human confirmed the labels; rewrites BOTH provenance fields
+uv run python -m stf.cli label-finalize --data data/labeled/indomain/to_label_batch2_ai.csv
+
+# Union with the earlier batch; ids are re-keyed so they cannot collide
+uv run python -m stf.cli label-merge \
+  r1=data/labeled/indomain/to_label_r1.csv \
+  b2=data/labeled/indomain/to_label_batch2_ai.csv \
+  --output data/labeled/indomain/labeled_merged.csv
+
+# Train on everything, score only the prior-preserving strata
+uv run python -m stf.cli sentiment-cv \
+  --data data/labeled/indomain/labeled_merged.csv \
+  --input-variant title_context --truncation-strategy head_tail \
+  --class-weighting inverse_frequency --epochs 5 --folds 5 \
+  --eval-strata eval_random baseline_random \
+  --output models/experiments/merged__title_context__head_tail
+```
+
+| Stratum | Selection | Use |
+| --- | --- | --- |
+| `eval_random` | uniform over the deduplicated pool; no model or lexicon input | the only stratum valid for an unbiased overall estimate |
+| `train_negative` | negative lexicon hit, weighted random draw by cue count, capped per ticker | training only |
+| `train_positive` | same, positive side | training only |
+| `train_active` | lowest checkpoint confidence | training only; the one model-informed stratum |
+
+Every row records its own `usage` and `model_informed`, so the provenance cannot drift from
+how the row was chosen. Lexicon hits only decide which articles a human reads; they never
+assign a label.
+
+Enrichment is ordered by the **lexicon**, not by the checkpoint's probabilities. Measured on
+all 306 already-labelled rows, a negative cue raises the `NEGATIVE` rate from the 10.1%
+corpus base rate to 28.9% (2.9x). The checkpoint's probabilities looked much stronger, but
+that was measured on rows it had trained on; re-measured on fold-01's 62 unseen rows the
+advantage could not be confirmed (only 16 eligible rows, 7 `NEGATIVE`), so it is not used for
+ranking. The lexicon is a fixed rule that never saw a label, so its 2.9x figure is honest.
+Expect roughly 25–30% `NEGATIVE` in `train_negative`.
+
+`--eval-strata` keeps the enriched rows in every training fold and folds the holdout only
+over the strata that preserve the corpus prior; files predating this design default to
+`baseline_random` and stay evaluable. This costs minority-class precision — 59 evaluable
+`NEGATIVE` rows give a recall interval of about ±0.128, against ±0.070 if all 194 were
+scored — but a wider unbiased interval beats a narrow one computed on rows selected for
+being rare. `label-candidates` writes a `*_manifest.json` with the quotas, seed,
+eligible-set sizes and inclusion probability of every stratum.
+
+`body_preview` is capped at 400 characters to match the existing rows, so a merged file has a
+single model-input length; `body_context` carries 2000 characters purely for the human
+annotator and is never a model input.
 
 ## Tests
 

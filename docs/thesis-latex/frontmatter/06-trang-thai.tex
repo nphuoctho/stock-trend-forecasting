@@ -1,11 +1,11 @@
-% Trang trạng thái tiến độ - chỉ có trong bản báo cáo tiến độ
-\chapter*{TRẠNG THÁI TIẾN ĐỘ}
-\addcontentsline{toc}{chapter}{Trạng thái tiến độ}
+% Completion-status page: which chapters are done and which proposal items were deferred.
+\chapter*{TRẠNG THÁI HOÀN THÀNH}
+\addcontentsline{toc}{chapter}{Trạng thái hoàn thành}
 
-Bản báo cáo này trình bày đồ án đến trạng thái hiện tại, được chốt vào ngày 15
+Bản báo cáo này trình bày đồ án đến trạng thái hiện tại, được chốt vào ngày 17
 tháng 9 năm 2026. Nội dung chỉ ghi nhận các công việc đã thực hiện; các hạng mục
-chưa hoàn thành được đánh dấu là đang thực hiện hoặc dự kiến, không trình bày trước
-các kết quả chưa được đo lường.
+chưa hoàn thành được đánh dấu là chưa thực hiện, không trình bày trước các kết quả
+chưa được đo lường.
 
 \begin{table}[H]
   \centering
@@ -16,15 +16,23 @@ các kết quả chưa được đo lường.
     \midrule
     1 & Mở đầu & Đã hoàn thành \\
     2 & Tổng quan & Đã hoàn thành \\
-    3 & Phương pháp và dữ liệu & Đã hoàn thành phần lớn \\
-    4 & Kết quả thực nghiệm & Đang thực hiện, chưa có số liệu \\
-    5 & Kết luận và kế hoạch & Kết luận tạm thời \\
-    6 & Hướng phát triển & Đã có khung \\
+    3 & Phương pháp và dữ liệu & Đã hoàn thành \\
+    4 & Kết quả thực nghiệm & Đã hoàn thành, có số liệu \\
+    5 & Kết luận & Đã hoàn thành \\
+    6 & Hướng phát triển & Đã hoàn thành \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\noindent Tóm tắt trạng thái: Dữ liệu hiện đã có snapshot gồm giá của 10 mã VN30 và
-10.695 bài tin có mốc thời gian và nội dung. Quy trình chuẩn bị dữ liệu và chạy thử
-PhoBERT đã được thực hiện. Bước tiếp theo là huấn luyện chính thức trên GPU để có
-số liệu cho Chương 4.
+\noindent Tóm tắt trạng thái: dữ liệu gồm giá của 10 mã VN30 (14.990 dòng mã--phiên) và
+10.695 bài tin có mốc thời gian và nội dung. Mô hình cảm xúc PhoBERT đã tinh chỉnh trên
+GPU với xác thực chéo 5 fold; điểm kiểm đại diện đã sinh xác suất ba lớp cho toàn bộ
+12.624 liên kết tin--mã. Thang mô hình dự báo đã chạy đầy đủ trên 5 cửa sổ cuốn chiếu và
+3 hạt giống, kèm lần chạy đối chứng để tách hiệu ứng kiến trúc khỏi đóng góp thông tin của
+cảm xúc.
+
+\noindent Hai hạng mục của đề cương chưa thực hiện và đã được chuyển sang Chương 6: mô
+hình Temporal Fusion Transformer, và biến thể PhoBERT kết hợp CNN hoặc BiLSTM. Hệ thống
+demo trực quan hóa cũng chưa thực hiện; quy trình hiện được điều khiển qua dòng lệnh. Đợt
+mở rộng 1.000 nhãn đã được người rà soát xác nhận và hợp nhất thành 1.306 mẫu, nhưng lần
+xác thực chéo GPU theo thiết kế tầng chưa chạy nên chưa góp vào kết quả nào của báo cáo.

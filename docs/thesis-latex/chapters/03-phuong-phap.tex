@@ -555,12 +555,17 @@ luật từ dữ liệu, nhưng cần thiết để kiểm tra một kiến trú
 
 \subsection{Tầng mô hình cổ điển chỉ giá}
 
-hồi quy logistic, rừng ngẫu nhiên và XGBoost chỉ nhận vector đặc trưng giá. Các mô
-hình này tạo mốc phi tuần tự để kiểm tra đặc trưng engineering và cho biết dữ liệu có tín
-hiệu đủ rõ trước khi dùng mô hình sâu hay không. Chúng không được nhận bất kỳ cột
-cảm xúc nào, kể cả số tin, cờ có tin hoặc siêu dữ liệu phát sinh từ văn bản. Siêu tham số
-của mỗi mô hình được chọn trên xác thực, còn kiểm thử chỉ được dùng sau khi cấu hình đã
-được khóa.
+Tầng này dùng một bộ phân loại phi tuần tự nhận véc-tơ đặc trưng giá của phiên quan sát
+cuối cùng trong cửa sổ, nhằm tạo mốc so sánh cho biết dữ liệu có tín hiệu đủ rõ trước khi
+dùng mô hình sâu hay không. Cấu hình đã thực hiện là hồi quy logistic đa lớp. Rừng ngẫu
+nhiên và XGBoost được nêu trong đề cương nhưng không được chạy: chúng trả lời cùng một câu
+hỏi với hồi quy logistic, trong khi câu hỏi trung tâm của đề tài là phần đóng góp của cảm
+xúc, nên ngân sách thực nghiệm được dành cho phép đối chứng đó.
+
+Tầng cổ điển được chạy ở cả hai dạng, chỉ giá và giá kèm cảm xúc, trên đúng các dòng mà
+mô hình tuần tự sử dụng, để hai họ mô hình được chấm trên cùng tập mẫu. Dạng chỉ giá không
+nhận bất kỳ cột cảm xúc nào, kể cả số tin, cờ có tin hoặc siêu dữ liệu phát sinh từ văn
+bản.
 
 \subsection{Tầng LSTM chỉ giá}
 
@@ -615,22 +620,29 @@ kết quả sạch nếu bộ chuẩn hóa, ngưỡng, lựa chọn đặc trưn
 liệu tương lai. Giao thức vì vậy dùng cuốn chiếu theo thời gian, khóa tập giữ lại cuối và kiểm tra các phép
 biến đổi.
 
-\subsection{Cuốn chiếu theo thời gian và tập giữ lại cuối}
+\subsection{Cuốn chiếu theo thời gian}
 
-Tất cả mã được chia theo mốc ngày chung. Một cửa sổ cuốn chiếu theo thời gian gồm tập huấn luyện ở quá khứ,
-xác thực ở đoạn kế tiếp và kiểm thử ở đoạn sau. Sau khi chọn cấu hình, tập giữ lại cuối được
-giữ nguyên và chỉ chạy một lần để báo cáo. Có thể dùng expanding window để tăng dần dữ
-liệu tập huấn luyện hoặc rolling window để giới hạn lịch sử; lựa chọn, độ dài các đoạn và bước
-dịch cửa sổ phải được ghi trong bản kê. Mỗi cửa sổ phải chỉ rõ ngày cuối của tập huấn luyện,
-ngày bắt đầu và kết thúc của xác thực, ngày bắt đầu và kết thúc của kiểm thử, cùng số mẫu
-thực sự sau khi tạo cửa sổ lịch sử.
+Tất cả mã được chia theo mốc ngày chung. Một cửa sổ cuốn chiếu theo thời gian gồm tập huấn
+luyện ở quá khứ, xác thực ở đoạn kế tiếp và kiểm thử ở đoạn sau. Có thể dùng cửa sổ mở
+rộng để tăng dần dữ liệu huấn luyện hoặc cửa sổ trượt để giới hạn lịch sử; lựa chọn, độ
+dài các đoạn và bước dịch cửa sổ phải được ghi trong bản kê. Mỗi cửa sổ phải chỉ rõ ngày
+cuối của tập huấn luyện, ngày bắt đầu và kết thúc của xác thực, ngày bắt đầu và kết thúc
+của kiểm thử, cùng số mẫu thực sự sau khi tạo cửa sổ lịch sử.
 
-Với expanding window, không trộn mẫu của một ngày giữa tập huấn luyện và kiểm thử. Các mã cùng ngày
-phải nằm trong cùng chia tập để tránh một mã tiết lộ trạng thái thị trường cho mã khác qua
-cách chia lệch. Mẫu được tạo từ cửa sổ lịch sử cũng phải cắt theo ngày mục tiêu, không
-chỉ theo ngày bắt đầu cửa sổ. Nếu một mẫu dùng lịch sử có phần nằm ở giai đoạn trước
-nhưng nhãn mục tiêu nằm sau mốc chia, mẫu đó thuộc chia tập của nhãn và phải được kiểm tra
-riêng trong kiểm tra.
+Cấu hình đã thực hiện dùng năm cửa sổ mở rộng, mỗi cửa sổ có 60 ngày xác thực và 60 ngày
+kiểm thử, các đoạn kiểm thử không chồng lấn nhau. \textbf{Không có tập giữ lại cuối tách
+riêng}, vì cũng \textbf{không có bước tìm kiếm siêu tham số}: cấu hình mô hình được cố
+định trước khi chạy và không thay đổi sau khi xem kết quả. Trong mỗi cửa sổ, tập xác thực
+chỉ dùng để chọn điểm dừng huấn luyện, còn đoạn kiểm thử được chấm đúng một lần. Vì không
+có cấu hình nào được tinh chỉnh trên đoạn kiểm thử, một tập giữ lại thứ hai không bổ sung
+thêm bảo đảm nào; việc nêu rõ điều này đúng hơn là mô tả một tập giữ lại mà kết quả không
+có.
+
+Với cửa sổ mở rộng, không trộn mẫu của một ngày giữa tập huấn luyện và kiểm thử. Các mã
+cùng ngày phải nằm trong cùng chia tập để tránh một mã tiết lộ trạng thái thị trường cho
+mã khác qua cách chia lệch. Mẫu được tạo từ cửa sổ lịch sử cũng phải cắt theo ngày mục
+tiêu, không chỉ theo ngày bắt đầu cửa sổ. Nếu một mẫu dùng lịch sử có phần nằm ở giai đoạn
+trước nhưng nhãn mục tiêu nằm sau mốc chia, mẫu đó thuộc chia tập của nhãn.
 
 Trong cấu hình hiện tại, các đoạn chia theo ngày mục tiêu được đặt liền nhau và không
 chèn khoảng cấm. Với nhãn phiên kế tiếp, giá dùng để tạo đặc trưng tại ngày quan sát
@@ -685,12 +697,27 @@ ngày kiểm thử để tạo chênh lệch theo cặp:
   \label{eq:ablation-delta}
 \end{equation}
 
-với $m$ là F1 vĩ mô, độ chính xác cân bằng hoặc AUC-ROC một-chống-còn-lại. Khoảng tin cậy được ước
-lượng bằng lấy mẫu lặp theo khối ngày hoặc theo phần chia để hạn chế giả định độc lập không
-phù hợp với chuỗi thời gian. Số lần resample, hạt giống và cách xử lý phần chia phải được ghi
-lại. Nếu khoảng tin cậy của $\Delta_m$ chứa 0, kết luận phù hợp là chưa có bằng chứng
-rõ rằng cảm xúc cải thiện chỉ số đó trong giao thức hiện tại, không phải khẳng định
-cảm xúc không hữu ích trong mọi bối cảnh.
+với $m$ là F1 vĩ mô, độ chính xác cân bằng hoặc AUC-ROC một-chống-còn-lại. Khoảng tin cậy
+được ước lượng bằng hai cách lấy mẫu lặp, cả hai đều được báo cáo. Cách thứ nhất lấy mẫu
+lặp trên các cửa sổ; cách thứ hai lấy mẫu lặp trên các \emph{ngày} kiểm thử, trong đó mọi
+mã của cùng một ngày được lấy cùng nhau để giữ tương quan chéo trong một phiên. Cách thứ
+hai được ưu tiên khi số cửa sổ nhỏ, vì một khoảng tin cậy dựng từ năm khối rất thô và có
+thể loại trừ 0 một cách ngẫu nhiên. Số lần lấy mẫu lặp và hạt giống phải được ghi lại. Nếu
+khoảng tin cậy của $\Delta_m$ chứa 0, kết luận phù hợp là chưa có bằng chứng rõ rằng cảm
+xúc cải thiện chỉ số đó trong giao thức hiện tại, không phải khẳng định cảm xúc không hữu
+ích trong mọi bối cảnh.
+
+Công thức~\eqref{eq:ablation-delta} một mình chưa tách được nguồn của chênh lệch, vì mô
+hình hai nhánh khác mô hình chỉ giá ở cả kiến trúc lẫn thông tin đầu vào. Vì vậy giao thức
+bổ sung một lần chạy đối chứng giữ nguyên kiến trúc hai nhánh nhưng thay véc-tơ xác suất
+cảm xúc bằng một phân phối tiên nghiệm trung tính hằng số. Khi đó
+\begin{align}
+  \text{hiệu ứng kiến trúc} &= m(\text{hai nhánh, tiên nghiệm trung tính}) - m(\text{chỉ giá}),\\
+  \text{đóng góp thông tin} &= m(\text{hai nhánh, cảm xúc thật}) - m(\text{hai nhánh, tiên nghiệm trung tính}),
+\end{align}
+và tổng của hai thành phần bằng đúng $\Delta_m$. Điều kiện để phép tách có hiệu lực là hai
+lần chạy phải dùng cùng cấu hình, cùng cửa sổ và cùng hạt giống, nên các mô hình chỉ giá
+của hai lần chạy phải cho kết quả trùng khớp.
 
 \subsection{Phân tích độ bền và điều kiện phát huy tín hiệu}
 
