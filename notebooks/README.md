@@ -65,5 +65,7 @@ The cross-validation notebook writes to its configured `OUTPUT_DIR`:
 - `cv_results.json` and `cv_results.csv` with fold and aggregate metrics;
 - `fold-01/` through `fold-05/`, each with `best/` and `manifest.json`.
 
-It does not export a confusion matrix or per-row predictions. The checkpoint used
-for downstream scoring must be selected from the saved fold artifacts.
+It does not export a confusion matrix or per-row predictions. Fold checkpoints are
+cross-validation artifacts and must not be selected using their outer-holdout metrics.
+Downstream scoring requires either an ensemble of all five folds or a full-data refit
+whose checkpoint rule uses validation data only; this notebook does not implement that refit.
