@@ -950,3 +950,25 @@ def test_stratum_aware_folds_reject_missing_provenance_column():
         experiments.make_stratum_aware_folds(
             frame, n_splits=3, seed=1, eval_strata=("eval_random",)
         )
+
+
+def test_outer_split_keeps_train_only_rows_out_of_validation():
+    rows = []
+    for i in range(45):
+        rows.append(
+            {
+                "row_id": i,
+                "text": f"tin số {i}",
+                "label_id": i % 3,
+                "usage": "eval_or_train" if i < 30 else "train_only",
+            }
+        )
+    frame = pd.DataFrame(rows)
+
+    split = experiments._outer_split(
+        frame, train_idx=list(range(3, 45)), holdout_idx=[0, 1, 2], seed=7
+    )
+
+    train_only_ids = set(range(30, 45))
+    assert train_only_ids <= set(split.train["row_id"])
+    assert not (train_only_ids & set(split.val["row_id"]))

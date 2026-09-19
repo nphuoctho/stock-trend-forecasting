@@ -101,11 +101,18 @@ def _outer_split(
     """Create inner train/validation data and keep the outer holdout untouched."""
     outer_train = frame.iloc[train_idx].reset_index(drop=True)
     outer_test = frame.iloc[holdout_idx].reset_index(drop=True)
+    if "usage" not in outer_train.columns:
+        pool = outer_train
+        train_only = outer_train.iloc[0:0]
+    else:
+        train_only = outer_train[outer_train["usage"] == "train_only"]
+        pool = outer_train[outer_train["usage"] != "train_only"]
     inner = StratifiedShuffleSplit(n_splits=1, test_size=0.1, random_state=seed)
-    train_rows, val_rows = next(inner.split(outer_train, outer_train["label_id"]))
+    train_rows, val_rows = next(inner.split(pool, pool["label_id"]))
+    train = pd.concat([pool.iloc[train_rows], train_only], ignore_index=True)
     return Split(
-        outer_train.iloc[train_rows].reset_index(drop=True),
-        outer_train.iloc[val_rows].reset_index(drop=True),
+        train.reset_index(drop=True),
+        pool.iloc[val_rows].reset_index(drop=True),
         outer_test,
     )
 
