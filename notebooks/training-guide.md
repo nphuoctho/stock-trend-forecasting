@@ -137,12 +137,12 @@ uv run python -m stf.cli sentiment-cv \
   --output models/experiments/merged__title_context__head_tail
 ```
 
-Trong mỗi fold, outer holdout chỉ lấy 656 dòng thuộc các tầng bảo toàn phân phối
-gốc. Các dòng làm giàu lớp thiểu số luôn ở train; validation được rút từ tầng
-đánh giá, nhưng có kích thước bằng 10\% của toàn bộ outer train. Không dùng
-holdout hoặc các tầng làm giàu để chọn checkpoint. Báo cáo `macro_f1`,
-`balanced_accuracy`, F1 và recall từng lớp; 59 mẫu NEGATIVE ở holdout toàn bộ
-đòi hỏi diễn giải khoảng tin cậy thận trọng.
+Năm outer holdout cộng lại gồm 656 dòng thuộc các tầng bảo toàn phân phối gốc,
+tương đương khoảng 131 dòng mỗi fold. Các dòng làm giàu lớp thiểu số luôn ở
+train; validation được rút từ tầng đánh giá, nhưng có kích thước bằng 10\% của
+toàn bộ outer train. Không dùng holdout hoặc các tầng làm giàu để chọn checkpoint.
+Báo cáo `macro_f1`, `balanced_accuracy`, F1 và recall từng lớp; 59 mẫu NEGATIVE
+ở toàn bộ holdout đòi hỏi diễn giải khoảng tin cậy thận trọng.
 
 ## Cải thiện tùy chọn
 - Nếu mở rộng nhãn, giữ một tầng lấy mẫu ngẫu nhiên độc lập cho đánh giá và đưa

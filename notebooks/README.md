@@ -53,11 +53,17 @@ branch set to the repaired source.
 
 ## Output
 
-Every run writes to `runs/phobert-sentiment-<timestamp>/`:
-- `best/` - model + tokenizer.
-- `manifest.json` - versions, seed, hyperparameters, test metrics (for reproducibility).
-- `test_classification_report.txt` / `test_report.json` - metrics to cite in the report.
-- `confusion_matrix.png` / `.csv` - ready to drop into the report.
-- `train_log_history.csv` - per-epoch loss/metric for debugging.
+### `phobert_finetune.ipynb`
 
-The `predict_proba` helper then generates 3-class probabilities for the news corpus (next step).
+The basic notebook writes to `runs/phobert-sentiment-<timestamp>/`:
+- `best/`, `manifest.json`, and `train_log_history.csv`;
+- `test_classification_report.txt`, `test_report.json`, and a confusion matrix.
+
+### `sentiment_cv.ipynb`
+
+The cross-validation notebook writes to its configured `OUTPUT_DIR`:
+- `cv_results.json` and `cv_results.csv` with fold and aggregate metrics;
+- `fold-01/` through `fold-05/`, each with `best/` and `manifest.json`.
+
+It does not export a confusion matrix or per-row predictions. The checkpoint used
+for downstream scoring must be selected from the saved fold artifacts.

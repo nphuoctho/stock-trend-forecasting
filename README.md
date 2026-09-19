@@ -234,6 +234,9 @@ uv run python -m stf.cli label-candidates \
 # After annotating: validate structure and report minority-class precision
 uv run python -m stf.cli label-audit --data data/labeled/indomain/to_label_batch2_ai.csv
 
+# Record the completed human review of the legacy batch as well.
+uv run python -m stf.cli label-finalize --data data/labeled/indomain/to_label_r1.csv
+
 # Attest that a human confirmed the labels; rewrites BOTH provenance fields
 uv run python -m stf.cli label-finalize --data data/labeled/indomain/to_label_batch2_ai.csv
 
