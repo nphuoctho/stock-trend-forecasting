@@ -234,7 +234,7 @@ So với baseline, hai lớp thiểu số không còn bị bỏ qua hoàn toàn.
 
 Recall `NEGATIVE` theo từng fold là `0.1429`, `0.0000`, `0.0000`, `0.0000`, `0.1667`; ba trên năm fold không nhận diện đúng mẫu `NEGATIVE` nào. Vì chỉ có 31 mẫu `NEGATIVE`, một mẫu đúng hoặc sai đã làm recall của một fold thay đổi khoảng 16–17 điểm phần trăm.
 
-## 6. Đánh giá trạng thái thực nghiệm
+## 6. Đánh giá trạng thái lịch sử trên 306 mẫu
 
 ### Đã xác nhận
 
@@ -247,27 +247,20 @@ Recall `NEGATIVE` theo từng fold là `0.1429`, `0.0000`, `0.0000`, `0.0000`, `
 - Cơ chế lưu trữ mới không làm ma trận ablation đầy đĩa.
 - Lần chạy 5 epoch đã hoàn thành đủ chín cấu hình và lần chạy riêng cấu hình đại diện đã lưu các thư mục `fold-*/best/`.
 
-### Chưa được xác nhận
+### Hạn chế của lần chạy lịch sử
 
-- Chưa có cấu hình nào cho thấy khả năng phân loại cân bằng cả ba lớp; ở cấu hình đại diện 5 epoch, lớp `NEGATIVE` vẫn có recall trung bình chỉ `0.0619` và bằng 0 ở ba trên năm fold.
-- Chưa thể kết luận `context` tốt hơn `title`, vì số lượng mẫu sau chuẩn bị đầu vào khác nhau.
-- Chưa có bằng chứng cho phép suy rộng chất lượng cảm xúc ra ngoài phạm vi 306 mẫu này.
+- Lần chạy 5 epoch lịch sử không phân loại cân bằng ba lớp: `NEGATIVE` có recall trung bình `0.0619` và bằng 0 ở ba trên năm fold.
+- Không thể kết luận `context` tốt hơn `title`, vì số lượng mẫu sau chuẩn bị đầu vào khác nhau.
+- Các giới hạn này được thay thế cho mục đích báo cáo bởi xác thực chéo theo tầng trên 1.306 nhãn ở đầu tài liệu.
 
-## 7. Quyết định nghiên cứu
+## 7. Quyết định lịch sử đã được thay thế
 
-**Chốt cấu hình cảm xúc để phục vụ nhánh dự báo giá, và ghi rõ giới hạn của nó.** Lần chạy
-5 epoch chỉ cải thiện nhẹ so với 3 epoch:
+Quyết định dưới đây chỉ giải thích cách nhánh dự báo lịch sử được tạo. Nó không phải quy
+tắc lựa chọn cho bộ sinh mới. Tại thời điểm lần chạy lịch sử, tập dữ liệu có 306 mẫu,
+gồm `31 NEGATIVE`, `204 NEUTRAL` và `71 POSITIVE`; lớp NEGATIVE quá nhỏ để tăng epoch
+giải quyết được bất định.
 
-- Cấu hình `title_context + head_tail`: Macro-F1 từ `0.506284` lên `0.517616`;
-- Balanced accuracy từ `0.544866` lên `0.547288`;
-- F1 `NEGATIVE` từ `0.0444` lên `0.0767`;
-- Recall `NEGATIVE` đạt `0.0619`, nhưng bằng 0 ở ba trên năm fold.
-
-Tập dữ liệu hiện có 306 mẫu, gồm `31 NEGATIVE`, `204 NEUTRAL` và `71 POSITIVE`. Với 5 fold,
-mỗi fold chỉ có khoảng sáu mẫu `NEGATIVE`, nên các ước lượng recall của lớp này có độ biến
-động rất lớn. Tăng thêm epoch không giải quyết được giới hạn này.
-
-### 7.1. Checkpoint được chọn và quy tắc chọn
+### 7.1. Checkpoint lịch sử và giới hạn quy tắc chọn
 
 Nhánh dự báo giá cần một bộ sinh xác suất cảm xúc để trả lời câu hỏi trung tâm của đồ án.
 Vì vậy checkpoint dùng cho suy luận được chọn từ lần chạy có trọng số 5 epoch của cấu hình
@@ -282,10 +275,9 @@ thực chéo**:
 |    4 | 0.422852 |                          0.094764 |
 |    5 | 0.587607 |                          0.069991 |
 
-Fold 1 được chọn và giải nén vào `models/sentiment/selected/`. Quy tắc này cố ý **không**
-chọn fold có điểm cao nhất (fold 5): chọn theo điểm cao nhất trên tập holdout là chọn trên
-tập kiểm tra và sẽ cho một ước lượng lạc quan. Fold đại diện cho hiệu năng trung bình là
-lựa chọn không chệch hơn.
+Fold 1 được dùng trong nhánh dự báo lịch sử; quy tắc này vẫn tham chiếu tập kiểm thử
+ngoài, nên không được tái sử dụng cho bộ sinh mới. Bộ sinh mới phải tinh chỉnh lại với
+quy tắc validation-only hoặc tổ hợp toàn bộ năm checkpoint.
 
 ### 7.2. Khớp độ dài đầu vào giữa huấn luyện và suy luận
 
@@ -294,39 +286,33 @@ Checkpoint được huấn luyện trên `title` cộng `body_preview` bị ch�
 suy luận trên nội dung đầy đủ, đầu vào sẽ dài hơn hẳn miền huấn luyện. Do đó `score-news`
 được chạy với `--context-chars 400` để giữ độ dài ngữ cảnh trong đúng miền của checkpoint.
 
-### 7.3. Giới hạn phải nêu kèm mọi kết quả dùng đặc trưng cảm xúc
+### 7.3. Giới hạn của đầu vào dự báo lịch sử
 
-- Recall `NEGATIVE` là `0.0619`; tin xấu bị nhận diện rất yếu.
+- Recall `NEGATIVE` của bộ sinh lịch sử là `0.0619`; tin xấu bị nhận diện rất yếu.
 - Đặc trưng đưa vào nhánh dự báo là **phân phối xác suất mềm**, không phải nhãn cứng, nên
   nhiễu ở lớp thiểu số làm suy giảm tín hiệu thay vì tạo nhãn sai dứt khoát.
-- Mọi kết luận về đóng góp của cảm xúc phải được phát biểu kèm chất lượng bộ sinh cảm xúc
-  này; một kết quả "không cải thiện" có thể do tín hiệu yếu, do bộ sinh yếu, hoặc cả hai.
-  Đồ án không được quy kết nguyên nhân khi chưa có bằng chứng tách bạch.
+- Các kết luận dự báo hiện tại chỉ gắn với bộ sinh lịch sử; chúng phải được kiểm tra lại
+  sau khi chấm lại kho tin bằng bộ sinh mới.
 
-### 7.4. Việc còn lại để nâng chất lượng cảm xúc
+### 7.4. Kế hoạch lịch sử, nay đã hoàn thành hoặc thay thế
 
-Mở rộng tập nhãn, đặc biệt lớp `NEGATIVE`, và bổ sung tập hạt giống CafeF (999 mẫu,
-`564 POSITIVE / 249 NEUTRAL / 186 NEGATIVE`) vào **phần huấn luyện của từng fold**, giữ 306
-mẫu in-domain làm tập đánh giá duy nhất. Nếu gộp thẳng thành một tập 1.305 mẫu rồi chia
-5-fold, phần lớn mẫu kiểm tra sẽ là tiêu đề CafeF và con số Macro-F1 sẽ bị lạc quan. CafeF
-chỉ có tiêu đề nên phải chạy ở dạng `title`, hoặc ghi rõ là đầu vào trộn độ dài. Ngoài ra,
-nhãn CafeF mô tả sắc thái tiêu đề, còn hướng dẫn gán nhãn của đồ án mô tả tác động giá kỳ
-vọng ngắn hạn; nếu dùng, phải nêu đây là một giả định chuyển miền.
+Việc mở rộng nhãn trong miền dữ liệu đã hoàn thành với 1.306 mẫu đã rà soát và xác thực
+chéo theo tầng được báo cáo ở đầu tài liệu. Bước còn lại không phải gộp thêm CafeF vào
+đánh giá, mà là tinh chỉnh lại hoặc tổ hợp bộ sinh mới, chấm lại kho tin theo mốc cắt
+thông tin, rồi chạy lại dự báo và đối chứng.
 
 ## 8. Tệp cần lưu trữ
 
-Để tái kiểm tra số liệu, giữ:
+Để tái kiểm tra kết quả hiện tại, giữ:
 
-- `ablation_summary.csv`;
-- một cặp `cv_results.json` và `cv_results.csv` cho mỗi cấu hình;
-- hai tệp nén của lần chạy có trọng số;
+- `outputs/sentiment-cv-merged/cv_results.json` và `cv_results.csv`;
+- archive Kaggle chứa năm thư mục `fold-*/best/`;
 - bản notebook đã chạy;
 - mã nguồn ở nhánh có cơ chế lưu checkpoint an toàn;
 - tệp nhãn gốc hoặc mã băm của tệp nhãn.
 
-Tệp `title_context__head_tail__cw-inverse_frequency__e5.zip` đã chứa các thư mục `fold-*/best/` dùng cho suy luận thử nghiệm. Tệp `ablation__cw-inverse_frequency__e5.zip` không chứa mô hình tốt nhất vì ma trận ablation chỉ lưu số liệu.
-
-Các tệp nén của lần chạy 3 epoch đã được thay thế sau khi lưu kết quả mới; số liệu 3 epoch vẫn được ghi lại trong các bảng so sánh ở trên.
+Các tệp ablation 306 mẫu là artifact lịch sử; chỉ giữ chúng khi cần tái tạo các bảng
+so sánh lịch sử.
 
 ## 9. Tài liệu và mã thực thi liên quan
 
