@@ -25,14 +25,14 @@ tin--mã, và 14.990 dòng giá của 10 mã HOSE trong giai đoạn 2020--2025 
 thiếu. Trong 12.624 liên kết, 12.613 được neo vào một phiên giao dịch và 11 bị loại vì
 không neo được. Toàn bộ dữ liệu được ghi kèm mã băm trong bản kê của lần chạy.
 
-Mục tiêu thứ hai là đánh giá PhoBERT ở tầng cảm xúc. Tập nhãn trong miền dữ liệu đã được
-rà soát đã mở rộng lên 1.306 mẫu, nhưng xác thực chéo phân tầng trên tập này chưa chạy.
-Vì vậy, các chỉ số đang báo cáo vẫn là lượt chạy 306 mẫu: F1 vĩ mô 0,5176 và balanced
-accuracy 0,5473. Con số này thấp hơn mốc tham chiếu 85--90\% trong đề cương. So sánh
-tương đương phải dùng độ chính xác, vì mốc đó được phát biểu theo độ chính xác: 0,7353
-so với 85--90\%. Kết quả cũ có 31 mẫu NEGATIVE, độ bao phủ 0,0619 và bằng 0 ở ba trên
-năm lượt, nên lớp này chưa được đo. Việc chưa hoàn thành là lần chạy phân tầng trên
-tập 1.306 mẫu và so sánh với biến thể PhoBERT kết hợp CNN hoặc BiLSTM.
+Mục tiêu thứ hai là đánh giá PhoBERT ở tầng cảm xúc. Xác thực chéo theo tầng trên 1.306
+nhãn đã rà soát đã hoàn thành: cấu hình có trọng số nghịch đảo tần suất đạt F1 vĩ mô
+0,7298, độ chính xác 0,8125 và độ chính xác cân bằng 0,7689. Con số 0,8125 vẫn dưới mốc
+tham chiếu 85--90\% của đề cương. Năm tập kiểm thử ngoài có tổng 59 mẫu NEGATIVE và độ
+bao phủ trung bình 0,6803, nên lớp này đã được đo nhưng bất định vẫn lớn hơn hai lớp
+còn lại. Kết quả có trọng số là phép so sánh trên tập mở rộng, không phải mô hình cuối.
+Phần chưa hoàn thành là tinh chỉnh lại hoặc tổ hợp các điểm kiểm, chấm lại kho tin và
+chạy lại dự báo cùng đối chứng; sau đó mới đánh giá biến thể PhoBERT kết hợp CNN hoặc BiLSTM.
 
 Mục tiêu thứ ba và thứ tư là kết hợp hai nguồn dữ liệu và huấn luyện mô hình dự báo. Mục
 tiêu này \textbf{đã hoàn thành với LSTM} và \textbf{chưa thực hiện với TFT}. Mô hình LSTM
@@ -103,12 +103,12 @@ Mốc cắt thông tin bảo thủ giúp giảm nguy cơ sử dụng dữ liệu
 làm trễ một phần tín hiệu được thị trường nhìn thấy trước phiên kế tiếp.
 
 Thứ ba, và là giới hạn quyết định: \textbf{chất lượng bộ sinh cảm xúc là một biến gây nhiễu
-chưa tách được}. Với độ bao phủ lớp NEGATIVE chỉ 0,0619 trong lượt chạy 306 mẫu, kết luận
-``chưa có bằng chứng cải thiện'' có thể do tín hiệu cảm xúc thực sự yếu ở chân trời một
-phiên, do bộ sinh cảm xúc yếu, hoặc do cả hai. Tập 1.306 nhãn đã rà soát tạo điều kiện
-để kiểm tra giả thuyết này; bước kế tiếp là xác thực chéo phân tầng trên bộ xử lý đồ họa,
-không phải tiếp tục mở rộng nhãn trước. Ngoài ra, nhãn ba lớp buộc phải nén các bài có
-nhiều sự kiện trái chiều về một lớp duy nhất.
+chưa tách được hoàn toàn}. Độ bao phủ NEGATIVE 0,6803 trên 59 mẫu kiểm thử ngoài cho thấy
+cấu hình mới tốt hơn lượt lịch sử, nhưng xác thực chéo chỉ đánh giá chất lượng phân loại.
+Để kiểm tra liệu kết luận ``chưa có bằng chứng cải thiện'' do tín hiệu cảm xúc yếu hay do
+bộ sinh lịch sử yếu, cần tinh chỉnh lại hoặc tổ hợp điểm kiểm mới, chấm lại kho tin theo
+mốc cắt thông tin, rồi chạy lại dự báo và đối chứng. Ngoài ra, nhãn ba lớp buộc phải nén
+các bài có nhiều sự kiện trái chiều về một lớp duy nhất.
 
 Thứ tư, dự báo phiên kế tiếp chỉ quan sát một khoảng thời gian ngắn. Tin về kế hoạch dài
 hạn, chất lượng quản trị hoặc thay đổi ngành có thể chưa thể hiện trong lợi suất của phiên

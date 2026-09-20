@@ -237,18 +237,16 @@ DOWN, và F1 vĩ mô cùng độ chính xác cân bằng được đặt làm ch
 
 \subsection{Chất lượng nhãn trong miền dữ liệu}
 
-Các số liệu chính thức đang trình bày trong mục này vẫn dùng 306 mẫu lượt đầu
-trong tệp \texttt{to\_label\_r1.csv}, do một người rà soát. Đợt mở rộng 1.000 mẫu
-đã được người đó rà soát và hợp nhất với lượt đầu thành tệp \texttt{labeled\_merged.csv}
-gồm 1.306 mẫu. Mô hình ngôn ngữ lớn chỉ tạo nhãn sơ bộ; ở lượt mở rộng này, người
-rà soát không thay đổi nhãn sơ bộ nào. Do không có người gán nhãn thứ hai, quy trình
-không tính Cohen's hoặc Fleiss' kappa.
+Các số liệu chính thức trong mục này dùng tập \texttt{labeled\_merged.csv} gồm 1.306
+mẫu trong miền dữ liệu. Lượt đầu có 306 mẫu; 1.000 mẫu mở rộng đã được cùng người rà
+soát xác nhận, không thay đổi nhãn sơ bộ nào, rồi hợp nhất với lượt đầu. Mô hình ngôn
+ngữ lớn chỉ tạo nhãn sơ bộ. Do không có người gán nhãn thứ hai, quy trình không tính
+Cohen's hoặc Fleiss' kappa.
 
-Tập 1.306 mẫu đã mang \texttt{annotation\_source} bằng \texttt{human\_reviewed}
-và \texttt{annotation\_status} bằng \texttt{REVIEWED}; quy trình huấn luyện chấp nhận
-tập này. Lần xác thực chéo trên tập mở rộng chưa được chạy tại thời điểm viết chương,
-nên nó chưa góp vào các chỉ số mô hình trong mục này. Mục~\ref{sec:kq-mornhan} mô tả
-thiết kế đánh giá sẽ dùng cho lần chạy đó.
+Toàn bộ tập mang \texttt{annotation\_source} bằng \texttt{human\_reviewed} và
+\texttt{annotation\_status} bằng \texttt{REVIEWED}. Xác thực chéo theo tầng đã hoàn
+thành trên tập này; Mục~\ref{sec:kq-mornhan} trình bày cách các tầng được dùng để giữ
+ước lượng kiểm thử không chệch.
 
 \begin{table}[H]
   \centering
@@ -263,25 +261,27 @@ thiết kế đánh giá sẽ dùng cho lần chạy đó.
     NEGATIVE & 31 (10,1\%) & 163 (16,3\%) \\
     NEUTRAL & 204 (66,7\%) & 567 (56,7\%) \\
     POSITIVE & 71 (23,2\%) & 270 (27,0\%) \\
-    Dùng cho chỉ số đang trình bày & Có & Chưa \\
+    Dùng cho chỉ số đang trình bày & Có, lịch sử & Có, xác thực chéo theo tầng \\
     \bottomrule
   \end{tabular}
 \noindent\textit{Nguồn: \texttt{to\_label\_r1.csv} và \texttt{to\_label\_batch2\_ai.csv}.}
 \end{table}
 
-Các chỉ số mô hình đang trình bày dựa trên 31 mẫu NEGATIVE của lượt 1. Với 5 lượt,
-mỗi tập kiểm thử chỉ có khoảng sáu mẫu thuộc lớp này. Khoảng tin cậy 95\% của một
-ước lượng độ bao phủ quanh 0,5 khi $n=31$ có nửa độ rộng $\pm0{,}176$. Đây là giới
-hạn thống kê của kết quả hiện có và là lý do các số liệu ở
-Mục~\ref{sec:kq-sentiment-metrics} không cho phép kết luận về lớp NEGATIVE.
+Năm tập kiểm thử ngoài cộng lại có 59 mẫu NEGATIVE, với 11 hoặc 12 mẫu ở mỗi lượt.
+Khoảng tin cậy của độ bao phủ lớp này vẫn rộng hơn hai lớp còn lại --- nửa độ rộng
+xấp xỉ $\pm0{,}128$ quanh tỷ lệ 0,5 --- nhưng đã đủ để đo độ bao phủ của lớp
+NEGATIVE thay vì để lớp này vắng mặt trong nhiều lượt như ở kết quả lịch sử 306 mẫu.
 
 \subsection{Chỉ số mô hình cảm xúc}
 \label{sec:kq-sentiment-metrics}
 
-PhoBERT được đánh giá bằng xác thực chéo phân tầng 5 lượt trên 306 mẫu đã rà soát. Mỗi
-lượt giữ 20\% làm tập kiểm thử ngoài, 10\% phần huấn luyện làm tập xác thực để chọn điểm
-kiểm. Cấu hình đại diện là \texttt{title\_context} với cắt \texttt{head\_tail} và trọng số
-lớp \texttt{inverse\_frequency} tính riêng trên phần huấn luyện của từng lượt.
+PhoBERT được đánh giá bằng xác thực chéo theo tầng 5 lượt trên 1.306 mẫu đã rà soát.
+Hai tầng làm giàu chỉ vào phần huấn luyện; tập kiểm thử ngoài chỉ lấy từ
+\texttt{eval\_random} và \texttt{baseline\_random}. Năm tập kiểm thử cộng lại có 656
+dòng, mỗi lượt 131 hoặc 132 dòng. Mỗi lượt còn rút 118 dòng xác thực từ phần huấn luyện
+ngoài để chọn điểm kiểm. Cấu hình chạy là \texttt{title\_context} với cắt
+\texttt{head\_tail}, năm vòng huấn luyện và trọng số lớp
+\texttt{inverse\_frequency} tính riêng trên phần huấn luyện.
 
 \begin{table}[H]
   \centering
@@ -289,75 +289,63 @@ lớp \texttt{inverse\_frequency} tính riêng trên phần huấn luyện của
   \label{tab:kq-sentiment}
   \begin{tabular}{l c c c c}
     \toprule
-    Cấu hình & Độ chính xác & F1 vĩ mô & Độ chính xác cân bằng & F1 NEG \\
+    Cấu hình và tập nhãn & Độ chính xác & F1 vĩ mô & Độ chính xác cân bằng & F1 NEG \\
     \midrule
-    Không trọng số lớp, 3 vòng & 0,6667 & 0,2667 & 0,3333 & 0,0000 \\
-    Có trọng số lớp, 3 vòng & 0,7417 & 0,5063 & 0,5449 & 0,0444 \\
-    Có trọng số lớp, 5 vòng & 0,7353 & \textbf{0,5176} & 0,5473 & 0,0767 \\
+    Không trọng số lớp, 3 vòng, 306 mẫu & 0,6667 & 0,2667 & 0,3333 & 0,0000 \\
+    Có trọng số lớp, 5 vòng, 306 mẫu & 0,7353 & 0,5176 & 0,5473 & 0,0767 \\
+    Có trọng số lớp, 5 vòng, 1.306 mẫu & \textbf{0,8125} & \textbf{0,7298} & \textbf{0,7689} & \textbf{0,6036} \\
     \bottomrule
   \end{tabular}
-\noindent\textit{Nguồn: \texttt{outputs/cv\_results.json} và hai tệp nén lần chạy có trọng số.}
+\noindent\textit{Nguồn: \texttt{outputs/sentiment-cv-merged/cv\_results.json}; hai dòng 306 mẫu là kết quả lịch sử.}
 \end{table}
 
-Đường cơ sở của nhánh cảm xúc là cấu hình \emph{không} dùng trọng số lớp; hai lần chạy có
-trọng số nghịch đảo tần suất được trình bày như một phép so sánh, không phải cấu hình cuối
-cùng của đồ án. Đồ án cũng không tuyên bố một ``mô hình cảm xúc cuối''; điểm kiểm được chọn
-ở cuối mục này chỉ là \emph{bộ sinh xác suất được chọn để phục vụ nhánh dự báo}.
+Cấu hình không trọng số lớp trên 306 mẫu là đường cơ sở lịch sử. Kết quả có trọng số
+nghịch đảo tần suất trên 1.306 mẫu là một phép so sánh trên tập và giao thức mới, không
+được gọi là mô hình cảm xúc cuối cùng. Các khác biệt giữa hai cỡ tập không được diễn giải
+như hiệu ứng riêng của trọng số lớp.
 
-So sánh với biến thể PhoBERT kết hợp CNN hoặc BiLSTM, tức mục tiêu thứ hai của đề cương,
-\textbf{chưa được thực hiện} và được chuyển sang Chương~\ref{ch:huong-phat-trien}; lý do nêu
-ở Mục~\ref{sec:hpt-chuyen}.
-
-Cấu hình không trọng số lớp \textbf{suy biến}: độ chính xác cân bằng đúng bằng $1/3$ ở cả năm
-lượt, F1 của NEGATIVE và POSITIVE đều bằng 0, và độ chính xác khoảng 0,667 trùng với tỷ lệ lớp
-NEUTRAL. Mô hình dự đoán toàn bộ mẫu là NEUTRAL. Đây là bằng chứng trực tiếp rằng độ chính xác
-không dùng được làm chỉ số đại diện trên tập lệch lớp này.
-
-Trọng số nghịch đảo tần suất khắc phục hiện tượng suy biến: hai lớp thiểu số không còn bị
-bỏ qua hoàn toàn. Bảng~\ref{tab:kq-sentiment-class} cho chi tiết theo lớp của cấu hình
-đại diện 5 vòng.
+Đường cơ sở 306 mẫu dự đoán toàn bộ mẫu là NEUTRAL: độ chính xác cân bằng bằng $1/3$ ở
+cả năm lượt, còn F1 của NEGATIVE và POSITIVE bằng 0. Lần chạy mở rộng có trọng số không
+còn suy biến; F1 vĩ mô trung bình là 0,7298 với độ lệch chuẩn 0,0423 và độ chính xác cân
+bằng là 0,7689 với độ lệch chuẩn 0,0497.
 
 \begin{table}[H]
   \centering
-  \caption{F1 và độ bao phủ theo lớp, cấu hình đại diện 5 vòng, trung bình 5 lượt.}
+  \caption{F1 và độ bao phủ theo lớp, cấu hình 1.306 mẫu có trọng số, trung bình 5 lượt.}
   \label{tab:kq-sentiment-class}
   \begin{tabular}{l c c}
     \toprule
     Lớp & F1 & Độ bao phủ \\
     \midrule
-    NEGATIVE & 0,0767 & 0,0619 \\
-    NEUTRAL & 0,8625 & 0,8333 \\
-    POSITIVE & 0,6136 & 0,7467 \\
+    NEGATIVE & 0,6036 & 0,6803 \\
+    NEUTRAL & 0,8816 & 0,8359 \\
+    POSITIVE & 0,7041 & 0,7906 \\
     \bottomrule
   \end{tabular}
-\noindent\textit{Nguồn: \texttt{cv\_results.csv} của lần chạy có trọng số 5 vòng.}
+\noindent\textit{Nguồn: \texttt{outputs/sentiment-cv-merged/cv\_results.csv}.}
 \end{table}
 
-Lớp NEGATIVE vẫn được nhận diện rất yếu: độ bao phủ trung bình 0,0619, và độ bao phủ theo từng lượt
-là $0{,}1429$; $0{,}0000$; $0{,}0000$; $0{,}0000$; $0{,}1667$ --- ba trên năm lượt không nhận
-đúng mẫu NEGATIVE nào. Với khoảng sáu mẫu NEGATIVE mỗi lượt, một mẫu đúng hay sai làm độ bao phủ
-của lượt đó đổi khoảng 16--17 điểm phần trăm. Vì vậy con số 0,0619 \textbf{không} được diễn
-giải như một ước lượng ổn định; kết luận đúng là lớp NEGATIVE chưa được đo.
+Độ bao phủ NEGATIVE theo lượt là $0{,}7500$; $0{,}8182$; $0{,}6667$;
+$0{,}5000$; $0{,}6667$. Kết quả không còn có lượt nào bỏ qua hoàn toàn lớp này,
+nhưng 59 mẫu kiểm thử ngoài vẫn khiến bất định của lớp NEGATIVE lớn hơn các lớp còn lại.
 
-So sánh giữa ba phương án đầu vào và ba chiến lược cắt token không cho kết luận, vì trên tệp
-nhãn hiện tại không mẫu nào vượt giới hạn 256 token: đo bằng bộ tách từ của điểm kiểm, độ dài
-tối đa là 71 token với \texttt{title}, 206 với \texttt{context} và 229 với
-\texttt{title\_context}. Ba chiến lược cắt vì thế tạo cùng một chuỗi đầu vào và bắt buộc cho
-cùng kết quả. Chênh lệch nhỏ khoảng 0,002 F1 vĩ mô quan sát được giữa vài cấu hình là dao
-động không tất định của GPU, và con số này được dùng làm sàn nhiễu của quy trình.
+Artifact hiện có chỉ đánh giá cấu hình \texttt{title\_context} với
+\texttt{head\_tail}; nó không là so sánh mới giữa các phương án đầu vào hay chiến lược
+cắt token.
 
-Điểm kiểm dùng cho bước suy luận là lượt có F1 vĩ mô gần trung bình xác thực chéo nhất
-(lượt 1, hạt giống 43, F1 vĩ mô 0,5535). Quy tắc này cố ý không chọn lượt có điểm cao nhất
-(lượt 5, 0,5876), vì chọn theo điểm kiểm thử ngoài cao nhất là chọn trên tập kiểm tra và cho ước
-lượng lạc quan.
+Các điểm kiểm của từng lượt là artifact xác thực chéo, không được chọn theo chỉ số tập
+kiểm thử ngoài để chấm điểm tin tức. Các phép dự báo hiện có vẫn dùng bộ sinh xác suất
+lịch sử trên 306 mẫu. Muốn truyền kết quả mới sang nhánh dự báo, cần hoặc tổ hợp năm
+điểm kiểm, hoặc tinh chỉnh lại cấu hình trên toàn bộ 1.306 mẫu với quy tắc chọn điểm
+kiểm chỉ dùng tập xác thực; sau đó chấm lại toàn bộ tin theo mốc cắt thông tin và chạy
+lại cả mô hình dự báo lẫn đối chứng.
 
-Các số liệu ở tầng cảm xúc chỉ cho biết chất lượng phân loại trên tập kiểm thử của tầng
-đó. Chúng không tự chứng minh tín hiệu có giá trị dự báo. Vì vậy, đầu ra đưa sang nhánh dự
-báo được sinh đúng mốc cắt: 12.624 liên kết tin--mã được gán xác suất ba lớp bằng
-\texttt{score-news} với \texttt{--context-chars 400} để giữ độ dài ngữ cảnh đúng miền đã
-huấn luyện. Phân bố lớp đa số của đầu ra là 2.095 NEGATIVE, 6.776 NEUTRAL và 3.753 POSITIVE.
-Nhánh dự báo dùng \textbf{phân phối xác suất mềm}, không dùng nhãn cứng, nên nhiễu ở lớp
-thiểu số làm suy giảm tín hiệu thay vì tạo nhãn sai dứt khoát.
+Các bảng dự báo hiện có được tạo bằng bộ sinh lịch sử 306 mẫu với
+\texttt{score-news} và \texttt{--context-chars 400}; 12.624 liên kết tin--mã đã nhận
+xác suất ba lớp theo đúng mốc cắt thông tin. Phân bố lớp đa số của đầu ra lịch sử là
+2.095 NEGATIVE, 6.776 NEUTRAL và 3.753 POSITIVE. Nhánh dự báo dùng phân phối xác suất
+mềm, không dùng nhãn cứng, nên các con số này vẫn là bằng chứng đầu vào cho bảng dự báo
+hiện tại nhưng không được gán cho bộ sinh 1.306 mẫu.
 
 \section{Kết quả dự báo xu hướng và loại bỏ đặc trưng}
 \label{sec:kq-forecast}
@@ -567,16 +555,13 @@ khác 0, nên việc thay LSTM bằng một kiến trúc phức tạp hơn khó 
 
 \subsection{Bàn luận theo câu hỏi nghiên cứu}
 
-\textbf{Câu hỏi thứ nhất} --- mức chính xác của PhoBERT trên bộ dữ liệu tự xây dựng. Cấu
-hình tốt nhất đạt F1 vĩ mô 0,5176 và độ chính xác cân bằng 0,5473 trên 306 mẫu. Đề cương
-nêu mốc tham chiếu 85--90\% và mốc đó được phát biểu theo \emph{độ chính xác}, nên so sánh
-tương đương phải dùng độ chính xác: 0,7353 so với 85--90\%, tức vẫn chưa đạt nhưng khoảng
-cách nhỏ hơn nhiều so với khi đặt F1 vĩ mô cạnh con số đó. Đề cương đã ghi mốc này là ``cần
-kiểm chứng thực nghiệm''. Cần nói thêm rằng độ chính xác là thước đo không phù hợp ở đây:
-cấu hình suy biến dự đoán toàn bộ là NEUTRAL cũng đạt độ chính xác 0,6667 mà không nhận
-được lớp nào khác, nên F1 vĩ mô mới là chỉ số quyết định. Nguyên nhân
-trực tiếp là quy mô lớp NEGATIVE: 31 mẫu, khoảng sáu mẫu mỗi lượt, độ bao phủ 0,0619 và bằng 0 ở
-ba trên năm lượt. Không dùng kết quả của kho ngữ liệu khác để lấp khoảng trống này.
+\textbf{Câu hỏi thứ nhất} --- mức chính xác của PhoBERT trên bộ dữ liệu tự xây dựng.
+Xác thực chéo theo tầng trên 1.306 mẫu đạt F1 vĩ mô 0,7298, độ chính xác 0,8125 và độ
+chính xác cân bằng 0,7689. Mốc tham chiếu 85--90\% trong đề cương được phát biểu theo
+độ chính xác; 0,8125 vẫn chưa đạt mốc đó. Tuy vậy, 59 mẫu NEGATIVE trên năm tập kiểm
+thử ngoài cho độ bao phủ 0,6803, thay vì 0,0619 trên 31 mẫu của lượt lịch sử. Đây là
+bằng chứng chất lượng phân loại tốt hơn của cấu hình có trọng số trên tập mở rộng, không
+phải bằng chứng rằng tín hiệu cảm xúc đã cải thiện dự báo giá.
 
 \textbf{Câu hỏi thứ hai} --- cảm xúc có cải thiện dự báo hay không, và mức bao nhiêu. Sau
 khi tách hiệu ứng kiến trúc, đóng góp thông tin của cảm xúc là $-0{,}0024$ F1 vĩ mô với
@@ -650,11 +635,11 @@ Vietstock, trong khi đề cương dự kiến bốn nguồn; độ phủ tin v�
 ánh tác động dài hạn của tin.
 
 Thứ tư, và là giới hạn quan trọng nhất: \textbf{chất lượng của bộ sinh cảm xúc là một biến
-gây nhiễu chưa tách được}. Recall lớp NEGATIVE chỉ 0,0619, nên kết quả ``không có bằng
-chứng cải thiện'' có thể do tín hiệu cảm xúc thực sự yếu ở chân trời một phiên, do bộ sinh
-cảm xúc yếu, hoặc do cả hai. Đề tài \textbf{không} quy kết nguyên nhân cho một trong ba khả
-năng này, vì thiết kế hiện tại không tách được chúng. Muốn tách, cần hoàn thành xác thực
-chéo phân tầng trên tập nhãn 1.306 mẫu đã rà soát.
+gây nhiễu chưa tách được hoàn toàn}. Xác thực chéo mới cho thấy cấu hình có trọng số nhận
+diện được lớp NEGATIVE tốt hơn, nhưng riêng nó không tách được liệu kết luận ``không có
+bằng chứng cải thiện'' đến từ tín hiệu cảm xúc yếu hay từ bộ sinh lịch sử yếu. Muốn trả
+lời, cần tinh chỉnh lại trên toàn bộ tập hoặc tổ hợp các điểm kiểm, chấm lại kho tin theo
+mốc cắt thông tin, rồi chạy lại phép so sánh dự báo và đối chứng.
 
 Thứ năm, ngưỡng phân vị một phần ba tạo lớp FLAT theo nghĩa thống kê, không theo nghĩa kinh
 tế: ngưỡng khoảng $\pm0{,}5\%$ (Bảng~\ref{tab:kq-windows}) là một lựa chọn thiết kế, không
@@ -715,9 +700,9 @@ của tập 306 mẫu lượt đầu. Sự khớp này là một kiểm tra nh�
 
 Người rà soát đã xác nhận toàn bộ 1.000 nhãn và không thay đổi nhãn sơ bộ nào. Nhãn
 cuối cùng mang hai cờ \texttt{human\_reviewed} và \texttt{REVIEWED}, sau đó được hợp
-nhất thành 1.306 mẫu gồm 194 NEGATIVE. Tập mở rộng \textbf{chưa phải kết quả} của
-chương: nó chỉ được đưa vào số liệu sau khi hoàn thành xác thực chéo theo tầng mô tả
-ở đây; hiện tại vai trò của nó là dữ liệu đã chuẩn bị cho lần chạy GPU tiếp theo.
+nhất thành 1.306 mẫu gồm 194 NEGATIVE. Xác thực chéo theo tầng trên tập này đã hoàn
+thành với F1 vĩ mô trung bình 0,7298; kết quả này được báo cáo ở
+Mục~\ref{sec:kq-sentiment-metrics}.
 
 Cần nêu rõ một đánh đổi của thiết kế này. Vì hai tầng làm giàu phá tỷ lệ lớp của kho, chúng
 chỉ được dùng để huấn luyện; tập dùng để đánh giá gồm tầng \texttt{eval\_random} cộng 306 mẫu
@@ -744,7 +729,7 @@ Bảng~\ref{tab:kq-artifact} liệt kê lệnh và tệp kết quả tương ứ
     \toprule
     Bảng & Lệnh và tệp kết quả \\
     \midrule
-    \ref{tab:kq-sentiment}, \ref{tab:kq-sentiment-class} & \texttt{stf.cli sentiment-cv}; \texttt{outputs/cv\_results.json} và tệp nén lần chạy có trọng số \\
+    \ref{tab:kq-sentiment}, \ref{tab:kq-sentiment-class} & \texttt{stf.cli sentiment-cv}; \texttt{outputs/sentiment-cv-merged/cv\_results.json} và tệp nén lần chạy có trọng số \\
     \ref{tab:kq-windows}, \ref{tab:kq-price-stats}, \ref{tab:ket-qua} & \texttt{stf.cli forecast -{}-news-sentiment ...}; \texttt{outputs/forecast/forecast\_metrics.csv} \\
     \ref{tab:kq-perclass} & \texttt{outputs/forecast/forecast\_predictions.csv} \\
     \ref{tab:kq-ablation}, \ref{tab:kq-ablation-ci} & \texttt{stf.cli forecast-compare}; \texttt{outputs/forecast/information\_gain.json} \\

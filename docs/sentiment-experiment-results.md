@@ -1,10 +1,34 @@
 # Bản ghi thực nghiệm phân loại cảm xúc
 
-> **Trạng thái:** Bản ghi bằng chứng cho ba lần chạy trên Kaggle, chưa phải kết quả cuối cùng để đưa vào báo cáo.
+> **Trạng thái:** Kết quả xác thực chéo theo tầng trên 1.306 nhãn đã rà soát là kết quả sẵn sàng đưa vào báo cáo. Các phần về 306 mẫu bên dưới chỉ là bản ghi lịch sử của đường cơ sở và ablation.
 >
-> **Nguồn số liệu:** Các tệp JSON/CSV và tệp nén trong [`../outputs/`](../outputs/), được tải về sau khi chạy `sentiment-cv` và `sentiment-ablation`.
+> **Nguồn số liệu hiện tại:** [`../outputs/sentiment-cv-merged/cv_results.json`](../outputs/sentiment-cv-merged/cv_results.json) và [`cv_results.csv`](../outputs/sentiment-cv-merged/cv_results.csv), được trích từ archive Kaggle đã kiểm tra toàn vẹn.
 
-## 1. Mục đích và phạm vi
+## Kết quả hiện tại: xác thực chéo theo tầng trên 1.306 nhãn
+
+Lần chạy dùng `title_context + head_tail`, 5 epoch, kích thước lô 16, hạt giống gốc
+`42` và `inverse_frequency`. Tập có 194 `NEGATIVE`, 771 `NEUTRAL` và 341
+`POSITIVE`. Hai tầng làm giàu chỉ dùng để huấn luyện; năm outer holdout cộng lại gồm
+656 dòng với 59 `NEGATIVE`.
+
+| Chỉ số | Trung bình 5 fold | Độ lệch chuẩn |
+| --- | ---: | ---: |
+| Macro-F1 | 0.729764 | 0.042252 |
+| Accuracy | 0.812457 | 0.020328 |
+| Balanced accuracy | 0.768920 | 0.049668 |
+
+| Lớp | F1 trung bình | Recall trung bình | Số mẫu outer holdout |
+| --- | ---: | ---: | ---: |
+| `NEGATIVE` | 0.603609 | 0.680303 | 59 |
+| `NEUTRAL` | 0.881565 | 0.835858 | 463 |
+| `POSITIVE` | 0.704119 | 0.790598 | 134 |
+
+Lần chạy này đánh giá chất lượng bộ phân loại, không chọn checkpoint bằng chỉ số
+outer holdout và chưa sinh lại đặc trưng cảm xúc cho nhánh dự báo giá. Bước kế tiếp là
+tinh chỉnh lại trên toàn bộ tập với quy tắc validation-only hoặc tổ hợp năm checkpoint,
+chấm lại kho tin theo mốc cắt thông tin, rồi chạy lại dự báo và đối chứng.
+
+## Thực nghiệm lịch sử trên 306 mẫu
 
 Lần chạy không trọng số và lần chạy có trọng số kiểm tra ảnh hưởng của ba dạng đầu vào và ba chiến lược giữ token của PhoBERT trên tập nhãn tin tức tài chính Vietstock đã được rà soát. Ma trận gồm:
 

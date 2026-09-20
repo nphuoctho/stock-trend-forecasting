@@ -25,14 +25,13 @@ chưa được đo lường.
 \end{table}
 
 \noindent Tóm tắt trạng thái: dữ liệu gồm giá của 10 mã VN30 (14.990 dòng mã--phiên) và
-10.695 bài tin có mốc thời gian và nội dung. Mô hình cảm xúc PhoBERT đã tinh chỉnh trên
-GPU với xác thực chéo 5 fold; điểm kiểm đại diện đã sinh xác suất ba lớp cho toàn bộ
-12.624 liên kết tin--mã. Thang mô hình dự báo đã chạy đầy đủ trên 5 cửa sổ cuốn chiếu và
-3 hạt giống, kèm lần chạy đối chứng để tách hiệu ứng kiến trúc khỏi đóng góp thông tin của
-cảm xúc.
+10.695 bài tin có mốc thời gian và nội dung. Xác thực chéo PhoBERT theo tầng 5 lượt trên
+1.306 nhãn đã rà soát đã hoàn thành, đạt F1 vĩ mô 0,7298 và độ chính xác cân bằng 0,7689.
+Thang mô hình dự báo lịch sử đã chạy đầy đủ trên 5 cửa sổ cuốn chiếu và 3 hạt giống, kèm
+lần chạy đối chứng để tách hiệu ứng kiến trúc khỏi đóng góp thông tin của cảm xúc.
 
-\noindent Hai hạng mục của đề cương chưa thực hiện và đã được chuyển sang Chương 6: mô
-hình Temporal Fusion Transformer, và biến thể PhoBERT kết hợp CNN hoặc BiLSTM. Hệ thống
-demo trực quan hóa cũng chưa thực hiện; quy trình hiện được điều khiển qua dòng lệnh. Đợt
-mở rộng 1.000 nhãn đã được người rà soát xác nhận và hợp nhất thành 1.306 mẫu, nhưng lần
-xác thực chéo GPU theo thiết kế tầng chưa chạy nên chưa góp vào kết quả nào của báo cáo.
+\noindent Các bước tiếp theo là tinh chỉnh lại hoặc tổ hợp các điểm kiểm PhoBERT mới,
+chấm lại 12.624 liên kết tin--mã theo mốc cắt thông tin, rồi chạy lại thang dự báo và
+đối chứng. Hai hạng mục của đề cương chưa thực hiện và được chuyển sang Chương 6 là mô
+hình Temporal Fusion Transformer và biến thể PhoBERT kết hợp CNN hoặc BiLSTM. Hệ thống
+demo trực quan hóa cũng chưa thực hiện; quy trình hiện được điều khiển qua dòng lệnh.

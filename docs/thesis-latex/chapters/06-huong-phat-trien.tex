@@ -31,11 +31,11 @@ thay vì để trống:
         phức tạp của bộ dự báo. Khi thực hiện, TFT cần được cấu hình cho phân loại ba lớp và
         chạy trên đúng tập giữ lại; phần quan trọng của biến và cơ chế chú ý chỉ được diễn
         giải như mô tả phụ thuộc mô hình, không phải bằng chứng nhân quả.
-  \item \textbf{Biến thể PhoBERT kết hợp CNN hoặc BiLSTM.} Lượt chạy đang báo cáo có
-        306 mẫu và 31 mẫu lớp tiêu cực, nên chưa đủ để phân biệt hai kiến trúc phân
-        loại về mặt thống kê. Tập 1.306 nhãn đã được rà soát đã sẵn sàng; cần hoàn
-        thành xác thực chéo phân tầng trên tập này trước, rồi mới quyết định so sánh
-        các biến thể kiến trúc ở Mục~\ref{sec:kq-mornhan}.
+  \item \textbf{Biến thể PhoBERT kết hợp CNN hoặc BiLSTM.} Xác thực chéo mới trên 1.306
+        mẫu đã cho mức đo lớp NEGATIVE tốt hơn, nhưng chưa truyền bộ sinh mới sang nhánh
+        dự báo. Trước hết cần tinh chỉnh lại hoặc tổ hợp các điểm kiểm hiện có, chấm lại
+        kho tin và chạy lại đối chứng; sau đó mới so sánh các biến thể kiến trúc ở
+        Mục~\ref{sec:kq-mornhan}.
   \item \textbf{Hệ thống demo trực quan hóa.} Toàn bộ quy trình hiện được điều khiển qua
         giao diện dòng lệnh và ghi artifact ra tệp, đủ cho mục đích nghiên cứu và tái lập.
         Một giao diện trực quan hóa sẽ hữu ích cho việc thăm dò dữ liệu, nhưng không bổ sung
@@ -43,10 +43,10 @@ thay vì để trống:
         của kết quả.
 \end{enumerate}
 
-Ưu tiên cao nhất trong số các hướng của chương này là hoàn thành xác thực chéo phân tầng
-trên tập 1.306 nhãn cảm xúc đã rà soát. Chỉ sau khi có độ bao phủ các lớp biên mới, đồ án
-mới có thể tách hai cách giải thích cho kết luận âm --- tín hiệu cảm xúc yếu, hay bộ sinh
-cảm xúc yếu.
+Ưu tiên cao nhất trong số các hướng của chương này là truyền bộ sinh cảm xúc đã đánh giá
+qua toàn bộ chuỗi dự báo: tinh chỉnh lại hoặc tổ hợp các điểm kiểm, chấm lại kho tin theo
+mốc cắt thông tin, rồi chạy lại dự báo và đối chứng. Chỉ chuỗi thực nghiệm hoàn chỉnh này
+mới có thể tách tín hiệu cảm xúc yếu khỏi ảnh hưởng của bộ sinh lịch sử.
 
 \section{Củng cố dữ liệu và giao thức point-in-time}
 
