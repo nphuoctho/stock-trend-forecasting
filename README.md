@@ -137,9 +137,10 @@ uv run python -m stf.cli sentiment-ablation \
 ```
 
 Lệnh `sentiment-ablation` chỉ giữ các tệp số liệu và bản kê nguồn của từng cấu hình;
-để tránh đầy đĩa, không lưu các thư mục mô hình `best/` của từng fold. Sau khi
-chọn cấu hình có `macro_f1` cao nhất, chạy lại `sentiment-cv` cho cấu hình đó để
-giữ checkpoint dùng cho bước suy luận.
+để tránh đầy đĩa, không lưu các thư mục mô hình `best/` của từng fold. Sau khi chọn
+cấu hình, chạy `sentiment-cv` để tạo artifact xác thực chéo. Checkpoint dùng suy luận
+phải được tạo bằng `sentiment-refit`, lệnh này khóa cấu hình và tệp nhãn theo
+`cv_results.json`, rồi học lại trên toàn bộ nhãn đã duyệt mà không dùng outer holdout.
 
 Không dùng nhãn hoặc giá tương lai để tạo đầu vào cảm xúc. Tập CafeF chỉ có
 tiêu đề nên không đủ để kết luận riêng về `context`; cần dùng tệp Vietstock đã
@@ -147,24 +148,32 @@ gán nhãn có nội dung bài viết.
 
 ### Gán nhãn cảm xúc cho tin đã crawl
 
-Checkpoint đại diện đang dùng nằm ở `models/sentiment/selected/` (fold có Macro-F1 gần
-trung bình xác thực chéo nhất; xem `docs/sentiment-experiment-results.md` mục 7.1).
+`sentiment-refit` chỉ nhận tệp nhãn đã duyệt và từ chối cấu hình không khớp artifact
+xác thực chéo. Lần chạy thực cần GPU (Kaggle/Colab); xem `notebooks/training-guide.md`.
+
+```bash
+uv run python -m stf.cli sentiment-refit \
+  --data data/labeled/indomain/labeled_merged.csv \
+  --cv-results outputs/sentiment-cv-merged/cv_results.json \
+  --input-variant title_context \
+  --truncation-strategy head_tail \
+  --class-weighting inverse_frequency \
+  --epochs 5 --batch-size 16 --seed 42 \
+  --output models/sentiment/merged-refit
+```
 
 `--context-chars` giữ độ dài ngữ cảnh khớp với tệp nhãn đã huấn luyện. Tệp nhãn chặn
-`body_preview` ở 400 ký tự, còn `articles.parquet` giữ nội dung đầy đủ; bỏ cờ này sẽ suy
-luận trên đầu vào dài hơn miền huấn luyện.
+`body_preview` ở 400 ký tự, còn `articles.parquet` giữ nội dung đầy đủ; bỏ cờ này sẽ
+suy luận trên đầu vào dài hơn miền huấn luyện.
 
 ```bash
 uv run python -m stf.cli score-news \
-  --model-dir models/sentiment/selected \
+  --model-dir models/sentiment/merged-refit/best \
   --input-variant title_context \
   --context-chars 400 \
   --batch-size 64 \
-  --output data/processed/news_sentiment.parquet
+  --output data/processed/news_sentiment_merged.parquet
 ```
-
-> This machine has no GPU/CUDA. Real fine-tuning should run on a GPU (Google Colab/Kaggle).
-> See `notebooks/training-guide.md`.
 
 ## Phase 4: forecasting experiment
 
@@ -173,21 +182,23 @@ reportable numbers: it loads the real price parquets, optionally a `score-news` 
 and runs the full ladder on walk-forward windows.
 
 ```bash
-# Price-only control: every session gets the neutral prior. Same config as below,
-# so the two runs differ only in whether the sentiment branch carries information.
+# Đối chứng chỉ giá: mọi phiên nhận prior trung tính. Giữ cùng cấu hình phía dưới
+# để hai lần chạy chỉ khác thông tin đi vào nhánh cảm xúc.
 uv run python -m stf.cli forecast --windows 5 --test-size 60 --val-size 60 \
-  --epochs 40 --patience 6 --seeds 42 43 44 --output outputs/forecast_price_only
+  --epochs 40 --patience 6 --seeds 42 43 44 \
+  --output outputs/forecast_merged_control
 
-# Full ladder with sentiment; both arms share identical windows, seeds and test rows
+# Thang đầy đủ với cảm xúc; hai nhánh dùng cùng cửa sổ, hạt giống và hàng kiểm thử.
 uv run python -m stf.cli forecast \
-  --news-sentiment data/processed/news_sentiment.parquet \
+  --news-sentiment data/processed/news_sentiment_merged.parquet \
   --windows 5 --test-size 60 --val-size 60 --epochs 40 --patience 6 \
-  --seeds 42 43 44 --output outputs/forecast
+  --seeds 42 43 44 --output outputs/forecast_merged_sentiment
 
-# Split the two-branch gain into architecture effect and information gain
+# Tách ảnh hưởng kiến trúc và giá trị thông tin.
 uv run python -m stf.cli forecast-compare \
-  --real outputs/forecast --control outputs/forecast_price_only \
-  --output outputs/forecast/information_gain.json
+  --real outputs/forecast_merged_sentiment \
+  --control outputs/forecast_merged_control \
+  --output outputs/forecast_merged_sentiment/information_gain.json
 ```
 
 The ladder is `majority`, `random`, `logreg_price`, `logreg_price_sentiment`,

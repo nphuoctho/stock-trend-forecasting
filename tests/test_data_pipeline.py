@@ -6,6 +6,7 @@ uv run pytest tests/test_data_pipeline.py -q
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 
 import pandas as pd
 import pytest
@@ -162,6 +163,87 @@ def test_compute_class_weights_rejects_missing_class():
         model.compute_class_weights([0, 0, 1, 1])
 
 
+
+
+def test_full_refit_reference_requires_the_evaluated_configuration(tmp_path):
+    source = tmp_path / "labels.csv"
+    source.write_text("text,label\na,NEGATIVE\nb,NEUTRAL\nc,POSITIVE\n", encoding="utf-8")
+    frame = pd.DataFrame({"text": ["a", "b", "c"], "label_id": [0, 1, 2]})
+    cfg = model.TrainConfig(
+        epochs=5.0,
+        batch_size=16,
+        seed=42,
+        truncation_strategy="head_tail",
+        class_weighting="inverse_frequency",
+    )
+    reference_path = tmp_path / "cv_results.json"
+    reference = {
+        "input_variant": "title_context",
+        "truncation_strategy": "head_tail",
+        "data_size": 3,
+        "train_config": asdict(cfg),
+        "source_file_sha256": file_fingerprint(source),
+        "folds": 5,
+        "fold_results": [{"fold": 1}],
+        "aggregate": {"macro_f1": {"mean": 0.7, "std": 0.1}},
+    }
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
+
+    validated = experiments.validate_full_refit_reference(
+        reference_path,
+        frame,
+        input_variant="title_context",
+        cfg=cfg,
+        source_path=source,
+    )
+
+    assert validated["folds"] == 5
+    assert validated["data_size"] == 3
+    assert validated["cv_results_sha256"] == file_fingerprint(reference_path)
+
+    reference["train_config"]["epochs"] = 3.0
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
+    with pytest.raises(ValueError, match="train_config"):
+        experiments.validate_full_refit_reference(
+            reference_path,
+            frame,
+            input_variant="title_context",
+            cfg=cfg,
+            source_path=source,
+        )
+
+
+def test_full_refit_manifest_records_provenance_without_test_metrics(tmp_path):
+    source = tmp_path / "labels.csv"
+    source.write_text("text,label\na,NEGATIVE\nb,NEUTRAL\nc,POSITIVE\n", encoding="utf-8")
+    frame = pd.DataFrame({"text": ["a", "b", "c"], "label_id": [0, 1, 2]})
+    cfg = model.TrainConfig(
+        epochs=5.0,
+        batch_size=16,
+        truncation_strategy="head_tail",
+        class_weighting="inverse_frequency",
+    )
+
+    manifest = model.build_full_refit_manifest(
+        frame,
+        cfg,
+        source_path=source,
+        device="cuda",
+        warmup_steps=4,
+        class_weights=model.compute_class_weights(frame["label_id"]),
+        evaluation_reference={"cv_results_sha256": "abc", "folds": 5},
+    )
+
+    assert manifest["run_type"] == "full_data_refit"
+    assert manifest["training_size"] == 3
+    assert manifest["class_distribution"] == {
+        "NEGATIVE": 1,
+        "NEUTRAL": 1,
+        "POSITIVE": 1,
+    }
+    assert manifest["selection"]["outer_holdout_used"] is False
+    assert manifest["provenance"]["source_file_sha256"] == file_fingerprint(source)
+    assert "test_metrics" not in manifest
 
 def test_stratified_folds_are_disjoint_and_cover_every_row():
     frame = pd.DataFrame({"label_id": [0, 1, 2] * 5})

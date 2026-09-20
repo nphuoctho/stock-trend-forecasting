@@ -221,6 +221,45 @@ def cmd_sentiment_cv(args: argparse.Namespace) -> int:
     return 0
 
 
+
+
+def cmd_sentiment_refit(args: argparse.Namespace) -> int:
+    """Fit a cross-validated PhoBERT configuration on every reviewed label."""
+    from stf.sentiment import dataset, experiments, model
+
+    df = dataset.load_labeled(args.data)
+    frame = dataset.prepare_model_input(df, args.input_variant)
+    cfg = model.TrainConfig(
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        seed=args.seed,
+        truncation_strategy=args.truncation_strategy,
+        class_weighting=args.class_weighting,
+    )
+    evaluation_reference = experiments.validate_full_refit_reference(
+        args.cv_results,
+        frame,
+        input_variant=args.input_variant,
+        cfg=cfg,
+        source_path=args.data,
+    )
+    print(
+        f"Refitting {len(frame)} reviewed rows with the locked "
+        f"{evaluation_reference['folds']}-fold configuration."
+    )
+    manifest = model.refit_full_data(
+        frame,
+        cfg,
+        out_dir=Path(args.output),
+        source_path=args.data,
+        evaluation_reference=evaluation_reference,
+    )
+    print("Checkpoint:", Path(args.output) / "best")
+    print("Manifest:", Path(args.output) / "manifest.json")
+    print("Training rows:", manifest["training_size"])
+    return 0
+
+
 def cmd_sentiment_ablation(args: argparse.Namespace) -> int:
     """Run all title/context and truncation combinations sequentially."""
     from stf.sentiment import dataset, experiments, model
@@ -848,6 +887,37 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     p_cv.set_defaults(func=cmd_sentiment_cv)
+
+    p_refit = sub.add_parser(
+        "sentiment-refit",
+        help="fit a cross-validated PhoBERT configuration on every reviewed label",
+    )
+    p_refit.add_argument("--data", required=True)
+    p_refit.add_argument(
+        "--cv-results",
+        required=True,
+        help="cv_results.json that selected this exact configuration",
+    )
+    p_refit.add_argument("--epochs", type=float, required=True)
+    p_refit.add_argument("--batch-size", type=int, required=True)
+    p_refit.add_argument("--seed", type=int, required=True)
+    p_refit.add_argument(
+        "--input-variant",
+        choices=("title", "context", "title_context"),
+        required=True,
+    )
+    p_refit.add_argument(
+        "--truncation-strategy",
+        choices=("head", "tail", "head_tail"),
+        required=True,
+    )
+    p_refit.add_argument(
+        "--class-weighting",
+        choices=("none", "inverse_frequency"),
+        required=True,
+    )
+    p_refit.add_argument("--output", required=True)
+    p_refit.set_defaults(func=cmd_sentiment_refit)
 
     p_ablation = sub.add_parser(
         "sentiment-ablation",

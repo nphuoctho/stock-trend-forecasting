@@ -1,15 +1,18 @@
 # Chạy notebook huấn luyện và đánh giá PhoBERT trên Colab / Kaggle
 
-Có hai notebook cho hai mục đích:
+Có ba notebook cho ba mục đích:
 
 - `phobert_finetune.ipynb`: huấn luyện PhoBERT cơ bản và xuất checkpoint.
 - `sentiment_cv.ipynb`: notebook GPU chính thức cho xác thực chéo 5 lượt trên
   1.306 nhãn trong miền dữ liệu đã rà soát. Nó huấn luyện trên mọi tầng, nhưng
   chỉ đánh giá holdout ngoài trên các tầng giữ phân phối gốc.
+- `sentiment_refit.ipynb`: tinh chỉnh checkpoint triển khai trên toàn bộ 1.306 nhãn
+  bằng cấu hình đã khóa từ artifact xác thực chéo; không tạo chỉ số kiểm thử mới.
 
-Phần dưới đây hướng dẫn notebook huấn luyện cơ bản. Khi cần chạy lại thực nghiệm
-luận văn, dùng `sentiment_cv.ipynb`, bật Internet/GPU, và attach một phiên bản
-Kaggle Dataset có tệp `labeled_merged.csv` đã được rà soát.
+Khi cần chạy lại thực nghiệm luận văn, dùng `sentiment_cv.ipynb`, bật Internet/GPU,
+và attach một phiên bản Kaggle Dataset có tệp `labeled_merged.csv` đã được rà soát.
+Sau khi artifact CV được xác nhận, dùng `sentiment_refit.ipynb` để tạo checkpoint
+cho bước chấm toàn bộ tin.
 
 ---
 
@@ -17,8 +20,9 @@ Kaggle Dataset có tệp `labeled_merged.csv` đã được rà soát.
 
 ### Step 1: Open the notebook
 1. Go to https://colab.research.google.com.
-2. Upload `sentiment_cv.ipynb` for the 5-fold input/truncation experiments,
-   or `phobert_finetune.ipynb` for the basic single-split training run.
+2. Upload `sentiment_cv.ipynb` cho thực nghiệm xác thực chéo 5 lượt,
+   `sentiment_refit.ipynb` cho checkpoint triển khai đã khóa cấu hình, hoặc
+   `phobert_finetune.ipynb` cho lần huấn luyện cơ bản một split.
 ### Step 2: Enable the GPU (required)
 1. Menu **Runtime > Change runtime type**.
 2. Hardware accelerator > **T4 GPU** > Save.
@@ -79,8 +83,8 @@ If the session dies during training (free-tier timeout, lost network), you don't
 
 ### Step 1: Create or import the notebook
 1. Go to https://www.kaggle.com/code > New Notebook.
-2. Import `sentiment_cv.ipynb` for the cross-validation experiment, or
-   `phobert_finetune.ipynb` for the basic training run.
+2. Import `sentiment_cv.ipynb` cho thực nghiệm xác thực chéo, `sentiment_refit.ipynb`
+   cho checkpoint triển khai, hoặc `phobert_finetune.ipynb` cho lần huấn luyện cơ bản.
 3. Đính kèm phiên bản dataset `phuocthoai/stock-trend-forecasting` có tệp
    `labeled_merged.csv`. Notebook kiểm tra đủ 1.306 nhãn đã rà soát trước khi
    bắt đầu huấn luyện.
@@ -91,9 +95,9 @@ If the session dies during training (free-tier timeout, lost network), you don't
 3. Set **Internet** to **On** so the notebook can clone the repository and
    download PhoBERT when needed.
 
-### Step 3: Run cells in order
-The CV notebook writes results to `/kaggle/working`; download the output or
-save a new notebook version after the run.
+`sentiment_cv.ipynb` ghi artifact xác thực chéo vào `/kaggle/working`.
+`sentiment_refit.ipynb` ghi checkpoint cuối và ZIP vào `/kaggle/working`.
+Tải output hoặc lưu phiên bản notebook mới sau khi chạy.
 
 ---
 
@@ -107,8 +111,8 @@ save a new notebook version after the run.
 | Section 8 "newly initialized weights" warning | Normal (fresh classification head) | Ignore, that's expected when fine-tuning |
 | Training very slow (>30 min) | Running on CPU, not GPU | Section 3 must print "CUDA: True" |
 | `wget` fails in section 4 | Kaggle Internet off | Turn Internet on in Settings |
-| `operator torchvision::nms does not exist` or `Trainer` import fails | Kaggle's `torchvision` is incompatible with the installed `torch` | Start a fresh session and rerun the `sentiment_cv.ipynb` bootstrap cell; it pins the text-training stack and removes broken `torchvision` |
-| `No space left on device` while saving a model | Old runs or full ablation output retain model copies | Start a fresh Kaggle session or delete the previous output directory, then rerun; ablation now removes fold models after saving metrics, while the selected configuration should be rerun with `sentiment-cv` to keep a checkpoint |
+| `operator torchvision::nms does not exist` hoặc import `Trainer` thất bại | `torchvision` không tương thích với `torch` đã cài | Khởi tạo phiên mới và chạy bootstrap của `sentiment_cv.ipynb` hoặc `sentiment_refit.ipynb`; hai notebook giữ nguyên stack huấn luyện văn bản và gỡ `torchvision` lỗi |
+| Hết dung lượng khi lưu model | Lượt CV giữ nhiều checkpoint hoặc thư mục cũ còn tồn tại | Khởi tạo phiên Kaggle mới; `sentiment_refit.ipynb` chỉ lưu một checkpoint cuối và một ZIP |
 | Low macro-F1 (<0.5) | Normal for a small, imbalanced seed | Add in-domain labels, or accept it and report honestly |
 
 ---
@@ -143,6 +147,24 @@ train; validation được rút từ tầng đánh giá, nhưng có kích thư�
 toàn bộ outer train. Không dùng holdout hoặc các tầng làm giàu để chọn checkpoint.
 Báo cáo `macro_f1`, `balanced_accuracy`, F1 và recall từng lớp; 59 mẫu NEGATIVE
 ở toàn bộ holdout đòi hỏi diễn giải khoảng tin cậy thận trọng.
+
+Sau khi artifact `cv_results.json` được kiểm tra, tạo checkpoint triển khai bằng:
+
+```bash
+uv run python -m stf.cli sentiment-refit \
+  --data data/labeled/indomain/labeled_merged.csv \
+  --cv-results outputs/sentiment-cv-merged/cv_results.json \
+  --input-variant title_context \
+  --truncation-strategy head_tail \
+  --class-weighting inverse_frequency \
+  --epochs 5 --batch-size 16 --seed 42 \
+  --output models/sentiment/merged-refit
+```
+
+Lệnh bắt buộc mã băm dữ liệu, cấu hình và kích thước mẫu phải khớp artifact CV. Nó
+huấn luyện trên toàn bộ nhãn đã duyệt với số epoch cố định, không rút validation hoặc
+outer holdout nên manifest không chứa chỉ số kiểm thử. Sau khi tải checkpoint về, chạy
+`score-news`, hai lệnh `forecast` và `forecast-compare` theo `README.md`.
 
 ## Cải thiện tùy chọn
 - Nếu mở rộng nhãn, giữ một tầng lấy mẫu ngẫu nhiên độc lập cho đánh giá và đưa

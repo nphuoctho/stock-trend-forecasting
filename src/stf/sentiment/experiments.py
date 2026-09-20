@@ -240,6 +240,53 @@ def run_cross_validation(
     return result
 
 
+
+
+def validate_full_refit_reference(
+    reference_path: str | Path,
+    frame: pd.DataFrame,
+    *,
+    input_variant: str,
+    cfg: model.TrainConfig,
+    source_path: str | Path,
+) -> dict:
+    """Require a CV artifact that exactly selected a full-data refit configuration."""
+    reference_path = Path(reference_path)
+    try:
+        reference = json.loads(reference_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot read cross-validation reference {reference_path}.") from exc
+
+    actual = {
+        "input_variant": input_variant,
+        "truncation_strategy": cfg.truncation_strategy,
+        "data_size": len(frame),
+        "train_config": asdict(cfg),
+        "source_file_sha256": dataset.file_fingerprint(source_path),
+    }
+    mismatches = [
+        field
+        for field, expected in actual.items()
+        if reference.get(field) != expected
+    ]
+    if mismatches:
+        raise ValueError(
+            "Cross-validation reference does not match the refit "
+            f"configuration: {', '.join(mismatches)}."
+        )
+    if not isinstance(reference.get("fold_results"), list) or not reference["fold_results"]:
+        raise ValueError("Cross-validation reference has no fold results.")
+    if not isinstance(reference.get("aggregate"), dict):
+        raise ValueError("Cross-validation reference has no aggregate metrics.")
+
+    return {
+        "cv_results_sha256": dataset.file_fingerprint(reference_path),
+        "folds": reference["folds"],
+        "data_size": reference["data_size"],
+        "aggregate": reference["aggregate"],
+    }
+
+
 def _remove_model_artifacts(root: Path) -> None:
     """Remove persisted model directories owned by an ablation run."""
     if not root.exists():
