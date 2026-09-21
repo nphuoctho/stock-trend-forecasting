@@ -61,15 +61,17 @@ trên tập 1.306 mẫu đạt F1 vĩ mô 0,7298, độ chính xác 0,8125 và �
 Sau khi khóa cấu hình, một điểm kiểm triển khai được tinh chỉnh lại trên toàn bộ 1.306
 nhãn với năm epoch cố định và chấm lại 12.624 liên kết tin--mã. Có 12.613 liên kết được
 neo vào phiên giao dịch; 11 liên kết bị loại. Bảng dự báo gồm 14.990 dòng mã--phiên, trong
-đó 6.950 dòng có tin. Ở bài toán dự báo, mô hình LSTM chỉ dùng giá đạt F1 vĩ mô 0,3797,
-độ chính xác cân bằng 0,3915 và AUC-ROC một-chống-còn-lại 0,5721, vượt rõ mốc ngẫu nhiên
-0,3289 và mốc lớp phổ biến 0,1603. Vì nhãn ba lớp được cắt theo phân vị một phần ba, các
-lớp gần cân bằng theo thiết kế và mức ngẫu nhiên của bài toán là 0,333.
+đó 6.950 dòng có tin. Ở bài toán dự báo, mô hình LSTM chỉ dùng giá đạt F1 vĩ mô
+0,3797, độ chính xác cân bằng 0,3915 và AUC-ROC một-chống-còn-lại 0,5721; các
+điểm này cao hơn mốc ngẫu nhiên 0,3289 và mốc lớp phổ biến 0,1603. Vì nhãn ba
+lớp được cắt theo phân vị một phần ba, các lớp gần cân bằng theo thiết kế và mức
+ngẫu nhiên của bài toán là 0,333.
 
-Đóng góp riêng của tín hiệu cảm xúc được đo bằng một đối chứng giữ nguyên kiến trúc hai
-nhánh, cùng bài tin, thời điểm và số lượng tin, nhưng thay xác suất cảm xúc thật bằng phân
-phối tiên nghiệm trung tính. Hiệu số trực tiếp là $+0{,}0110$ F1 vĩ mô, trong đó hiệu ứng
-kiến trúc là $+0{,}0044$ và đóng góp thông tin theo cửa sổ là $+0{,}0066$. Khi lấy mẫu lặp
+Đóng góp riêng của tín hiệu cảm xúc được đo bằng một đối chứng giữ nguyên kiến
+trúc hai nhánh, cùng bài tin, thời điểm và số lượng tin, nhưng thay xác suất cảm
+xúc thật bằng phân phối tiên nghiệm trung tính. Hiệu số trực tiếp là $+0{,}0110$
+F1 vĩ mô, trong đó hiệu ứng kiến trúc và sự hiện diện tin là $+0{,}0044$ và đóng
+góp thông tin theo cửa sổ là $+0{,}0066$. Khi lấy mẫu lặp
 theo khối ngày, đóng góp thông tin ước lượng là $+0{,}0014$ với khoảng tin cậy 95\%
 $[-0{,}0087; +0{,}0116]$. Khoảng này chứa 0.
 

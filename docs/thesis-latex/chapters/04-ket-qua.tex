@@ -383,11 +383,12 @@ chạy (5 cửa sổ $\times$ 3 hạt giống), kèm độ lệch chuẩn của 
 \noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment/forecast\_metrics.csv}.}
 \end{table}
 
-Mô hình chỉ giá vượt rõ hai mốc đối chứng bắt buộc: LSTM chỉ giá đạt F1 vĩ mô 0,3797,
-so với 0,3289 của mốc ngẫu nhiên và 0,1603 của mốc lớp phổ biến; AUC-ROC OvR cũng cao
-nhất, 0,5721. Điểm số hai nhánh được giữ để mô tả lần chạy hồi cứu, nhưng không là bằng
-chứng độc lập về giá trị của tin hay cảm xúc vì bộ sinh xác suất đã học từ nhãn tương lai
-tương đối với các cửa sổ kiểm thử.
+LSTM chỉ giá có F1 vĩ mô 0,3797, so với 0,3289 của mốc ngẫu nhiên và 0,1603 của
+mốc lớp phổ biến; AUC-ROC một-chống-còn-lại là 0,5721. Báo cáo không thực hiện
+kiểm định ghép cặp với hai mốc đối chứng, nên đây chỉ là so sánh mô tả các điểm
+quan sát được. Điểm số hai nhánh được giữ để mô tả lần chạy hồi cứu, nhưng không
+là bằng chứng độc lập về giá trị của tin hay cảm xúc vì bộ sinh xác suất đã học từ
+nhãn tương lai tương đối với các cửa sổ kiểm thử.
 
 \subsection{Báo cáo chỉ số theo lớp}
 

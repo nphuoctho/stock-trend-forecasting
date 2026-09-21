@@ -38,8 +38,9 @@ Lượt tinh chỉnh lại không tạo chỉ số kiểm thử mới.
 Mục tiêu thứ ba và thứ tư là kết hợp hai nguồn dữ liệu và huấn luyện mô hình dự báo. Mục
 tiêu này \textbf{đã được thực hiện hồi cứu với LSTM} và \textbf{chưa thực hiện với TFT}.
 Mô hình LSTM chỉ giá đạt F1 vĩ mô 0,3797, độ chính xác cân bằng 0,3915 và AUC-ROC
-một-chống-còn-lại 0,5721, vượt rõ mốc ngẫu nhiên 0,3289 và mốc lớp phổ biến
-0,1603. Như vậy tồn tại tín hiệu dự báo từ đặc trưng giá, ở mức khiêm tốn. Các điểm
+một-chống-còn-lại 0,5721; các điểm này cao hơn mốc ngẫu nhiên 0,3289 và mốc lớp
+phổ biến 0,1603. Báo cáo không có kiểm định ghép cặp với hai mốc đối chứng, nên
+so sánh này chỉ mô tả mức điểm quan sát được. Các điểm
 số của nhánh có cảm xúc dùng bộ sinh học từ nhãn tương lai tương đối với các cửa sổ
 kiểm thử, nên chỉ có giá trị mô tả hồi cứu
 \cite{Halder2022_221107392v1,Gu2024_240716150v1}.
@@ -132,7 +133,8 @@ LSTM hai nhánh được lựa chọn làm cấu hình cơ sở để so sánh m
 hình có cảm xúc, còn TFT được giữ ở vị trí mở rộng sau khi cấu hình cơ sở được xác minh.
 
 Đồ án \textbf{đã đưa ra kết quả định lượng hồi cứu}. Mô hình dự báo dùng đặc trưng giá
-vượt rõ hai mốc đối chứng bắt buộc, xác nhận tồn tại tín hiệu dự báo thật ở mức khiêm tốn.
+có điểm cao hơn hai mốc đối chứng bắt buộc; do chưa có kiểm định ghép cặp với các mốc
+này, kết quả chỉ mô tả mức điểm quan sát được.
 Với đối chứng giữ nguyên kiến trúc, thời điểm và số lượng tin, đóng góp thông tin theo cửa
 sổ là $+0{,}0066$ F1 vĩ mô; ước lượng theo ngày là $+0{,}0014$ với khoảng tin cậy
 $[-0{,}0087; +0{,}0116]$. Khoảng này chứa 0.
