@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 from stf import config
+from stf.forecasting.serve import ARM_FAMILIES
 
 def cmd_prices(args: argparse.Namespace) -> int:
     from stf.data import prices
@@ -427,40 +428,67 @@ def cmd_score_news(args: argparse.Namespace) -> int:
     scored = build_input_text(
         articles, args.input_variant, context_chars=args.context_chars
     )
+    scored_all = scored
+
+    output_path = Path(args.output)
+    existing = None
+    if args.incremental and output_path.exists():
+        existing = pd.read_parquet(output_path)
+        scored_keys = set(zip(existing["ticker"], existing["url"]))
+        fresh = ~pd.Series(
+            list(zip(scored["ticker"], scored["url"])), index=scored.index
+        ).isin(scored_keys)
+        scored = scored.loc[fresh].reset_index(drop=True)
+        print(
+            f"[score-news] incremental: {int(fresh.sum())} new rows "
+            f"({len(existing)} already scored)"
+        )
+
+    probability_columns = ["prob_negative", "prob_neutral", "prob_positive"]
     effective_strategy, effective_max_len = resolve_inference_config(
         model_dir, truncation_strategy=args.truncation_strategy
     )
-    probs = predict_proba(
-        scored["text"].tolist(),
-        model_dir,
-        batch_size=args.batch_size,
-        truncation_strategy=effective_strategy,
-        max_len=effective_max_len,
-    )
-    probability_columns = ["prob_negative", "prob_neutral", "prob_positive"]
-    probs = np.asarray(probs, dtype="float64")
-    if probs.shape != (len(scored), len(probability_columns)):
-        raise RuntimeError(
-            "score-news: checkpoint returned probabilities with an unexpected shape."
+    if len(scored):
+        probs = predict_proba(
+            scored["text"].tolist(),
+            model_dir,
+            batch_size=args.batch_size,
+            truncation_strategy=effective_strategy,
+            max_len=effective_max_len,
         )
-    if (
-        not np.isfinite(probs).all()
-        or (probs < 0).any()
-        or (probs > 1).any()
-        or not np.isclose(probs.sum(axis=1), 1.0, rtol=0, atol=1e-6).all()
-    ):
-        raise RuntimeError(
-            "score-news: checkpoint returned invalid probability vectors."
+        probs = np.asarray(probs, dtype="float64")
+        if probs.shape != (len(scored), len(probability_columns)):
+            raise RuntimeError(
+                "score-news: checkpoint returned probabilities with an unexpected shape."
+            )
+        if (
+            not np.isfinite(probs).all()
+            or (probs < 0).any()
+            or (probs > 1).any()
+            or not np.isclose(probs.sum(axis=1), 1.0, rtol=0, atol=1e-6).all()
+        ):
+            raise RuntimeError(
+                "score-news: checkpoint returned invalid probability vectors."
+            )
+        new_rows = pd.DataFrame(
+            {
+                "ticker": scored["ticker"].to_numpy(),
+                "url": scored["url"].to_numpy(),
+                "published_at": scored["published_at"].to_numpy(),
+                "prob_negative": probs[:, 0],
+                "prob_neutral": probs[:, 1],
+                "prob_positive": probs[:, 2],
+            }
         )
-    out = pd.DataFrame(
-        {
-            "ticker": scored["ticker"].to_numpy(),
-            "url": scored["url"].to_numpy(),
-            "published_at": scored["published_at"].to_numpy(),
-            "prob_negative": probs[:, 0],
-            "prob_neutral": probs[:, 1],
-            "prob_positive": probs[:, 2],
-        }
+    else:
+        new_rows = pd.DataFrame(
+            columns=["ticker", "url", "published_at", *probability_columns]
+        )
+
+    out = (
+        pd.concat([existing, new_rows], ignore_index=True)
+        if existing is not None
+        else new_rows
     )
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -504,7 +532,7 @@ def cmd_score_news(args: argparse.Namespace) -> int:
         },
         "input": {
             "fingerprint": frame_fingerprint(
-                scored, columns=("ticker", "url", "published_at", "text")
+                scored_all, columns=("ticker", "url", "published_at", "text")
             ),
             "variant": args.input_variant,
             "context_chars": args.context_chars,
@@ -776,6 +804,165 @@ def cmd_forecast(args: argparse.Namespace) -> int:
             )
     print(f"[forecast] artifacts -> {args.output}")
     return 0
+
+def cmd_forecast_refit(args: argparse.Namespace) -> int:
+    """Fit one ladder arm on the full panel and persist it for daily inference."""
+    from stf.forecasting import assemble
+    from stf.forecasting.experiment import ForecastConfig, frame_hash
+    from stf.forecasting.serve import ARM_FAMILIES, refit_arm
+
+    prices = _load_prices()
+    provenance: dict = {
+        "tickers": list(config.TICKERS),
+        "date_start": config.DATE_START,
+        "date_end": config.DATE_END,
+        "session_cutoff": config.SESSION_CUTOFF,
+        "timezone": config.TIMEZONE,
+        "prices_hash": frame_hash(prices),
+        "news_sentiment": None,
+    }
+
+    news = None
+    if args.news_sentiment is not None:
+        news_path = Path(args.news_sentiment)
+        if not news_path.exists():
+            print(f"forecast-refit: missing {news_path}", file=sys.stderr)
+            return 2
+        news = pd.read_parquet(news_path)
+        try:
+            score_manifest = _validated_scored_news_manifest(news_path, news)
+        except ValueError as error:
+            print(f"forecast-refit: {error}", file=sys.stderr)
+            return 2
+        provenance["news_sentiment"] = {
+            "mode": "real",
+            "source_path": str(news_path),
+            "source_hash": frame_hash(news),
+            "rows": int(len(news)),
+            "score_manifest": score_manifest,
+        }
+
+    family, use_sentiment = ARM_FAMILIES[args.arm]
+    if use_sentiment and news is None:
+        print(
+            f"forecast-refit: arm {args.arm!r} needs --news-sentiment.",
+            file=sys.stderr,
+        )
+        return 2
+
+    panel = assemble(prices, news)
+    if "alignment_report" in panel.attrs:
+        provenance["alignment_report"] = panel.attrs["alignment_report"]
+    provenance["panel_hash"] = frame_hash(panel)
+
+    cfg = ForecastConfig(
+        seq_len=args.seq_len,
+        val_size=args.val_size,
+        hidden=args.hidden,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        patience=args.patience,
+        seeds=tuple(args.seeds),
+    )
+    manifest = refit_arm(
+        panel, args.arm, cfg=cfg, output_dir=Path(args.model_dir), provenance=provenance
+    )
+    print(
+        f"[forecast-refit] arm={args.arm} family={family} "
+        f"train={manifest['train_rows']} val={manifest['val_rows']} "
+        f"seeds={manifest['seeds']} -> {args.model_dir}"
+    )
+    return 0
+
+
+def cmd_forecast_predict(args: argparse.Namespace) -> int:
+    """Score the latest session per ticker with a refit arm."""
+    from stf.forecasting import assemble
+    from stf.forecasting.serve import load_arm, predict_latest
+
+    arm = load_arm(Path(args.model_dir))
+    prices = _load_prices()
+
+    news = None
+    if arm.use_sentiment:
+        if args.news_sentiment is None:
+            print(
+                f"forecast-predict: arm {arm.name!r} needs --news-sentiment; "
+                "run score-news first.",
+                file=sys.stderr,
+            )
+            return 2
+        news_path = Path(args.news_sentiment)
+        if not news_path.exists():
+            print(f"forecast-predict: missing {news_path}", file=sys.stderr)
+            return 2
+        news = pd.read_parquet(news_path)
+        try:
+            _validated_scored_news_manifest(news_path, news)
+        except ValueError as error:
+            print(f"forecast-predict: {error}", file=sys.stderr)
+            return 2
+
+    panel = assemble(prices, news)
+    predictions = predict_latest(panel, arm)
+
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    obs_date = pd.to_datetime(predictions["observation_date"]).max().date().isoformat()
+    dated_path = out_dir / f"predictions_{obs_date}.parquet"
+    predictions.to_parquet(dated_path, index=False)
+    predictions.to_parquet(out_dir / "latest.parquet", index=False)
+
+    print(f"[forecast-predict] arm={arm.name} date={obs_date} tickers={len(predictions)}")
+    for _, row in predictions.iterrows():
+        print(
+            f"  {row['ticker']:<6} {row['y_pred']:<5} "
+            f"UP={row['prob_up']:.3f} FLAT={row['prob_flat']:.3f} "
+            f"DOWN={row['prob_down']:.3f} news={'yes' if row['has_news'] else 'no'}"
+        )
+    print(f"[forecast-predict] -> {dated_path}")
+    return 0
+
+
+def cmd_forecast_resolve(args: argparse.Namespace) -> int:
+    """Join stored daily predictions with realized labels for monitoring."""
+    from stf.forecasting import assemble
+    from stf.forecasting.serve import load_arm, resolve_predictions
+
+    arm = load_arm(Path(args.model_dir))
+    live_dir = Path(args.predictions_dir)
+    files = sorted(live_dir.glob("predictions_*.parquet"))
+    if not files:
+        print(f"forecast-resolve: no predictions under {live_dir}", file=sys.stderr)
+        return 1
+    predictions = pd.concat(
+        [pd.read_parquet(path) for path in files], ignore_index=True
+    )
+
+    news = None
+    if arm.use_sentiment and args.news_sentiment is not None:
+        news_path = Path(args.news_sentiment)
+        if not news_path.exists():
+            print(f"forecast-resolve: missing {news_path}", file=sys.stderr)
+            return 2
+        news = pd.read_parquet(news_path)
+    panel = assemble(_load_prices(), news)
+
+    resolved = resolve_predictions(predictions, panel, arm.thresholds)
+    out_path = live_dir / "resolved.parquet"
+    resolved.to_parquet(out_path, index=False)
+
+    scored = resolved.dropna(subset=["y_true"])
+    pending = int(resolved["y_true"].isna().sum())
+    print(
+        f"[forecast-resolve] rows={len(resolved)} resolved={len(scored)} "
+        f"pending={pending} -> {out_path}"
+    )
+    if len(scored):
+        acc = float(scored["correct"].astype(bool).mean())
+        print(f"[forecast-resolve] live accuracy={acc:.4f} over {len(scored)} rows")
+    return 0
+
 
 
 def cmd_label_candidates(args: argparse.Namespace) -> int:
@@ -1222,6 +1409,63 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_forecast.set_defaults(func=cmd_forecast)
 
+    p_refit_fc = sub.add_parser(
+        "forecast-refit",
+        help="fit one arm on the full panel and persist it for daily inference",
+    )
+    p_refit_fc.add_argument("--arm", required=True, choices=sorted(ARM_FAMILIES))
+    p_refit_fc.add_argument(
+        "--news-sentiment",
+        default=None,
+        help="verified score-news parquet; required for *_sentiment arms",
+    )
+    p_refit_fc.add_argument(
+        "--model-dir", required=True, help="output directory for the frozen arm"
+    )
+    p_refit_fc.add_argument("--seq-len", type=int, default=5)
+    p_refit_fc.add_argument("--val-size", type=int, default=60)
+    p_refit_fc.add_argument("--hidden", type=int, default=32)
+    p_refit_fc.add_argument("--epochs", type=int, default=30)
+    p_refit_fc.add_argument("--batch-size", type=int, default=128)
+    p_refit_fc.add_argument("--patience", type=int, default=5)
+    p_refit_fc.add_argument(
+        "--seeds", type=int, nargs="+", default=[42, 43, 44]
+    )
+    p_refit_fc.set_defaults(func=cmd_forecast_refit)
+
+    p_predict = sub.add_parser(
+        "forecast-predict",
+        help="score the latest session per ticker with a refit arm",
+    )
+    p_predict.add_argument("--model-dir", required=True)
+    p_predict.add_argument(
+        "--news-sentiment",
+        default=None,
+        help="verified score-news parquet; required for *_sentiment arms",
+    )
+    p_predict.add_argument(
+        "--output-dir",
+        default="outputs/live",
+        help="directory for dated + latest prediction parquets",
+    )
+    p_predict.set_defaults(func=cmd_forecast_predict)
+
+    p_resolve = sub.add_parser(
+        "forecast-resolve",
+        help="join stored daily predictions with realized labels",
+    )
+    p_resolve.add_argument("--model-dir", required=True)
+    p_resolve.add_argument(
+        "--predictions-dir", default="outputs/live"
+    )
+    p_resolve.add_argument(
+        "--news-sentiment",
+        default=None,
+        help="score-news parquet matching the arm's sentiment features",
+    )
+    p_resolve.set_defaults(func=cmd_forecast_resolve)
+
+
     p_cmp = sub.add_parser(
         "forecast-compare",
         help="measure paired polarity information against a neutral-news control",
@@ -1265,6 +1509,11 @@ def main(argv: list[str] | None = None) -> int:
         "--limit", type=int, default=None, help="only score the first N rows"
     )
     p_score.add_argument("--output", required=True, help="output parquet path")
+    p_score.add_argument(
+        "--incremental",
+        action="store_true",
+        help="append only articles not already scored in --output",
+    )
     p_score.set_defaults(func=cmd_score_news)
 
     p_web = sub.add_parser(

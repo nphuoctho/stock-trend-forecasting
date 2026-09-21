@@ -268,6 +268,51 @@ The API lives under `/api` (`/api/runs`, per-run `summary`, `metrics`,
 during frontend development run `bun run dev` in `web/` for the Vite dev server
 with an `/api` proxy.
 
+## Phase 6: daily prediction (live serving)
+
+The walk-forward experiment discards every trained model; `forecast-refit` freezes one
+arm — label thresholds, both feature scalers, and per-seed weights — into
+`models/forecast/<arm>/` so a daily job can score the latest session without refitting:
+
+```bash
+# one-time: freeze the serving arms (sentiment arms need the scored-news parquet)
+uv run python -m stf.cli forecast-refit --arm lstm_price_sentiment \
+  --news-sentiment data/processed/news_sentiment_merged.parquet \
+  --model-dir models/forecast/lstm_price_sentiment
+uv run python -m stf.cli forecast-refit --arm lstm_price \
+  --model-dir models/forecast/lstm_price
+```
+
+`forecast-predict` scores the last `seq_len` sessions per ticker and writes
+`outputs/live/<arm>/predictions_<date>.parquet` plus `latest.parquet`;
+`forecast-resolve` joins stored predictions with realized next-session labels into
+`resolved.parquet` for live-accuracy monitoring:
+
+```bash
+uv run python -m stf.cli forecast-predict \
+  --model-dir models/forecast/lstm_price_sentiment \
+  --news-sentiment data/processed/news_sentiment_merged.parquet \
+  --output-dir outputs/live/lstm_price_sentiment
+uv run python -m stf.cli forecast-resolve \
+  --model-dir models/forecast/lstm_price_sentiment \
+  --predictions-dir outputs/live/lstm_price_sentiment \
+  --news-sentiment data/processed/news_sentiment_merged.parquet
+```
+
+`score-news --incremental` appends only articles not already present in the output
+parquet, so the daily job scores just the new crawl instead of the full archive.
+`scripts/daily-forecast.sh` chains prices → news → score-news → predict → resolve for
+every arm in `$ARMS`; schedule it after the 15:00 ICT close, e.g. cron:
+
+```cron
+30 15 * * 1-5  /path/to/stock-trend-forecasting/scripts/daily-forecast.sh
+```
+
+The dashboard exposes the results at `/api/live/latest` (per-arm signals for the
+newest session) and `/api/live/history` (resolved rows, pending count, per-date
+accuracy).
+
+
 ## Expanding the sentiment label set
 
 `label-candidates` draws a stratified annotation batch. A uniform draw spends the budget

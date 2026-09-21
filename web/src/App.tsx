@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import LiveSignalsSection from './components/LiveSignalsSection'
 import OverviewCards from './components/OverviewCards'
 import MetricsTable from './components/MetricsTable'
 import InformationGainSection from './components/InformationGainSection'
@@ -137,6 +138,8 @@ export default function App() {
           <Skeleton className="h-64" />
         </div>
       )}
+
+      <LiveSignalsSection />
 
       {summary && !detailQuery.isLoading && (
         <main className="space-y-6">

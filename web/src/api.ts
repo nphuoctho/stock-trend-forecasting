@@ -133,6 +133,33 @@ export interface InformationGain {
   effects: Record<string, IgEffect>
 }
 
+export interface LivePrediction {
+  ticker: string
+  observation_date: string
+  has_news: number
+  prob_down: number
+  prob_flat: number
+  prob_up: number
+  y_pred: string
+  arm: string
+}
+
+export interface LiveArmLatest {
+  arm: string
+  observation_date: string
+  rows: LivePrediction[]
+}
+
+export interface LiveArmHistory {
+  arm: string
+  total: number
+  resolved: number
+  pending: number
+  accuracy: number | null
+  by_date: { target_date: string; n: number; accuracy: number }[]
+}
+
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path)
   if (!res.ok) throw new Error(`${path} → HTTP ${res.status}`)
@@ -166,4 +193,6 @@ export const api = {
     q.set('offset', String(params.offset))
     return get<PredictionsResp>(`/api/runs/${name}/predictions?${q.toString()}`)
   },
+  liveLatest: () => getOr404<{ arms: LiveArmLatest[] }>('/api/live/latest'),
+  liveHistory: () => getOr404<{ arms: LiveArmHistory[] }>('/api/live/history'),
 }
