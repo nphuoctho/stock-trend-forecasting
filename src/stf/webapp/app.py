@@ -181,6 +181,80 @@ def run_information_gain(name: str) -> dict:
     return _normalize_information_gain(_read_json(path))
 
 
+def _live_dir() -> Path:
+    return _outputs_root() / "live"
+
+
+def _live_arm_dirs() -> dict[str, Path]:
+    root = _live_dir()
+    if not root.is_dir():
+        return {}
+    return {
+        child.name: child
+        for child in sorted(root.iterdir())
+        if child.is_dir() and (child / "latest.parquet").is_file()
+    }
+
+
+@app.get("/api/live/latest")
+def live_latest() -> dict:
+    """Latest per-ticker predictions produced by ``forecast-predict``, per arm."""
+    arms = []
+    for name, path in _live_arm_dirs().items():
+        frame = pd.read_parquet(path / "latest.parquet")
+        rows = json.loads(frame.to_json(orient="records", date_format="iso"))
+        obs = pd.to_datetime(frame["observation_date"]).max()
+        arms.append(
+            {
+                "arm": name,
+                "observation_date": obs.date().isoformat(),
+                "rows": rows,
+            }
+        )
+    if not arms:
+        raise HTTPException(status_code=404, detail="no live predictions yet")
+    return {"arms": arms}
+
+
+@app.get("/api/live/history")
+def live_history() -> dict:
+    """Resolved predictions with realized labels and per-date accuracy, per arm."""
+    arms = []
+    for name, path in _live_arm_dirs().items():
+        resolved_path = path / "resolved.parquet"
+        if not resolved_path.is_file():
+            continue
+        frame = pd.read_parquet(resolved_path)
+        scored = frame.dropna(subset=["y_true"])
+        by_date = []
+        if len(scored):
+            grouped = scored.groupby(
+                pd.to_datetime(scored["target_date"]).dt.date, sort=True
+            )
+            for date, block in grouped:
+                by_date.append(
+                    {
+                        "target_date": date.isoformat(),
+                        "n": int(len(block)),
+                        "accuracy": float(block["correct"].astype(bool).mean()),
+                    }
+                )
+        arms.append(
+            {
+                "arm": name,
+                "total": int(len(frame)),
+                "resolved": int(len(scored)),
+                "pending": int(frame["y_true"].isna().sum()),
+                "accuracy": float(scored["correct"].astype(bool).mean())
+                if len(scored)
+                else None,
+                "by_date": by_date,
+            }
+        )
+    if not arms:
+        raise HTTPException(status_code=404, detail="no resolved predictions yet")
+    return {"arms": arms}
+
 def mount_frontend() -> None:
     """Serve the built dashboard when ``web/dist`` exists."""
     if not WEB_DIST.is_dir():
