@@ -1,0 +1,104 @@
+{
+  "arm": "lstm_price_sentiment",
+  "price_arm": "lstm_price",
+  "config": {
+    "seq_len": 5,
+    "n_windows": 5,
+    "test_size": 60,
+    "val_size": 60,
+    "expanding": true,
+    "hidden": 32,
+    "num_layers": 1,
+    "epochs": 40,
+    "batch_size": 128,
+    "lr": 0.001,
+    "patience": 6,
+    "seeds": [
+      42,
+      43,
+      44
+    ],
+    "bootstrap_samples": 2000,
+    "bootstrap_seed": 7
+  },
+  "effects": {
+    "macro_f1": {
+      "price_only": 0.37971969824478435,
+      "two_branch_neutral_prior": 0.38485615157577546,
+      "two_branch_real_sentiment": 0.3825051478978399,
+      "architecture_effect": 0.005136453330991109,
+      "information_gain": -0.002351003677935559,
+      "naive_delta": 0.0027854496530555495,
+      "information_gain_per_window": [
+        -0.004080247257841396,
+        -0.0035964351270455497,
+        -0.010318132594442864,
+        -0.0008366787374494145,
+        0.007076475327100984
+      ],
+      "information_gain_window_bootstrap": {
+        "mean": -0.002351003677935648,
+        "low": -0.006575401392481983,
+        "high": 0.0028073111454423707
+      },
+      "information_gain_date_bootstrap": {
+        "mean": -0.00017355134092650326,
+        "low": -0.011291209110635924,
+        "high": 0.011058515021635832,
+        "n_blocks": 300
+      }
+    },
+    "balanced_accuracy": {
+      "price_only": 0.3915234951383306,
+      "two_branch_neutral_prior": 0.39539277989009375,
+      "two_branch_real_sentiment": 0.39212016325515486,
+      "architecture_effect": 0.0038692847517631246,
+      "information_gain": -0.003272616634938885,
+      "naive_delta": 0.0005966681168242394,
+      "information_gain_per_window": [
+        -0.004891557494822396,
+        -0.001697476697476663,
+        -0.011249292771031816,
+        -0.0021182396254748603,
+        0.003593483414111198
+      ],
+      "information_gain_window_bootstrap": {
+        "mean": -0.0032726166349389073,
+        "low": -0.007512718927209394,
+        "high": 0.0007541306244072676
+      },
+      "information_gain_date_bootstrap": {
+        "mean": -0.0018265400845065005,
+        "low": -0.01231553476041959,
+        "high": 0.008728973331411611,
+        "n_blocks": 300
+      }
+    },
+    "accuracy": {
+      "price_only": 0.42999999999999994,
+      "two_branch_neutral_prior": 0.4314444444444445,
+      "two_branch_real_sentiment": 0.4282222222222222,
+      "architecture_effect": 0.0014444444444445814,
+      "information_gain": -0.003222222222222293,
+      "naive_delta": -0.0017777777777777115,
+      "information_gain_per_window": [
+        -0.006111111111111067,
+        0.0033333333333332438,
+        -0.021666666666666667,
+        -0.0011111111111111183,
+        0.009444444444444478
+      ],
+      "information_gain_window_bootstrap": {
+        "mean": -0.003222222222222226,
+        "low": -0.012555555555555575,
+        "high": 0.005111111111111122
+      },
+      "information_gain_date_bootstrap": {
+        "mean": -0.0032222222222222374,
+        "low": -0.013222222222222246,
+        "high": 0.007111111111111124,
+        "n_blocks": 300
+      }
+    }
+  }
+}

@@ -26,6 +26,58 @@ SENTIMENT_COLUMNS: tuple[str, ...] = (
     "sent_dispersion",
 )
 
+# Trailing-window features derived on the panel, after no-news days are filled in.
+# They must be computed on the full session calendar (not on ``daily_sentiment``,
+# which omits no-news days) so a quiet stretch actually decays the signal.
+ROLLING_WINDOW = 5
+
+ROLLING_SENTIMENT_COLUMNS: tuple[str, ...] = (
+    "sent_pos_minus_neg_roll",
+    "sent_pos_minus_neg_ewm",
+    "news_count_roll_sum",
+    "has_news_roll_mean",
+)
+
+
+def add_rolling_sentiment(
+    panel: pd.DataFrame, *, window: int = ROLLING_WINDOW
+) -> pd.DataFrame:
+    """Append trailing sentiment aggregates to a panel, per ticker and causally.
+
+    Each value covers the ``window`` sessions ending at the row's own observation
+    date, so it only uses information available at that session's cutoff. A
+    single-row classical model sees a flat sentiment signal on the ~62% of
+    ticker-days without news; these trailing columns carry recent news forward so
+    the price-versus-price-plus-sentiment comparison is not null by construction.
+    """
+    if window < 1:
+        raise ValueError("window must be >= 1.")
+    required = {"ticker", "observation_date", "sent_pos_minus_neg", "news_count", "has_news"}
+    missing = sorted(required - set(panel.columns))
+    if missing:
+        raise ValueError(f"panel missing columns {missing} for rolling sentiment.")
+
+    out = panel.sort_values(["ticker", "observation_date"]).copy()
+    grouped = out.groupby("ticker", sort=False)
+    score = out["sent_pos_minus_neg"].astype("float64")
+    out["sent_pos_minus_neg_roll"] = (
+        score.groupby(out["ticker"]).rolling(window, min_periods=1).mean().to_numpy()
+    )
+    out["sent_pos_minus_neg_ewm"] = (
+        score.groupby(out["ticker"]).ewm(span=window, adjust=False).mean().to_numpy()
+    )
+    out["news_count_roll_sum"] = (
+        grouped["news_count"]
+        .rolling(window, min_periods=1)
+        .sum()
+        .to_numpy()
+        .astype("float64")
+    )
+    out["has_news_roll_mean"] = (
+        grouped["has_news"].rolling(window, min_periods=1).mean().to_numpy()
+    )
+    return out.reset_index(drop=True)
+
 
 def _empty() -> pd.DataFrame:
     return pd.DataFrame(columns=["ticker", "observation_date", *SENTIMENT_COLUMNS])

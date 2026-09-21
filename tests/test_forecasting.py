@@ -6,14 +6,30 @@ value leaks into a feature column.
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from stf.forecasting import calendar as cal
+from stf.forecasting.experiment import (
+    LADDER,
+    ForecastConfig,
+    _date_block_bootstrap,
+    compare_information_gain,
+    run_experiment,
+)
 from stf.forecasting.features import FeatureScaler, price_feature_columns, price_features
-from stf.forecasting.labels import add_target, apply_labels, fit_thresholds, label_panel
+from stf.forecasting.labels import (
+    TREND_LABELS,
+    add_target,
+    apply_labels,
+    fit_thresholds,
+    label_panel,
+)
 from stf.forecasting.models import (
+    ClassicalBaseline,
     MajorityBaseline,
     PriceLSTM,
     PriceSentimentLSTM,
@@ -22,10 +38,15 @@ from stf.forecasting.models import (
     fit_lstm,
     make_sequences,
     make_two_branch_sequences,
+    predict_lstm,
     set_seed,
 )
 from stf.forecasting.panel import assemble, build_panel
-from stf.forecasting.sentiment_agg import daily_sentiment
+from stf.forecasting.sentiment_agg import (
+    ROLLING_SENTIMENT_COLUMNS,
+    add_rolling_sentiment,
+    daily_sentiment,
+)
 from stf.forecasting.split import chronological_split, walk_forward_windows
 
 # --- fixtures -------------------------------------------------------------------------
@@ -399,11 +420,45 @@ def test_fit_lstm_runs_real_gradient_steps():
     X, y, _ = make_sequences(panel, cols, seq_len=5)
     set_seed(0)
     model = PriceLSTM(n_features=len(cols), hidden=8)
-    history = fit_lstm(model, X, y, epochs=6, lr=0.05, seed=0)
-    assert len(history) == 6
-    assert all(np.isfinite(history))
+    history = fit_lstm(model, X, y, epochs=6, lr=0.05, batch_size=8, seed=0)
+    losses = history["loss_history"]
+    assert len(losses) == 6
+    assert history["epochs_run"] == 6
+    assert all(np.isfinite(losses))
     # A real optimizer on separable-ish synthetic data reduces the loss.
-    assert history[-1] < history[0]
+    assert losses[-1] < losses[0]
+    # Without validation data there is nothing to select on.
+    assert history["best_val_macro_f1"] is None
+
+
+def test_fit_lstm_restores_the_best_validation_checkpoint():
+    cols = price_feature_columns()
+    panel = _labeled_panel(n=90)
+    X, y, meta = make_sequences(panel, cols, seq_len=5)
+    cut = len(y) // 2
+    set_seed(0)
+    model = PriceLSTM(n_features=len(cols), hidden=8)
+    history = fit_lstm(
+        model,
+        X[:cut],
+        y[:cut],
+        X_val=X[cut:],
+        y_val=y[cut:],
+        epochs=12,
+        lr=0.05,
+        batch_size=8,
+        patience=3,
+        seed=0,
+    )
+    scores = history["val_macro_f1_history"]
+    assert scores, "validation data must be scored once per epoch"
+    assert history["best_val_macro_f1"] == pytest.approx(max(scores))
+    assert scores[history["best_epoch"] - 1] == pytest.approx(max(scores))
+    # The weights left in the model must be the selected epoch's, not the last epoch's.
+    restored = evaluate_predictions(y[cut:], predict_lstm(model, X[cut:]).argmax(axis=1))
+    assert restored["macro_f1"] == pytest.approx(max(scores))
+    # Early stopping must not run past the patience budget.
+    assert history["epochs_run"] <= history["best_epoch"] + 3
 
 
 def test_feature_scaler_uses_training_rows_and_preserves_schema():
@@ -496,3 +551,321 @@ def test_evaluate_predictions_rejects_mismatched_lengths():
 def test_evaluate_predictions_rejects_labels_outside_fixed_ids():
     with pytest.raises(ValueError, match="fixed ids"):
         evaluate_predictions([0, 5], [0, 1])
+
+
+# --- trailing sentiment features ------------------------------------------------------
+
+
+def test_rolling_sentiment_never_reads_a_later_session():
+    """A news spike on the last session must not alter any earlier row."""
+    panel = build_panel(_prices(n=20))
+    quiet = add_rolling_sentiment(panel)
+
+    spiked = panel.copy()
+    last = spiked.index[-1]
+    spiked.loc[last, ["sent_pos_minus_neg", "news_count", "has_news"]] = [0.9, 7, 1]
+    loud = add_rolling_sentiment(spiked)
+
+    for col in ROLLING_SENTIMENT_COLUMNS:
+        np.testing.assert_allclose(
+            quiet[col].to_numpy()[:-1], loud[col].to_numpy()[:-1], atol=1e-12
+        )
+    # The spiked session itself must react, otherwise the feature is inert.
+    assert loud["sent_pos_minus_neg_roll"].iloc[-1] > quiet["sent_pos_minus_neg_roll"].iloc[-1]
+
+
+def test_rolling_sentiment_decays_after_news_stops():
+    """Trailing news must fade as quiet sessions accumulate, not persist flat."""
+    panel = build_panel(_prices(n=20))
+    panel.loc[5, ["sent_pos_minus_neg", "news_count", "has_news"]] = [1.0, 3, 1]
+    rolled = add_rolling_sentiment(panel)
+    ewm = rolled["sent_pos_minus_neg_ewm"].to_numpy()
+    assert ewm[5] > ewm[6] > ewm[7]
+    assert rolled["has_news_roll_mean"].iloc[5] > rolled["has_news_roll_mean"].iloc[-1]
+
+
+# --- walk-forward experiment contract -------------------------------------------------
+
+
+def test_experiment_windows_are_chronological_and_share_test_rows():
+    """Every arm must be scored on the same test rows, strictly after training."""
+    prices = pd.concat([_prices("FPT", n=120), _prices("VNM", n=120)], ignore_index=True)
+    panel = assemble(prices)
+    cfg = ForecastConfig(
+        n_windows=2, test_size=6, val_size=6, epochs=2, batch_size=32, seeds=(42,)
+    )
+    record = run_experiment(panel, cfg=cfg)
+
+    assert len(record["windows"]) == 2
+    assert record["chance_level"] == pytest.approx(1 / 3)
+    previous_test_end = None
+    for window in record["windows"]:
+        train_end = window["train_dates"][1]
+        assert train_end < window["val_dates"][0] < window["test_dates"][0]
+        if previous_test_end is not None:
+            assert window["test_dates"][0] > previous_test_end
+        previous_test_end = window["test_dates"][1]
+
+        sizes = {
+            arm: run["seed_runs"][0]["n"] for arm, run in window["metrics"].items()
+        }
+        assert len(set(sizes.values())) == 1, sizes
+        assert sizes["lstm_price"] == window["sizes"]["test"]
+
+
+def test_experiment_thresholds_are_refitted_per_window():
+    """Train-only thresholds must move with the window, not be fitted once globally."""
+    prices = pd.concat([_prices("FPT", n=140), _prices("VNM", n=140)], ignore_index=True)
+    panel = assemble(prices)
+    cfg = ForecastConfig(
+        n_windows=3, test_size=6, val_size=6, epochs=2, batch_size=32, seeds=(42,)
+    )
+    record = run_experiment(panel, cfg=cfg)
+    thresholds = [tuple(w["thresholds"]) for w in record["windows"]]
+    assert len(set(thresholds)) > 1, thresholds
+    for low, high in thresholds:
+        assert low < high
+
+
+def test_classical_baseline_expands_probabilities_to_all_three_classes():
+    """A train block missing a class must still yield a 3-column probability matrix."""
+    X = np.zeros((12, 5, 2), dtype=float)
+    X[:, -1, 0] = np.arange(12, dtype=float)
+    y = np.array([1, 2] * 6)  # DOWN (id 0) never appears in training
+    model = ClassicalBaseline(seed=0).fit(X, y)
+    probs = model.predict_proba(X)
+    assert probs.shape == (12, 3)
+    np.testing.assert_allclose(probs.sum(axis=1), 1.0, atol=1e-9)
+    # The absent class must carry exactly zero mass, not a shifted column.
+    np.testing.assert_allclose(probs[:, 0], 0.0)
+    assert probs[:, 1:].sum() > 0
+
+
+def test_date_block_bootstrap_brackets_a_real_difference():
+    """A uniformly better arm must produce an interval strictly above zero."""
+    dates = pd.to_datetime(pd.bdate_range("2024-01-01", periods=40)).repeat(5)
+    truth = np.tile([0, 1, 2, 0, 1], 40)
+    good = truth.copy()
+    bad = np.roll(truth, 1)
+    frame = pd.concat(
+        [
+            pd.DataFrame(
+                {
+                    "target_date": dates,
+                    "seed": 42,
+                    "arm": arm,
+                    "y_true": [TREND_LABELS[i] for i in truth],
+                    "y_pred": [TREND_LABELS[i] for i in pred],
+                }
+            )
+            for arm, pred in (("treated", good), ("control", bad))
+        ],
+        ignore_index=True,
+    )
+    out = _date_block_bootstrap(frame, "treated", "control", samples=500, seed=1)
+    assert out["macro_f1"]["n_blocks"] == 40
+    assert out["macro_f1"]["mean"] > 0.3
+    assert out["macro_f1"]["low"] > 0.0
+    # Two arms making the same predictions must instead give a zero-width interval.
+    identical = frame[frame["arm"] == "treated"]
+    identical = pd.concat(
+        [identical, identical.assign(arm="control")], ignore_index=True
+    )
+    same = _date_block_bootstrap(
+        identical, "treated", "control", samples=500, seed=1
+    )
+    assert same["macro_f1"]["low"] <= 0.0 <= same["macro_f1"]["high"]
+    assert same["macro_f1"]["mean"] == pytest.approx(0.0)
+
+
+def test_experiment_is_reproducible_across_repeated_runs():
+    """Two runs in one process must agree; weight init must not inherit RNG state.
+
+    Seeding only inside the training loop leaves initialisation drawing from
+    whatever global torch state earlier arms and windows left behind, which makes
+    a window's result depend on how much randomness was consumed before it.
+    """
+    prices = pd.concat([_prices("FPT", n=120), _prices("VNM", n=120)], ignore_index=True)
+    panel = assemble(prices)
+    cfg = ForecastConfig(
+        n_windows=2, test_size=6, val_size=6, epochs=4, batch_size=32, seeds=(42,)
+    )
+    first = run_experiment(panel, cfg=cfg)
+    second = run_experiment(panel, cfg=cfg)
+
+    for arm in ("lstm_price", "lstm_price_sentiment"):
+        a = [w["metrics"][arm]["window_mean"] for w in first["windows"]]
+        b = [w["metrics"][arm]["window_mean"] for w in second["windows"]]
+        assert a == b, f"{arm} is not reproducible: {a} vs {b}"
+
+
+def test_experiment_writes_every_artifact(tmp_path):
+    """The reportable artifacts and both interval flavours must be produced."""
+    prices = pd.concat([_prices("FPT", n=120), _prices("VNM", n=120)], ignore_index=True)
+    panel = assemble(prices)
+    cfg = ForecastConfig(
+        n_windows=2,
+        test_size=6,
+        val_size=6,
+        epochs=2,
+        batch_size=32,
+        seeds=(42, 43),
+        bootstrap_samples=200,
+    )
+    record = run_experiment(panel, cfg=cfg, output_dir=tmp_path)
+
+    for name in (
+        "forecast_results.json",
+        "forecast_metrics.csv",
+        "forecast_stratified.csv",
+        "forecast_predictions.csv",
+    ):
+        assert (tmp_path / name).exists(), name
+
+    delta = record["ablation"]["lstm_price_sentiment__minus__lstm_price"]["macro_f1"]
+    assert len(delta["per_window"]) == 2
+    assert delta["window_bootstrap"]["low"] is not None
+    assert delta["date_block_bootstrap"]["n_blocks"] == 2 * 6
+
+    # Predictions must cover every arm and every seed, not just the first.
+    preds = pd.read_csv(tmp_path / "forecast_predictions.csv")
+    assert set(preds["seed"]) == {42, 43}
+    assert set(preds["arm"]) == {name for name, _, _ in LADDER}
+
+
+def test_information_gain_decomposition_is_exact_and_guards_config_drift(tmp_path):
+    """Matched neutral controls must preserve both fused and price-only predictions."""
+    prices = pd.concat([_prices("FPT", n=120), _prices("VNM", n=120)], ignore_index=True)
+    news = pd.DataFrame(
+        {
+            "ticker": "FPT",
+            "published_at": pd.to_datetime(prices["time"].unique()).strftime(
+                "%Y-%m-%d 09:00:00+07:00"
+            ),
+            "prob_negative": 0.2,
+            "prob_neutral": 0.3,
+            "prob_positive": 0.5,
+        }
+    )
+    cfg = ForecastConfig(
+        n_windows=2, test_size=6, val_size=6, epochs=3, batch_size=32, seeds=(42,)
+    )
+    neutral_news = news.assign(
+        prob_negative=0.0,
+        prob_neutral=1.0,
+        prob_positive=0.0,
+    )
+    real_dir, control_dir = tmp_path / "real", tmp_path / "control"
+    run_experiment(
+        assemble(prices, news),
+        cfg=cfg,
+        output_dir=real_dir,
+        provenance={
+            "news_sentiment": {"mode": "real", "source_hash": "news-v1", "rows": len(news)},
+            "prices_hash": "prices-v1",
+        },
+    )
+    run_experiment(
+        assemble(prices, neutral_news),
+        cfg=cfg,
+        output_dir=control_dir,
+        provenance={
+            "news_sentiment": {
+                "mode": "neutral_prior",
+                "source_hash": "news-v1",
+                "rows": len(news),
+            },
+            "prices_hash": "prices-v1",
+        },
+    )
+
+    report = compare_information_gain(real_dir, control_dir)
+    effect = report["effects"]["macro_f1"]
+    assert (
+        effect["architecture_and_news_presence_volume_effect"]
+        + effect["information_gain"]
+        == pytest.approx(effect["naive_delta"])
+    )
+    assert len(effect["information_gain_per_window"]) == 2
+
+    # Config equality remains mandatory even when all prediction rows match.
+    control_results_path = control_dir / "forecast_results.json"
+    original_control_results = json.loads(
+        control_results_path.read_text(encoding="utf-8")
+    )
+    config_drift = json.loads(control_results_path.read_text(encoding="utf-8"))
+    config_drift["config"]["epochs"] += 1
+    control_results_path.write_text(json.dumps(config_drift), encoding="utf-8")
+    with pytest.raises(ValueError, match="different configs"):
+        compare_information_gain(real_dir, control_dir)
+    control_results_path.write_text(json.dumps(original_control_results), encoding="utf-8")
+
+    # Window records are keyed by their identifier, not their JSON list position.
+    control_results = json.loads(control_results_path.read_text(encoding="utf-8"))
+    control_results["windows"].reverse()
+    control_results_path.write_text(json.dumps(control_results), encoding="utf-8")
+    assert compare_information_gain(real_dir, control_dir) == report
+
+    duplicated_results = json.loads(control_results_path.read_text(encoding="utf-8"))
+    duplicated_results["windows"].append(duplicated_results["windows"][0])
+    control_results_path.write_text(json.dumps(duplicated_results), encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicates a window identifier"):
+        compare_information_gain(real_dir, control_dir)
+    control_results_path.write_text(json.dumps(control_results), encoding="utf-8")
+
+    # A run with observed probabilities cannot be its own neutralized control.
+    with pytest.raises(ValueError, match="preserve the scored-news rows"):
+        compare_information_gain(real_dir, real_dir)
+
+    # Matching parameters alone are insufficient if the underlying prices changed.
+    price_drift = tmp_path / "price-drift"
+    run_experiment(
+        assemble(prices, neutral_news),
+        cfg=cfg,
+        output_dir=price_drift,
+        provenance={
+            "news_sentiment": {
+                "mode": "neutral_prior",
+                "source_hash": "news-v1",
+                "rows": len(news),
+            },
+            "prices_hash": "prices-v2",
+        },
+    )
+    with pytest.raises(ValueError, match="different price provenance"):
+        compare_information_gain(real_dir, price_drift)
+
+    # A stale run with different observations cannot supply a paired information gain.
+    control_predictions = pd.read_csv(control_dir / "forecast_predictions.csv")
+    row = control_predictions["arm"].eq("lstm_price_sentiment").idxmax()
+    original_target = control_predictions.loc[row, "y_true"]
+    control_predictions.loc[row, "y_true"] = (
+        "UP" if original_target != "UP" else "DOWN"
+    )
+    control_predictions.to_csv(control_dir / "forecast_predictions.csv", index=False)
+    with pytest.raises(ValueError, match="different prediction keys"):
+        compare_information_gain(real_dir, control_dir)
+
+    # The control's price-only arm must remain identical, not merely have matching keys.
+    control_predictions.loc[row, "y_true"] = original_target
+    price_row = control_predictions["arm"].eq("lstm_price").idxmax()
+    original_prediction = control_predictions.loc[price_row, "y_pred"]
+    control_predictions.loc[price_row, "y_pred"] = (
+        "UP" if original_prediction != "UP" else "DOWN"
+    )
+    control_predictions.to_csv(control_dir / "forecast_predictions.csv", index=False)
+    with pytest.raises(ValueError, match="different price-arm predictions"):
+        compare_information_gain(real_dir, control_dir)
+
+    # Stale artifacts must report a documented pairing error, not leak a KeyError.
+    control_predictions.drop(columns="has_news").to_csv(
+        control_dir / "forecast_predictions.csv", index=False
+    )
+    with pytest.raises(ValueError, match="required pairing columns"):
+        compare_information_gain(real_dir, control_dir)
+
+    control_predictions.drop(columns="y_pred").to_csv(
+        control_dir / "forecast_predictions.csv", index=False
+    )
+    with pytest.raises(ValueError, match="required pairing columns"):
+        compare_information_gain(real_dir, control_dir)

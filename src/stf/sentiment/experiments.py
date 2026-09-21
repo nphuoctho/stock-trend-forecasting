@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import json
 import shutil
 from dataclasses import asdict, replace
@@ -37,6 +38,55 @@ def make_stratified_folds(
     ]
 
 
+def make_stratum_aware_folds(
+    df: pd.DataFrame,
+    *,
+    n_splits: int = 5,
+    seed: int = 42,
+    eval_strata: tuple[str, ...],
+    stratum_col: str = "stratum",
+) -> list[tuple[list[int], list[int]]]:
+    """Fold the frame so only ``eval_strata`` rows ever land in a holdout.
+
+    Strata drawn with help from a model or a polarity lexicon over-represent the
+    minority classes on purpose. Scoring on them would answer "how well does the
+    model do on rows chosen to be hard or rare", not "how well does it do on the
+    corpus". Those rows therefore stay in every training fold, while the holdout
+    is folded only over the strata that preserve the corpus label prior.
+
+    ``eval_strata`` is an explicit request for stratum-aware evaluation. A source
+    file without the provenance column therefore fails rather than silently
+    falling back to an all-row holdout.
+    """
+    if stratum_col not in df.columns:
+        raise ValueError(
+            f"Dataset has no {stratum_col!r} column required by evaluation strata "
+            f"{list(eval_strata)}."
+        )
+
+    stratum = df[stratum_col].astype("string")
+    evaluable = stratum.isna() | stratum.isin(list(eval_strata))
+    eval_positions = df.index[evaluable].to_numpy()
+    train_only_positions = df.index[~evaluable].to_numpy()
+    if len(eval_positions) == 0:
+        raise ValueError(
+            f"No rows belong to the evaluation strata {list(eval_strata)}; "
+            "cannot build a holdout that represents the corpus."
+        )
+
+    eval_frame = df.loc[eval_positions].reset_index(drop=True)
+    folds = make_stratified_folds(eval_frame, n_splits=n_splits, seed=seed)
+    lookup = {i: int(pos) for i, pos in enumerate(eval_positions)}
+    extra = [int(pos) for pos in train_only_positions]
+    return [
+        (
+            sorted([lookup[i] for i in train_idx] + extra),
+            sorted(lookup[i] for i in holdout_idx),
+        )
+        for train_idx, holdout_idx in folds
+    ]
+
+
 def _prepare_frame(
     df: pd.DataFrame, input_variant: str, *, allow_preliminary: bool = False
 ) -> pd.DataFrame:
@@ -47,16 +97,38 @@ def _prepare_frame(
 
 
 def _outer_split(
-    frame: pd.DataFrame, train_idx: list[int], holdout_idx: list[int], seed: int
+    frame: pd.DataFrame,
+    train_idx: list[int],
+    holdout_idx: list[int],
+    seed: int,
+    *,
+    eval_strata: tuple[str, ...] | None = None,
 ) -> Split:
-    """Create inner train/validation data and keep the outer holdout untouched."""
+    """Create an inner split without leaking train-only rows into model selection."""
     outer_train = frame.iloc[train_idx].reset_index(drop=True)
     outer_test = frame.iloc[holdout_idx].reset_index(drop=True)
-    inner = StratifiedShuffleSplit(n_splits=1, test_size=0.1, random_state=seed)
-    train_rows, val_rows = next(inner.split(outer_train, outer_train["label_id"]))
+    if eval_strata is None:
+        pool = outer_train
+        train_only = outer_train.iloc[0:0]
+    else:
+        stratum = outer_train["stratum"].astype("string")
+        evaluable = stratum.isna() | stratum.isin(list(eval_strata))
+        pool = outer_train[evaluable]
+        train_only = outer_train[~evaluable]
+
+    # Preserve the documented 10% validation budget of the full outer train,
+    # while drawing it only from the prior-preserving pool when strata are active.
+    validation_size = math.ceil(len(outer_train) * 0.1)
+    if validation_size >= len(pool):
+        raise ValueError("Validation pool is too small for the requested outer split.")
+    inner = StratifiedShuffleSplit(
+        n_splits=1, test_size=validation_size, random_state=seed
+    )
+    train_rows, val_rows = next(inner.split(pool, pool["label_id"]))
+    train = pd.concat([pool.iloc[train_rows], train_only], ignore_index=True)
     return Split(
-        outer_train.iloc[train_rows].reset_index(drop=True),
-        outer_train.iloc[val_rows].reset_index(drop=True),
+        train.reset_index(drop=True),
+        pool.iloc[val_rows].reset_index(drop=True),
         outer_test,
     )
 
@@ -73,6 +145,7 @@ def run_cross_validation(
     allow_preliminary: bool = False,
     source_path: str | Path | None = None,
     save_models: bool = True,
+    eval_strata: tuple[str, ...] | None = None,
 ) -> dict:
     """Train/evaluate one input configuration with outer stratified K-fold CV.
 
@@ -83,20 +156,35 @@ def run_cross_validation(
     only). ``source_path``, when given, is fingerprinted into each fold's manifest
     and the top-level result for provenance.
     Set ``save_models`` to ``False`` when the run is used only for comparison.
+
+    ``eval_strata`` restricts the holdout to rows whose ``stratum`` preserves the
+    corpus label prior; minority-enriched rows then contribute to training only.
+    Leave it unset to fold over every labeled row.
     """
     if input_variant not in INPUT_VARIANTS:
         raise ValueError(f"Unknown input variant {input_variant!r}.")
     if truncation_strategy not in TRUNCATION_STRATEGIES:
         raise ValueError(f"Unknown truncation strategy {truncation_strategy!r}.")
     frame = _prepare_frame(df, input_variant, allow_preliminary=allow_preliminary)
-    fold_indices = make_stratified_folds(frame, n_splits=folds, seed=seed)
+    if eval_strata:
+        fold_indices = make_stratum_aware_folds(
+            frame, n_splits=folds, seed=seed, eval_strata=tuple(eval_strata)
+        )
+    else:
+        fold_indices = make_stratified_folds(frame, n_splits=folds, seed=seed)
     cfg = cfg or model.TrainConfig()
     cfg = replace(cfg, seed=seed, truncation_strategy=truncation_strategy)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     fold_results = []
     for fold_number, (train_idx, holdout_idx) in enumerate(fold_indices, start=1):
-        split = _outer_split(frame, train_idx, holdout_idx, seed + fold_number)
+        split = _outer_split(
+            frame,
+            train_idx,
+            holdout_idx,
+            seed + fold_number,
+            eval_strata=tuple(eval_strata) if eval_strata else None,
+        )
         fold_cfg = replace(cfg, seed=seed + fold_number)
         fold_dir = out_dir / f"fold-{fold_number:02d}"
         manifest = model.fine_tune(
@@ -130,6 +218,10 @@ def run_cross_validation(
         "folds": folds,
         "seed": seed,
         "data_size": len(frame),
+        "eval_strata": list(eval_strata) if eval_strata else None,
+        "holdout_pool_size": (
+            int(sum(len(h) for _, h in fold_indices)) if eval_strata else len(frame)
+        ),
         "class_distribution": {
             str(k): int(v) for k, v in frame["label_id"].value_counts().sort_index().items()
         },
@@ -146,6 +238,54 @@ def run_cross_validation(
         json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     return result
+
+
+
+
+def validate_full_refit_reference(
+    reference_path: str | Path,
+    frame: pd.DataFrame,
+    *,
+    input_variant: str,
+    cfg: model.TrainConfig,
+    source_path: str | Path,
+) -> dict:
+    """Require a CV artifact that exactly selected a full-data refit configuration."""
+    reference_path = Path(reference_path)
+    try:
+        reference = json.loads(reference_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot read cross-validation reference {reference_path}.") from exc
+
+    actual = {
+        "input_variant": input_variant,
+        "truncation_strategy": cfg.truncation_strategy,
+        "data_size": len(frame),
+        "train_config": asdict(cfg),
+        "source_file_sha256": dataset.file_fingerprint(source_path),
+    }
+    mismatches = [
+        field
+        for field, expected in actual.items()
+        if reference.get(field) != expected
+    ]
+    if mismatches:
+        raise ValueError(
+            "Cross-validation reference does not match the refit "
+            f"configuration: {', '.join(mismatches)}."
+        )
+    if not isinstance(reference.get("fold_results"), list) or not reference["fold_results"]:
+        raise ValueError("Cross-validation reference has no fold results.")
+    if not isinstance(reference.get("aggregate"), dict):
+        raise ValueError("Cross-validation reference has no aggregate metrics.")
+
+    return {
+        "cv_results_sha256": dataset.file_fingerprint(reference_path),
+        "folds": reference["folds"],
+        "data_size": reference["data_size"],
+        "input_variant": reference["input_variant"],
+        "aggregate": reference["aggregate"],
+    }
 
 
 def _remove_model_artifacts(root: Path) -> None:

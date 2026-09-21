@@ -1,10 +1,74 @@
 # Bản ghi thực nghiệm phân loại cảm xúc
 
-> **Trạng thái:** Bản ghi bằng chứng cho ba lần chạy trên Kaggle, chưa phải kết quả cuối cùng để đưa vào báo cáo.
+> **Trạng thái:** Xác thực chéo theo tầng trên 1.306 nhãn, điểm kiểm tinh chỉnh cuối,
+> chấm lại kho tin và phép đối chứng dự báo ghép cặp đã hoàn thành. Lượt dự báo này là
+> **hồi cứu**: điểm kiểm được học từ toàn bộ tập nhãn, trong đó có bài sau các ngày kiểm
+> thử dự báo. Các phần về 306 mẫu bên dưới chỉ là bản ghi lịch sử của đường cơ sở và ablation.
 >
-> **Nguồn số liệu:** Các tệp JSON/CSV và tệp nén trong [`../outputs/`](../outputs/), được tải về sau khi chạy `sentiment-cv` và `sentiment-ablation`.
+> **Nguồn số liệu hiện tại:** [`../outputs/sentiment-cv-merged/cv_results.json`](../outputs/sentiment-cv-merged/cv_results.json),
+> `outputs/merged-refit.zip`, `outputs/forecast_merged_sentiment/forecast_results.json`,
+> `outputs/forecast_merged_control/forecast_results.json` và
+> `outputs/forecast_merged_sentiment/information_gain.json`.
 
-## 1. Mục đích và phạm vi
+## Kết quả hiện tại: xác thực chéo theo tầng trên 1.306 nhãn
+
+Lần chạy dùng `title_context + head_tail`, 5 epoch, kích thước lô 16, hạt giống gốc
+`42` và `inverse_frequency`. Tập có 194 `NEGATIVE`, 771 `NEUTRAL` và 341
+`POSITIVE`. Hai tầng làm giàu chỉ dùng để huấn luyện; năm outer holdout cộng lại gồm
+656 dòng với 59 `NEGATIVE`.
+
+| Chỉ số | Trung bình 5 fold | Độ lệch chuẩn |
+| --- | ---: | ---: |
+| Macro-F1 | 0.729764 | 0.042252 |
+| Accuracy | 0.812457 | 0.020328 |
+| Balanced accuracy | 0.768920 | 0.049668 |
+
+| Lớp | F1 trung bình | Recall trung bình | Số mẫu outer holdout |
+| --- | ---: | ---: | ---: |
+| `NEGATIVE` | 0.603609 | 0.680303 | 59 |
+| `NEUTRAL` | 0.881565 | 0.835858 | 463 |
+| `POSITIVE` | 0.704119 | 0.790598 | 134 |
+
+Xác thực chéo chỉ đánh giá bộ phân loại; nó không tự chứng minh tín hiệu cảm xúc cải thiện
+dự báo giá. Cấu hình này được khóa trước khi tinh chỉnh checkpoint triển khai.
+
+## Tinh chỉnh cuối, chấm lại tin và dự báo ghép cặp hồi cứu
+
+Điểm kiểm `full_data_refit` được tinh chỉnh trên toàn bộ 1.306 nhãn với cấu hình đã khóa,
+5 epoch cố định, trọng số nghịch đảo tần suất và hạt giống 42. Manifest xác nhận mã băm
+nguồn `18d896d8c6b0e9badc91828030e205f2c523704bf38ed4fcde8a52a895eb0b56`, 194/771/341
+mẫu ba lớp và môi trường `torch 2.10.0+cu128`, `transformers 5.15.1`. Đây là lượt huấn
+luyện triển khai hậu xác thực chéo, không sinh chỉ số kiểm thử mới.
+
+Điểm kiểm đã chấm lại 12.624 liên kết tin--mã bằng `title_context`, `head_tail` và
+`context-chars 400`. Có 12.613 liên kết được neo theo mốc 15:00, 11 liên kết không neo
+được bị loại, và 6.950 trên 14.990 dòng mã--phiên có tin. Nhánh cảm xúc và đối chứng đều
+dùng đúng cùng parquet đã chấm; đối chứng chỉ thay xác suất mỗi bài thành
+`(NEGATIVE=0, NEUTRAL=1, POSITIVE=0)`, nên giữ nguyên thời điểm, số lượng tin và cờ có tin.
+
+Các artifact forecast hiện có có trước lược đồ sidecar phiên bản 2. Vì vậy chúng không
+được diễn giải là đã kiểm tra mã băm parquet/điểm kiểm bởi sidecar; không tạo backfill
+tổng hợp. Một lượt tái chạy từ checkpoint và parquet xác định mới có thể mang bảo đảm đó.
+
+| Chỉ số LSTM | Chỉ giá | Hai nhánh trung tính | Hai nhánh cảm xúc thật | Đóng góp thông tin |
+| --- | ---: | ---: | ---: | ---: |
+| F1 vĩ mô | 0.3797 | 0.3841 | 0.3907 | +0.0066 |
+| Độ chính xác cân bằng | 0.3915 | 0.3954 | 0.3981 | +0.0027 |
+| Độ chính xác | 0.4300 | 0.4320 | 0.4296 | -0.0024 |
+
+Ước lượng đóng góp F1 vĩ mô theo năm cửa sổ là $+0{,}0066$ với khoảng 95\%
+`[+0.0011, +0.0128]`; nhưng khoảng lấy mẫu theo 300 ngày là
+`[-0.0087, +0.0116]`. Khoảng theo ngày là căn cứ chính vì các mã cùng ngày được lấy mẫu
+cùng nhau; nó chứa 0, như hai chỉ số còn lại.
+
+**Giới hạn thời điểm:** `labeled_merged.csv` có bài năm 2025, trong khi cửa sổ kiểm thử
+đầu tiên bắt đầu ngày 2024-10-22. Vì vậy điểm kiểm đã học từ văn bản và nhãn tương lai so
+với một phần ngày đánh giá. Phép đối chứng ghép cặp vẫn là đo lường hồi cứu nhất quán giữa
+xác suất thật và prior trung tính, nhưng không là bằng chứng dự báo ngoài mẫu. Cần tinh
+chỉnh lại từng cửa sổ chỉ bằng nhãn quá khứ, hoặc dùng điểm kiểm đóng băng được huấn luyện
+trước ngày kiểm thử đầu tiên, rồi chấm lại và chạy lại phép so sánh.
+
+## Thực nghiệm lịch sử trên 306 mẫu
 
 Lần chạy không trọng số và lần chạy có trọng số kiểm tra ảnh hưởng của ba dạng đầu vào và ba chiến lược giữ token của PhoBERT trên tập nhãn tin tức tài chính Vietstock đã được rà soát. Ma trận gồm:
 
@@ -12,7 +76,10 @@ Lần chạy không trọng số và lần chạy có trọng số kiểm tra �
 - chiến lược cắt: `head`, `tail`, `head_tail`;
 - năm fold xác thực chéo phân tầng;
 - ba và năm epoch cho mỗi fold;
-- hạt giống ngẫu nhiên `42`.
+- hạt giống: hạt giống gốc `42`, mỗi fold dùng `42 + chỉ số fold`, nên fold 1 đến fold 5
+  của mỗi cấu hình dùng lần lượt `43, 44, 45, 46, 47` (đọc từ
+  `fold-*/manifest.json`). Lần chạy không trọng số 3 epoch ghi `seed = 42` ở cấp
+  cấu hình. Checkpoint đang dùng cho suy luận là fold 1, hạt giống `43`.
 
 Mục tiêu của lần chạy không trọng số là kiểm tra quy trình và tạo đường cơ sở. Hai lần chạy có trọng số cho thấy cải thiện rõ ở Macro-F1 và balanced accuracy, nhưng vẫn chưa đủ điều kiện để chọn mô hình cảm xúc cuối cùng vì lớp `NEGATIVE` còn được nhận diện rất yếu.
 
@@ -45,12 +112,14 @@ Mã băm nguồn nhãn giống nhau trong các tệp kết quả, nên các cấ
 
 Quy trình xác thực chéo được cài đặt tại [`src/stf/sentiment/experiments.py`](../src/stf/sentiment/experiments.py), còn thứ tự nhãn được cố định tại [`src/stf/sentiment/labels.py`](../src/stf/sentiment/labels.py). Tập outer holdout chỉ dùng để đánh giá; một phần của outer train được dùng làm validation để chọn checkpoint.
 
-## 3. Ánh xạ tệp kết quả
+## 3. Ánh xạ artifact lịch sử
+
+Ánh xạ dưới đây được giữ để truy nguyên các bảng CV/ablation 306 nhãn. Các tệp tương ứng
+không nằm trong working tree hiện tại, vì vậy tên được ghi như bản kê lịch sử, không phải
+liên kết tái lập trực tiếp.
 
 Hai tệp không có hậu tố là kết quả chạy riêng cấu hình `title_context + head_tail`:
-
-- [`outputs/cv_results.json`](../outputs/cv_results.json)
-- [`outputs/cv_results.csv`](../outputs/cv_results.csv)
+`outputs/cv_results.json` và `outputs/cv_results.csv`.
 
 Chín cặp tệp có hậu tố là kết quả của ma trận ablation:
 
@@ -66,14 +135,12 @@ Chín cặp tệp có hậu tố là kết quả của ma trận ablation:
 | `cv_results (8)` | `title_context` | `head_tail`    |
 | `cv_results (9)` | `title_context` | `tail`         |
 
-`cv_results.json` và `cv_results (8).json` là cùng một kết quả. Hai tệp CSV tương ứng cũng là bản sao. Vì vậy, khi tổng hợp số liệu, chỉ tính một trong hai bản.
+`cv_results.json` và `cv_results (8).json` là cùng một kết quả; hai CSV tương ứng cũng
+là bản sao. Bảng xếp hạng lịch sử là `outputs/ablation_summary.csv`.
 
-Bảng xếp hạng đầy đủ nằm tại [`outputs/ablation_summary.csv`](../outputs/ablation_summary.csv).
-
-Kết quả có trọng số được lưu trong hai tệp nén:
-
-- `outputs/title_context__head_tail__cw-inverse_frequency__e5.zip`: chạy riêng cấu hình `title_context + head_tail`, có đầy đủ `fold-*/best/`.
-- `outputs/ablation__cw-inverse_frequency__e5.zip`: ma trận chín cấu hình, chỉ lưu số liệu và manifest.
+Artifact CV hiện có của lần chạy 1.306 nhãn là
+`outputs/sentiment-cv-merged/cv_results.{json,csv}`; archive được giữ là
+`outputs/merged__title_context__head_tail__inverse_frequency__e5.zip`.
 
 ## 4. Kết quả tổng hợp
 
@@ -85,7 +152,8 @@ Sáu cấu hình `context` và `title_context` đều có cùng số liệu tổ
 | -----: | ------------------: | ------------: | ------------------: | ----------------: |
 |    306 |            0.266667 |      0.002923 |            0.666737 |          0.333333 |
 
-Không có bằng chứng cho thấy `head`, `tail` hoặc `head_tail` tốt hơn trong nhóm này.
+Ba chiến lược cắt cho cùng một con số. Nguyên nhân là cơ học, không phải bằng chứng
+tương đương: xem mục 4.3.
 
 ### 4.2. Các cấu hình chỉ dùng tiêu đề
 
@@ -97,9 +165,42 @@ Ba cấu hình `title` đều có cùng số liệu tổng hợp:
 
 Khi tạo đầu vào, mã chọn văn bản cuối rồi khử trùng lặp trên chính văn bản đó. Vì vậy, các cấu hình chỉ dùng tiêu đề được ghi nhận với 301 mẫu, trong khi các cấu hình có ngữ cảnh được ghi nhận với 306 mẫu. Hai nhóm không được đánh giá trên cùng số lượng mẫu, do đó không nên diễn giải chênh lệch nhỏ giữa chúng như một ưu thế chắc chắn của dạng đầu vào.
 
-### 4.3. Không chọn cấu hình đứng đầu một cách máy móc
+### 4.3. Chiến lược cắt token không được kích hoạt trên tệp nhãn này
 
-`ablation_summary.csv` đặt `context + tail` ở dòng đầu vì các cấu hình có cùng `macro_f1_mean` và việc sắp xếp cần một thứ tự phá hòa. Đây không phải bằng chứng rằng `context + tail` tốt hơn `context + head`, `context + head_tail` hoặc các cấu hình `title_context`.
+Ba chiến lược `head`, `tail`, `head_tail` cho kết quả trùng nhau đến từng chữ số vì
+chúng **không bao giờ được gọi** trên tệp nhãn hiện dùng. Đo bằng chính tokenizer của
+checkpoint (`models/sentiment/selected`) trên 306 mẫu của `to_label_r1.csv`:
+
+| Dạng đầu vào    | Trung vị | Phân vị 90 | Tối đa | Số mẫu > 256 token |
+| --------------- | -------: | ---------: | -----: | -----------------: |
+| `title`         |       22 |         32 |     71 |              0/306 |
+| `context`       |      109 |        132 |    206 |              0/306 |
+| `title_context` |      130 |        160 |    229 |              0/306 |
+
+Không một mẫu nào đạt tới giới hạn 256 token, nên ba chiến lược tạo ra cùng một chuỗi
+token đầu vào và bắt buộc cho cùng một kết quả. Nguyên nhân gốc là trường `body_preview`
+trong `to_label_r1.csv` bị chặn ở 400 ký tự khi tệp được sinh; `make_indomain_sample.py`
+hiện chặn ở 2000 ký tự, nên một tệp sinh lại sẽ không còn tính chất này.
+
+Vì vậy, **không được báo cáo lần chạy này như một so sánh giữa các chiến lược cắt**. Kết
+luận đúng là: ở độ dài văn bản của tệp nhãn hiện tại, việc cắt không phát sinh, nên thí
+nghiệm không có khả năng phân biệt ba chiến lược. Muốn kiểm định thật, phải gán nhãn lại
+trên nội dung bài đầy đủ; khi nối `to_label_r1.url` với `articles.parquet`, 296/306 mẫu
+có nội dung đầy đủ và khoảng **19% vượt 256 từ** — số token BPE luôn lớn hơn hoặc bằng số
+từ, nên tỷ lệ vượt 256 *token* còn cao hơn 19%. Như vậy chiến lược cắt sẽ thực sự có hiệu
+lực trên tệp gán nhãn lại, nhưng cỡ hiệu ứng dự kiến vẫn nhỏ.
+
+### 4.3.1. Sàn nhiễu của lần chạy có trọng số
+
+Trong lần chạy 5 epoch, `context + head` và `context + head_tail` cho `0.495236`, còn
+`context + tail` cho `0.493463`. Vì đầu vào token là như nhau và hạt giống mỗi fold cũng
+như nhau giữa các cấu hình, khác biệt `0.0018` này **không thể** do chiến lược cắt. Đây là
+dao động không tất định giữa các lần chạy trên GPU. Con số đó là **sàn nhiễu đo được của
+quy trình, khoảng `0.002` Macro-F1**, và mọi chênh lệch nhỏ hơn mức này không được diễn
+giải là khác biệt thực.
+
+`ablation_summary.csv` đặt `context + tail` ở dòng đầu chỉ vì cần một thứ tự phá hòa khi
+mọi cấu hình có cùng `macro_f1_mean`. Đây không phải bằng chứng rằng cấu hình đó tốt hơn.
 
 ### 4.4. Kết quả có trọng số lớp — 3 epoch
 
@@ -173,7 +274,7 @@ So với baseline, hai lớp thiểu số không còn bị bỏ qua hoàn toàn.
 
 Recall `NEGATIVE` theo từng fold là `0.1429`, `0.0000`, `0.0000`, `0.0000`, `0.1667`; ba trên năm fold không nhận diện đúng mẫu `NEGATIVE` nào. Vì chỉ có 31 mẫu `NEGATIVE`, một mẫu đúng hoặc sai đã làm recall của một fold thay đổi khoảng 16–17 điểm phần trăm.
 
-## 6. Đánh giá trạng thái thực nghiệm
+## 6. Đánh giá trạng thái lịch sử trên 306 mẫu
 
 ### Đã xác nhận
 
@@ -181,46 +282,77 @@ Recall `NEGATIVE` theo từng fold là `0.1429`, `0.0000`, `0.0000`, `0.0000`, `
 - Mỗi cấu hình đã hoàn thành năm fold.
 - Kết quả JSON và CSV có đầy đủ số liệu tổng hợp.
 - Tất cả cấu hình dùng cùng hạt giống, siêu tham số và mã băm tệp nhãn.
-- Các chiến lược cắt token không tạo khác biệt quan sát được trong lần chạy này.
+- Chiến lược cắt token không được kích hoạt trên tệp nhãn này (mục 4.3), nên lần chạy
+  không phân biệt được ba chiến lược.
 - Cơ chế lưu trữ mới không làm ma trận ablation đầy đĩa.
 - Lần chạy 5 epoch đã hoàn thành đủ chín cấu hình và lần chạy riêng cấu hình đại diện đã lưu các thư mục `fold-*/best/`.
 
-### Chưa được xác nhận
+### Hạn chế của lần chạy lịch sử
 
-- Chưa có cấu hình nào cho thấy khả năng phân loại cân bằng cả ba lớp; ở cấu hình đại diện 5 epoch, lớp `NEGATIVE` vẫn có recall trung bình chỉ `0.0619` và bằng 0 ở ba trên năm fold.
-- Chưa thể kết luận `context` tốt hơn `title`, vì số lượng mẫu sau chuẩn bị đầu vào khác nhau.
-- Chưa nên dùng các kết quả này để sinh đặc trưng cảm xúc cho nhánh dự báo giá.
-- Chưa có mô hình cuối được chọn cho suy luận toàn bộ kho tin.
+- Lần chạy 5 epoch lịch sử không phân loại cân bằng ba lớp: `NEGATIVE` có recall trung bình `0.0619` và bằng 0 ở ba trên năm fold.
+- Không thể kết luận `context` tốt hơn `title`, vì số lượng mẫu sau chuẩn bị đầu vào khác nhau.
+- Các giới hạn này được thay thế cho mục đích báo cáo bởi xác thực chéo theo tầng trên 1.306 nhãn ở đầu tài liệu.
 
-## 7. Quyết định nghiên cứu
+## 7. Quyết định lịch sử đã được thay thế
 
-Không chọn mô hình cuối để gán nhãn toàn bộ kho tin. Lần chạy 5 epoch chỉ cải thiện nhẹ so với 3 epoch:
+Quyết định dưới đây chỉ giải thích cách nhánh dự báo lịch sử được tạo. Nó không phải quy
+tắc lựa chọn cho bộ sinh mới. Tại thời điểm lần chạy lịch sử, tập dữ liệu có 306 mẫu,
+gồm `31 NEGATIVE`, `204 NEUTRAL` và `71 POSITIVE`; lớp NEGATIVE quá nhỏ để tăng epoch
+giải quyết được bất định.
 
-- Cấu hình `title_context + head_tail`: Macro-F1 từ `0.506284` lên `0.517616`;
-- Balanced accuracy từ `0.544866` lên `0.547288`;
-- F1 `NEGATIVE` từ `0.0444` lên `0.0767`;
-- Recall `NEGATIVE` đạt `0.0619`, nhưng bằng 0 ở ba trên năm fold.
+### 7.1. Checkpoint lịch sử và giới hạn quy tắc chọn
 
-Tập dữ liệu hiện có 306 mẫu, gồm `31 NEGATIVE`, `204 NEUTRAL` và `71 POSITIVE`. Với 5 fold, mỗi fold chỉ có khoảng sáu mẫu `NEGATIVE`, nên các ước lượng recall của lớp này có độ biến động rất lớn.
+Nhánh dự báo giá cần một bộ sinh xác suất cảm xúc để trả lời câu hỏi trung tâm của đồ án.
+Vì vậy checkpoint dùng cho suy luận được chọn từ lần chạy có trọng số 5 epoch của cấu hình
+`title_context + head_tail`, theo quy tắc **fold có Macro-F1 gần nhất với trung bình xác
+thực chéo**:
 
-Ưu tiên tiếp theo là kiểm tra thủ công 31 mẫu `NEGATIVE` và mở rộng tập dữ liệu, đặc biệt bổ sung các mẫu `NEGATIVE` và `POSITIVE`. Không nên tiếp tục tăng epoch trước khi giải quyết giới hạn về số lượng và độ ổn định của nhãn.
+| Fold | Macro-F1 | Lệch so với trung bình `0.517616` |
+| ---: | -------: | --------------------------------: |
+|    1 | 0.553464 |                        **0.035848** |
+|    2 | 0.464726 |                          0.052890 |
+|    3 | 0.559429 |                          0.041813 |
+|    4 | 0.422852 |                          0.094764 |
+|    5 | 0.587607 |                          0.069991 |
 
-Sau khi có thêm dữ liệu, chạy lại cấu hình `title_context + head_tail` với `inverse_frequency`, giữ nguyên hạt giống và quy trình xác thực chéo. Chỉ sau khi recall `NEGATIVE` ổn định hơn mới chọn mô hình để chạy `score-news`; các đặc trưng cảm xúc chưa được đưa vào nhánh dự báo giá ở thời điểm này.
+Fold 1 được dùng trong nhánh dự báo lịch sử; quy tắc này vẫn tham chiếu tập kiểm thử
+ngoài, nên không được tái sử dụng cho bộ sinh mới. Bộ sinh mới phải tinh chỉnh lại với
+quy tắc validation-only hoặc tổ hợp toàn bộ năm checkpoint.
+
+### 7.2. Khớp độ dài đầu vào giữa huấn luyện và suy luận
+
+Checkpoint được huấn luyện trên `title` cộng `body_preview` bị chặn 400 ký tự, trong khi
+`articles.parquet` giữ nội dung đầy đủ (trung vị 429 ký tự, phân vị 90 là 2218 ký tự). Nếu
+suy luận trên nội dung đầy đủ, đầu vào sẽ dài hơn hẳn miền huấn luyện. Do đó `score-news`
+được chạy với `--context-chars 400` để giữ độ dài ngữ cảnh trong đúng miền của checkpoint.
+
+### 7.3. Giới hạn của đầu vào dự báo lịch sử
+
+- Recall `NEGATIVE` của bộ sinh lịch sử là `0.0619`; tin xấu bị nhận diện rất yếu.
+- Đặc trưng đưa vào nhánh dự báo là **phân phối xác suất mềm**, không phải nhãn cứng, nên
+  nhiễu ở lớp thiểu số làm suy giảm tín hiệu thay vì tạo nhãn sai dứt khoát.
+- Các kết luận của artifact 306 mẫu chỉ có giá trị lịch sử; chúng đã được thay bằng lượt
+  chấm lại và đối chứng hồi cứu ở đầu tài liệu.
+
+### 7.4. Hạng mục còn lại để đánh giá ngoài mẫu
+
+Việc mở rộng nhãn trong miền dữ liệu, tinh chỉnh lại điểm kiểm triển khai, chấm lại kho
+tin và chạy đối chứng đã hoàn thành. Hạng mục còn lại là đánh giá không rò rỉ thời điểm:
+tinh chỉnh lại trong từng cửa sổ chỉ bằng nhãn quá khứ, hoặc đóng băng một điểm kiểm trước
+ngày kiểm thử đầu tiên; sau đó chấm lại kho tin và chạy lại dự báo cùng đối chứng.
 
 ## 8. Tệp cần lưu trữ
 
-Để tái kiểm tra số liệu, giữ:
+Để tái kiểm tra kết quả hiện tại, giữ:
 
-- `ablation_summary.csv`;
-- một cặp `cv_results.json` và `cv_results.csv` cho mỗi cấu hình;
-- hai tệp nén của lần chạy có trọng số;
+- `outputs/sentiment-cv-merged/cv_results.json` và `cv_results.csv`;
+- archive Kaggle chứa năm thư mục `fold-*/best/`;
 - bản notebook đã chạy;
 - mã nguồn ở nhánh có cơ chế lưu checkpoint an toàn;
 - tệp nhãn gốc hoặc mã băm của tệp nhãn.
 
-Tệp `title_context__head_tail__cw-inverse_frequency__e5.zip` đã chứa các thư mục `fold-*/best/` dùng cho suy luận thử nghiệm. Tệp `ablation__cw-inverse_frequency__e5.zip` không chứa mô hình tốt nhất vì ma trận ablation chỉ lưu số liệu.
-
-Các tệp nén của lần chạy 3 epoch đã được thay thế sau khi lưu kết quả mới; số liệu 3 epoch vẫn được ghi lại trong các bảng so sánh ở trên.
+Các tệp ablation 306 mẫu là artifact lịch sử; chỉ giữ chúng khi cần tái tạo các bảng
+so sánh lịch sử.
 
 ## 9. Tài liệu và mã thực thi liên quan
 

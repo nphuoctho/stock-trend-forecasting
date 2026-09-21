@@ -58,6 +58,50 @@ def compute_class_weights(
         raise ValueError("Every class must occur in the training split.")
     return values.size / (num_classes * counts.astype(np.float64))
 
+
+def _make_trainer(trainer_cls, trainer_kwargs: dict, class_weights: np.ndarray | None):
+    """Build the standard Trainer or its inverse-frequency weighted variant."""
+    if class_weights is None:
+        return trainer_cls(**trainer_kwargs)
+
+    import torch
+
+    class WeightedTrainer(trainer_cls):
+        def __init__(self, *args, class_weights, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.class_weights = torch.as_tensor(class_weights, dtype=torch.float32)
+
+        def compute_loss(
+            self,
+            model,
+            inputs,
+            return_outputs=False,
+            num_items_in_batch=None,
+        ):
+            labels = inputs.pop("labels")
+            outputs = model(**inputs)
+            loss = torch.nn.functional.cross_entropy(
+                outputs.logits,
+                labels,
+                weight=self.class_weights.to(outputs.logits.device),
+            )
+            return (loss, outputs) if return_outputs else loss
+
+    return WeightedTrainer(class_weights=class_weights, **trainer_kwargs)
+
+
+def _full_refit_labels(frame) -> tuple[np.ndarray, np.ndarray]:
+    """Validate and count labels before a full-data deployment fit."""
+    label_ids = np.asarray(frame["label_id"], dtype=np.int64)
+    if label_ids.ndim != 1 or label_ids.size == 0:
+        raise ValueError("full refit requires at least one labeled row.")
+    if (label_ids < 0).any() or (label_ids >= NUM_LABELS).any():
+        raise ValueError("full refit requires valid class ids.")
+    counts = np.bincount(label_ids, minlength=NUM_LABELS)
+    if (counts == 0).any():
+        raise ValueError("full refit requires every sentiment class.")
+    return label_ids, counts
+
 def set_seed(seed: int) -> None:
     """Fix the seed for reproducibility (python, numpy, torch)."""
     import torch
@@ -164,6 +208,18 @@ def resolve_inference_config(
         if isinstance(saved, int) and saved >= 1:
             return strategy, saved
     return strategy, MAX_LEN
+
+
+def resolve_input_variant(model_dir: Path) -> str:
+    """Read the model-input variant selected for a deployable checkpoint."""
+    manifest = _load_manifest(model_dir)
+    variant = manifest.get("selection", {}).get("input_variant") if manifest else None
+    if variant not in dataset.INPUT_VARIANTS:
+        raise ValueError(
+            "Checkpoint manifest lacks a valid selected input_variant; "
+            "rerun sentiment-refit before scoring news."
+        )
+    return variant
 
 
 def reproducibility_metadata() -> dict:
@@ -374,34 +430,7 @@ def fine_tune(
         "data_collator": DataCollatorWithPadding(tokenizer),
         "compute_metrics": _compute_metrics,
     }
-    if class_weights is None:
-        trainer = Trainer(**trainer_kwargs)
-    else:
-        import torch
-
-        class WeightedTrainer(Trainer):
-            def __init__(self, *args, class_weights, **kwargs):
-                super().__init__(*args, **kwargs)
-                self.class_weights = torch.as_tensor(
-                    class_weights, dtype=torch.float32
-                )
-            def compute_loss(
-                self,
-                model,
-                inputs,
-                return_outputs=False,
-                num_items_in_batch=None,
-            ):
-                labels = inputs.pop("labels")
-                outputs = model(**inputs)
-                loss = torch.nn.functional.cross_entropy(
-                    outputs.logits,
-                    labels,
-                    weight=self.class_weights.to(outputs.logits.device),
-                )
-                return (loss, outputs) if return_outputs else loss
-
-        trainer = WeightedTrainer(class_weights=class_weights, **trainer_kwargs)
+    trainer = _make_trainer(Trainer, trainer_kwargs, class_weights)
     trainer.train()
 
     # Full evaluation on test.
@@ -438,6 +467,159 @@ def fine_tune(
             },
         },
     }
+    (out_dir / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return manifest
+
+
+
+
+def build_full_refit_manifest(
+    frame,
+    cfg: TrainConfig,
+    *,
+    source_path: str | Path | None,
+    device: str,
+    warmup_steps: int,
+    class_weights: np.ndarray | None,
+    evaluation_reference: dict,
+) -> dict:
+    """Describe a fixed-configuration fit on every reviewed label.
+
+    The cross-validation artifact selects the configuration before this function
+    runs.  This manifest deliberately records no validation or test metric: all
+    reviewed rows are used for the deployable checkpoint.
+    """
+    label_ids, counts = _full_refit_labels(frame)
+    input_variant = evaluation_reference.get("input_variant")
+    if input_variant not in dataset.INPUT_VARIANTS:
+        raise ValueError("evaluation_reference lacks a valid input_variant.")
+
+    return {
+        "run_type": "full_data_refit",
+        "config": asdict(cfg),
+        "device": device,
+        "warmup_steps": warmup_steps,
+        "class_weights": class_weights.tolist() if class_weights is not None else None,
+        "training_size": int(label_ids.size),
+        "class_distribution": {
+            ID2LABEL[class_id]: int(count) for class_id, count in enumerate(counts)
+        },
+        "selection": {
+            "strategy": "fixed_configuration_from_cross_validation",
+            "outer_holdout_used": False,
+            "validation_used": False,
+            "input_variant": input_variant,
+            "evaluation_reference": evaluation_reference,
+        },
+        "reproducibility": reproducibility_metadata(),
+        "provenance": {
+            "source_file_sha256": (
+                dataset.file_fingerprint(source_path) if source_path is not None else None
+            ),
+            "training_fingerprint": dataset.frame_fingerprint(frame),
+        },
+    }
+
+
+def refit_full_data(
+    frame,
+    cfg: TrainConfig | None = None,
+    *,
+    out_dir: Path,
+    source_path: str | Path | None = None,
+    evaluation_reference: dict,
+) -> dict:
+    """Fit the cross-validated configuration on every reviewed row.
+
+    This is the deployable training stage after configuration evaluation.  It
+    does not reserve or score an outer test split, so it cannot be mistaken for
+    a new performance estimate.
+    """
+    from transformers import (
+        AutoModelForSequenceClassification,
+        AutoTokenizer,
+        DataCollatorWithPadding,
+        Trainer,
+        TrainingArguments,
+    )
+
+    cfg = cfg or TrainConfig()
+    required = {"text", "label_id"}
+    missing = required - set(frame.columns)
+    if missing:
+        raise ValueError(f"full refit is missing required columns: {sorted(missing)}")
+    if cfg.class_weighting not in ("none", "inverse_frequency"):
+        raise ValueError("class_weighting must be 'none' or 'inverse_frequency'.")
+    labels, _ = _full_refit_labels(frame)
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_dir = out_dir / "checkpoints"
+    shutil.rmtree(checkpoint_dir, ignore_errors=True)
+    shutil.rmtree(out_dir / "best", ignore_errors=True)
+    set_seed(cfg.seed)
+    device = get_device()
+    class_weights = (
+        compute_class_weights(labels) if cfg.class_weighting == "inverse_frequency" else None
+    )
+
+    tokenizer = AutoTokenizer.from_pretrained(cfg.model_name, use_fast=True)
+    model = AutoModelForSequenceClassification.from_pretrained(
+        cfg.model_name,
+        num_labels=NUM_LABELS,
+        id2label=ID2LABEL,
+        label2id=LABEL2ID,
+    )
+    ds_train = _TextDataset(
+        frame["text"],
+        labels,
+        tokenizer,
+        cfg.max_len,
+        cfg.truncation_strategy,
+    )
+    warmup_steps = bounded_warmup_steps(
+        len(ds_train), cfg.batch_size, cfg.epochs, cfg.warmup_ratio
+    )
+    args = TrainingArguments(
+        output_dir=str(checkpoint_dir),
+        num_train_epochs=cfg.epochs,
+        per_device_train_batch_size=cfg.batch_size,
+        learning_rate=cfg.lr,
+        weight_decay=cfg.weight_decay,
+        warmup_steps=warmup_steps,
+        eval_strategy="no",
+        save_strategy="no",
+        seed=cfg.seed,
+        logging_steps=20,
+        report_to=[],
+        use_cpu=(device == "cpu"),
+    )
+    trainer = _make_trainer(
+        Trainer,
+        {
+            "model": model,
+            "args": args,
+            "train_dataset": ds_train,
+            "data_collator": DataCollatorWithPadding(tokenizer),
+        },
+        class_weights,
+    )
+    trainer.train()
+    trainer.save_model(str(out_dir / "best"))
+    tokenizer.save_pretrained(str(out_dir / "best"))
+    shutil.rmtree(checkpoint_dir, ignore_errors=True)
+
+    manifest = build_full_refit_manifest(
+        frame,
+        cfg,
+        source_path=source_path,
+        device=device,
+        warmup_steps=warmup_steps,
+        class_weights=class_weights,
+        evaluation_reference=evaluation_reference,
+    )
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )

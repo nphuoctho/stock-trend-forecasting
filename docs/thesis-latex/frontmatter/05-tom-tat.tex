@@ -24,9 +24,9 @@ Nhánh thứ hai sử dụng dữ liệu OHLCV điều chỉnh cùng các đặc
 lợi suất log, tỷ lệ giá đóng cửa với đường trung bình động, thay đổi khối lượng và độ
 biến động. Hai nhánh được căn chỉnh theo mã và ngày sau khi áp dụng quy tắc thời điểm.
 Tin được chuyển về múi giờ Việt Nam; tin sau mốc cắt thông tin, tin cuối tuần hoặc tin
-vào ngày nghỉ được ánh xạ sang phiên giao dịch kế tiếp. Tại ngày quan sát $t$, hệ thống
-chỉ sử dụng thông tin có thể biết đến ngày đó, còn giá của phiên kế tiếp chỉ dùng để tạo
-nhãn mục tiêu.
+vào ngày nghỉ được ánh xạ sang phiên giao dịch kế tiếp. Quy tắc này bảo đảm thời điểm của
+mỗi bài tin phù hợp với phiên sử dụng nó; giới hạn thời điểm của điểm kiểm cảm xúc hồi cứu
+được nêu rõ trong phần kết quả.
 
 Về kiến trúc, các mô hình được xếp theo từng tầng để tách câu hỏi về dữ liệu khỏi câu
 hỏi về độ phức tạp. Tầng đầu gồm mô hình luôn chọn lớp phổ biến nhất và mô hình ngẫu
@@ -42,35 +42,44 @@ mã liên quan. Những bài đề cập nhiều mã được lưu theo quan h�
 thiếu thời điểm hoặc không xác định được mã được đánh dấu và không đưa trực tiếp vào
 bảng đặc trưng chính.
 
-Dữ liệu được chia theo thứ tự thời gian bằng kiểm định cuốn chiếu (cuốn chiếu theo thời gian), có tập
-kiểm tra cuối được khóa sau khi lựa chọn cấu hình. Bộ chuẩn hóa, bộ điền khuyết, ngưỡng
-tạo nhãn, lựa chọn đặc trưng và các tham số khác chỉ được học từ phần huấn luyện của
-từng cửa sổ. Mô hình có cảm xúc được so sánh với mô hình chỉ dùng giá trên cùng ngày
-huấn luyện, xác thực và kiểm thử, cùng cách tiền xử lý, hạt giống ngẫu nhiên hoặc tập
-hạt giống và tiêu chí dừng. Thiết kế này nhằm hạn chế rò rỉ dữ liệu, đồng thời tách phần
-đóng góp của tín hiệu cảm xúc khỏi ảnh hưởng của kiến trúc hoặc cách chia mẫu.
+Dữ liệu giá được chia theo thứ tự thời gian bằng kiểm định cuốn chiếu với năm đoạn kiểm
+thử tách biệt; không có tập kiểm tra cuối tách riêng vì cấu hình được cố định trước lần
+chạy và mỗi đoạn kiểm thử chỉ được chấm một lần. Bộ chuẩn hóa, bộ điền khuyết, ngưỡng tạo
+nhãn, lựa chọn đặc trưng và các tham số của nhánh giá chỉ được học từ phần huấn luyện từng
+cửa sổ. Mô hình có cảm xúc được so sánh với mô hình chỉ dùng giá trên cùng ngày huấn luyện,
+xác thực và kiểm thử, cùng cách tiền xử lý, hạt giống ngẫu nhiên hoặc tập hạt giống và
+tiêu chí dừng. Đối chứng giữ nguyên kiến trúc và độ phủ tin để tách phần chênh hồi cứu do
+xác suất cảm xúc khỏi ảnh hưởng của kiến trúc hoặc cách chia mẫu.
 
-Ở thời điểm khóa dữ liệu hiện tại, kho tin đã lưu 10.695 bản ghi có URL, thời điểm
-đăng và nội dung, kết hợp với 12.624 liên kết tin tức và mã cổ phiếu thuộc 10 mã
-VN30. Các tệp giá hiện có gồm 15.744 dòng dữ liệu OHLCV, còn tập hạt giống CafeF
-gồm 999 mẫu. Đây là kết quả của giai đoạn chuẩn bị dữ liệu; các chỉ số đánh giá
-PhoBERT và mô hình dự báo chỉ được công bố sau khi hoàn thành huấn luyện theo đúng
-giao thức.
+Về dữ liệu, kho tin đã lưu 10.695 bản ghi có URL, thời điểm đăng và nội dung, kết hợp với
+12.624 liên kết tin tức và mã cổ phiếu thuộc 10 mã VN30, cùng 14.990 dòng dữ liệu giá
+OHLCV trong giai đoạn 2020--2025. Tập nhãn cảm xúc trong miền dữ liệu đã được rà soát
+gồm 1.306 mẫu, bên cạnh tập hạt giống CafeF gồm 999 mẫu. Xác thực chéo theo tầng 5 lượt
+trên tập 1.306 mẫu đạt F1 vĩ mô 0,7298, độ chính xác 0,8125 và độ chính xác cân bằng
+0,7689; năm tập kiểm thử ngoài cộng lại có 59 mẫu NEGATIVE với độ bao phủ 0,6803.
 
-Kết quả được tổ chức thành hai tầng. Tầng thứ nhất báo cáo chất lượng phân loại cảm xúc
-bằng độ chính xác, độ chính xác dương tính, độ bao phủ, F1 theo lớp, F1 vĩ mô và ma trận nhầm lẫn. Tầng thứ
-hai báo cáo F1 vĩ mô, độ chính xác cân bằng, AUC-ROC một-chống-còn-lại và các chỉ số theo lớp cho bài
-toán dự báo, cùng chênh lệch giữa hai cấu hình loại bỏ đặc trưng. Khi số cửa sổ đủ lớn,
-độ không chắc chắn của chênh lệch có thể được ước lượng bằng lấy mẫu lặp theo khối ngày
-hoặc theo phần chia.
+Sau khi khóa cấu hình, một điểm kiểm triển khai được tinh chỉnh lại trên toàn bộ 1.306
+nhãn với năm epoch cố định và chấm lại 12.624 liên kết tin--mã. Có 12.613 liên kết được
+neo vào phiên giao dịch; 11 liên kết bị loại. Bảng dự báo gồm 14.990 dòng mã--phiên, trong
+đó 6.950 dòng có tin. Ở bài toán dự báo, mô hình LSTM chỉ dùng giá đạt F1 vĩ mô
+0,3797, độ chính xác cân bằng 0,3915 và AUC-ROC một-chống-còn-lại 0,5721; F1 vĩ
+mô này cao hơn mốc ngẫu nhiên 0,3289 và mốc lớp phổ biến 0,1603. Vì nhãn ba lớp
+được cắt theo phân vị một phần ba, các lớp gần cân bằng theo thiết kế và mức ngẫu
+nhiên của bài toán là 0,333.
 
-Đồ án không đặt trước giả định rằng tín hiệu cảm xúc chắc chắn cải thiện dự báo. Tin
-tức có thể yếu, xuất hiện trễ, đã được thị trường biết trước, phản ánh lại biến động
-giá hoặc chỉ hữu ích trong một số giai đoạn và một số mã. Khi chưa có số liệu chạy
-chính thức, các ô kết quả được giữ ở trạng thái chưa điền, không thay bằng số tham
-chiếu từ công trình khác. Một kết quả không cải thiện hoặc cải thiện không ổn định vẫn
-có giá trị nếu được thu nhận bằng giao thức hợp lệ, được phân tích cùng giới hạn dữ liệu
-và không bị diễn giải thành quan hệ nhân quả.
+Đóng góp riêng của tín hiệu cảm xúc được đo bằng một đối chứng giữ nguyên kiến
+trúc hai nhánh, cùng bài tin, thời điểm và số lượng tin, nhưng thay xác suất cảm
+xúc thật bằng phân phối tiên nghiệm trung tính. Hiệu số trực tiếp là $+0{,}0110$
+F1 vĩ mô, trong đó hiệu ứng kiến trúc, sự hiện diện và khối lượng tin là $+0{,}0044$ và
+đóng góp thông tin theo cửa sổ là $+0{,}0066$. Khi lấy mẫu lặp
+theo khối ngày, đóng góp thông tin ước lượng là $+0{,}0014$ với khoảng tin cậy 95\%
+$[-0{,}0087; +0{,}0116]$. Khoảng này chứa 0.
+
+Điểm kiểm cảm xúc được học từ toàn bộ tập nhãn, gồm cả bài sau các ngày kiểm thử dự báo.
+Do đó các kết quả nhánh có cảm xúc chỉ là hồi cứu, không phải bằng chứng dự báo ngoài mẫu.
+Một lượt đánh giá hợp lệ phải tinh chỉnh lại trong từng cửa sổ chỉ bằng nhãn quá khứ hoặc
+dùng một điểm kiểm đóng băng được huấn luyện trước ngày kiểm thử đầu tiên. Kết quả không
+được diễn giải thành quan hệ nhân quả hay khuyến nghị đầu tư.
 
 \vspace{0.5cm}
 \noindent Từ khóa: dự báo xu hướng giá cổ phiếu, phân tích cảm xúc, PhoBERT,

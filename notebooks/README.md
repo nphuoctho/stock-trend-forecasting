@@ -4,23 +4,25 @@ Fine-tune `vinai/phobert-base` into a 3-class sentiment classifier
 (NEGATIVE / NEUTRAL / POSITIVE) for Vietnamese financial news.
 
 ## Files
-- `phobert_finetune.ipynb` - the fine-tuning notebook, runs on Colab/Kaggle.
-- `sentiment_cv.ipynb` - the 5-fold input/truncation comparison notebook.
+- `phobert_finetune.ipynb` - the basic single-split fine-tuning notebook.
+- `sentiment_cv.ipynb` - the canonical GPU notebook for the reviewed 1,306-row,
+  stratum-aware 5-fold thesis run.
 - `training-guide.md` - step-by-step run instructions and troubleshooting.
 
 ## Quick start
 
 ### Google Colab
 1. Upload `phobert_finetune.ipynb` for the basic run, or `sentiment_cv.ipynb` for
-   the 5-fold input/truncation experiments.
+   the reviewed 1,306-row 5-fold experiment.
 2. Runtime > Change runtime type > **T4 GPU**.
-3. Run cells in order. If Colab asks to restart after the install cell,
-   restart and continue FROM section 3 (don't re-run section 2).
+3. Before running `sentiment_cv.ipynb`, make the Kaggle Dataset contain the
+   reviewed `labeled_merged.csv`; then run cells in order.
 
 ### Kaggle
-1. New Notebook > Upload `phobert_finetune.ipynb` or `sentiment_cv.ipynb`.
-2. Settings > Accelerator > **GPU** (T4 x2 or P100), and turn **Internet** on.
-3. Run cells in order.
+1. New Notebook > Upload `sentiment_cv.ipynb` and attach
+   `phuocthoai/stock-trend-forecasting`.
+2. Settings > Accelerator > **GPU** and turn **Internet** on.
+3. Ensure the attached dataset has `labeled_merged.csv`, then run cells in order.
 
 See `training-guide.md` for the detailed walkthrough.
 
@@ -28,40 +30,42 @@ See `training-guide.md` for the detailed walkthrough.
 
 - **CafeF seed** (999 pre-labeled headlines): the notebook downloads it from the public
   repo `209sontung/Vietnamese-stock-article-classification`.
-- **In-domain (required for the thesis matrix):** run
-  `stf.sentiment.make_indomain_sample`, have one human reviewer label at least 301
-  articles, and provide `to_label_r1.csv` with `title`, `body_preview`, `published_at`,
-  `url`, and final `label` columns. Do not upload preliminary labels.
+- **In-domain thesis run:** attach a Dataset version containing the reviewed
+  `labeled_merged.csv`. It contains 1,306 rows, records `stratum`, `usage` and
+  final human-review provenance, and is deliberately not committed to Git.
 
 ## Version notes (avoid breakage)
 
-The fine-tuning notebook pins `transformers==4.46.3`, `numpy<2`, and `pandas<2.3`
-for stable compatibility with the torch+CUDA already on Colab/Kaggle. The
-`sentiment_cv.ipynb` bootstrap uses the project-compatible text-training stack
-(`transformers==5.15.1`, `tokenizers>=0.22,<=0.23.0`) and does not reinstall
-torch. If Kaggle's `torchvision` import is broken, it removes `torchvision` and
-`timm`, which are not needed for text-only PhoBERT training. If Kaggle reports a
-dependency conflict, turn Internet on and run the bootstrap cell in a fresh
-session.
+The basic fine-tuning notebook pins `transformers==4.46.3`, `numpy<2`, and
+`pandas<2.3`. The canonical `sentiment_cv.ipynb` instead pins the exact stack
+recorded by the successful Kaggle CV manifest: platform `torch==2.10.0+cu128`
+and `transformers==5.15.1`. It never reinstalls torch; it checks the version
+before importing `Trainer` and stops with a fresh-runtime message on mismatch.
+If Kaggle's `torchvision` import is broken, the notebook removes `torchvision`
+and `timm`, which are not needed for text-only PhoBERT.
+
 The `sentiment-cv` runner keeps only the final `best/` model and manifest for
 each fold; transient per-epoch checkpoints are removed after evaluation to fit
-Kaggle's working-disk limit. The `sentiment-ablation` runner does not retain
-fold models while saving metrics, so the full 9-configuration matrix does not
-accumulate 45 PhoBERT copies. Run `sentiment-cv` again for the selected
-configuration when a checkpoint is needed for inference. The notebook
-includes the epoch count in each output directory name, so smoke-test and final
-runs do not share artifacts.
-The bootstrap also verifies that the configured source branch contains the
-disk-safe checkpoint settings before starting CV; keep the notebook's branch
-pointing at the repaired source.
+Kaggle's working-disk limit. The notebook runs the selected
+`title_context + head_tail`, inverse-frequency, five-epoch configuration and
+uses `eval_random` plus `baseline_random` only for outer holdouts. Keep its
+branch set to the repaired source.
 
 ## Output
 
-Every run writes to `runs/phobert-sentiment-<timestamp>/`:
-- `best/` - model + tokenizer.
-- `manifest.json` - versions, seed, hyperparameters, test metrics (for reproducibility).
-- `test_classification_report.txt` / `test_report.json` - metrics to cite in the report.
-- `confusion_matrix.png` / `.csv` - ready to drop into the report.
-- `train_log_history.csv` - per-epoch loss/metric for debugging.
+### `phobert_finetune.ipynb`
 
-The `predict_proba` helper then generates 3-class probabilities for the news corpus (next step).
+The basic notebook writes to `runs/phobert-sentiment-<timestamp>/`:
+- `best/`, `manifest.json`, and `train_log_history.csv`;
+- `test_classification_report.txt`, `test_report.json`, and a confusion matrix.
+
+### `sentiment_cv.ipynb`
+
+The cross-validation notebook writes to its configured `OUTPUT_DIR`:
+- `cv_results.json` and `cv_results.csv` with fold and aggregate metrics;
+- `fold-01/` through `fold-05/`, each with `best/` and `manifest.json`.
+
+It does not export a confusion matrix or per-row predictions. Fold checkpoints are
+cross-validation artifacts and must not be selected using their outer-holdout metrics.
+Downstream scoring requires either an ensemble of all five folds or a full-data refit
+whose checkpoint rule uses validation data only; this notebook does not implement that refit.

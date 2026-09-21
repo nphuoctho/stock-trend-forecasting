@@ -10,6 +10,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -206,11 +208,57 @@ def cmd_sentiment_cv(args: argparse.Namespace) -> int:
         out_dir=Path(args.output),
         allow_preliminary=args.allow_preliminary,
         source_path=args.data,
+        eval_strata=tuple(args.eval_strata) if args.eval_strata else None,
     )
     print("Data:", result["data_size"], "| folds:", result["folds"])
+    if result.get("eval_strata"):
+        print(
+            "Holdout restricted to strata",
+            result["eval_strata"],
+            f"| evaluated rows: {result['holdout_pool_size']}",
+        )
     for metric, values in result["aggregate"].items():
         print(f"{metric}: {values['mean']:.4f} +/- {values['std']:.4f}")
     print("Results:", Path(args.output) / "cv_results.json")
+    return 0
+
+
+
+
+def cmd_sentiment_refit(args: argparse.Namespace) -> int:
+    """Fit a cross-validated PhoBERT configuration on every reviewed label."""
+    from stf.sentiment import dataset, experiments, model
+
+    df = dataset.load_labeled(args.data)
+    frame = dataset.prepare_model_input(df, args.input_variant)
+    cfg = model.TrainConfig(
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        seed=args.seed,
+        truncation_strategy=args.truncation_strategy,
+        class_weighting=args.class_weighting,
+    )
+    evaluation_reference = experiments.validate_full_refit_reference(
+        args.cv_results,
+        frame,
+        input_variant=args.input_variant,
+        cfg=cfg,
+        source_path=args.data,
+    )
+    print(
+        f"Refitting {len(frame)} reviewed rows with the locked "
+        f"{evaluation_reference['folds']}-fold configuration."
+    )
+    manifest = model.refit_full_data(
+        frame,
+        cfg,
+        out_dir=Path(args.output),
+        source_path=args.data,
+        evaluation_reference=evaluation_reference,
+    )
+    print("Checkpoint:", Path(args.output) / "best")
+    print("Manifest:", Path(args.output) / "manifest.json")
+    print("Training rows:", manifest["training_size"])
     return 0
 
 
@@ -239,17 +287,134 @@ def cmd_sentiment_ablation(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_score_news(args: argparse.Namespace) -> int:
-    """Score crawled ticker articles with a trained PhoBERT checkpoint.
+def _directory_fingerprint(path: Path) -> str | None:
+    """Return a deterministic SHA-256 for the complete checkpoint directory."""
+    if not path.is_dir():
+        return None
+    digest = hashlib.sha256()
+    for item in sorted(path.rglob("*")):
+        if not item.is_file():
+            continue
+        digest.update(item.relative_to(path).as_posix().encode("utf-8"))
+        with item.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1 << 20), b""):
+                digest.update(chunk)
+    return digest.hexdigest()
 
-    Loads the persisted listing/article join, builds the selected model input
-    variant, and writes per-article sentiment probabilities to a parquet file.
-    Requires a checkpoint produced by sentiment-train or sentiment-cv; ablation
-    outputs metrics for selection and removes its fold models to limit disk use.
-    """
+
+def _checkpoint_manifest_path(model_dir: Path) -> Path | None:
+    """Find the manifest used by inference, matching the model loader's lookup."""
+    for candidate in (model_dir / "manifest.json", model_dir.parent / "manifest.json"):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _validated_scored_news_manifest(news_path: Path, news: pd.DataFrame) -> dict:
+    """Bind a forecast input to the contemporaneous score-news sidecar."""
+    from stf.sentiment.dataset import file_fingerprint
+
+    manifest_path = news_path.with_suffix(".manifest.json")
+    if not manifest_path.is_file():
+        raise ValueError(
+            f"missing score-news manifest {manifest_path}; rerun score-news before forecast."
+        )
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"invalid score-news manifest {manifest_path}.") from error
+    if manifest.get("schema_version") != 2:
+        raise ValueError(
+            f"unsupported score-news manifest schema at {manifest_path}; rerun score-news."
+        )
+
+    output = manifest.get("output")
+    checkpoint = manifest.get("checkpoint")
+    inference = manifest.get("inference")
+    score_input = manifest.get("input")
+    if not all(
+        isinstance(value, dict) for value in (output, checkpoint, inference, score_input)
+    ):
+        raise ValueError(f"score-news manifest {manifest_path} is missing required provenance.")
+
+    identity_columns = {"ticker", "url", "published_at"}
+    probability_columns = {"prob_negative", "prob_neutral", "prob_positive"}
+    missing_columns = (identity_columns | probability_columns) - set(news.columns)
+    if missing_columns:
+        raise ValueError(
+            f"score-news parquet lacks required columns: {sorted(missing_columns)}."
+        )
+    if news.empty:
+        raise ValueError("score-news parquet has no rows.")
+    try:
+        probabilities = news.loc[:, sorted(probability_columns)].apply(
+            pd.to_numeric, errors="raise"
+        ).to_numpy(dtype="float64")
+    except (TypeError, ValueError) as error:
+        raise ValueError("score-news parquet has non-numeric probabilities.") from error
+    if (
+        not np.isfinite(probabilities).all()
+        or (probabilities < 0).any()
+        or (probabilities > 1).any()
+        or not np.isclose(probabilities.sum(axis=1), 1.0, atol=1e-6).all()
+    ):
+        raise ValueError("score-news parquet has invalid probability vectors.")
+
+    actual_hash = file_fingerprint(news_path)
+    if output.get("sha256") != actual_hash:
+        raise ValueError(
+            f"score-news parquet hash does not match manifest {manifest_path}."
+        )
+    if output.get("rows") != int(len(news)):
+        raise ValueError(
+            f"score-news parquet row count does not match manifest {manifest_path}."
+        )
+    if not checkpoint.get("directory_sha256"):
+        raise ValueError(f"score-news manifest {manifest_path} lacks checkpoint provenance.")
+    if (
+        not score_input.get("fingerprint")
+        or inference.get("truncation_strategy") not in ("head", "tail", "head_tail")
+        or not isinstance(inference.get("max_len"), int)
+        or inference["max_len"] < 1
+        or not isinstance(inference.get("batch_size"), int)
+        or inference["batch_size"] < 1
+        or not isinstance(inference.get("runtime"), dict)
+    ):
+        raise ValueError(f"score-news manifest {manifest_path} lacks inference provenance.")
+
+    return {
+        "manifest_path": str(manifest_path),
+        "manifest_sha256": file_fingerprint(manifest_path),
+        "output_sha256": actual_hash,
+        "checkpoint_directory_sha256": checkpoint["directory_sha256"],
+        "checkpoint_manifest_sha256": checkpoint.get("manifest_sha256"),
+        "inference": inference,
+        "input": score_input,
+    }
+
+
+def cmd_score_news(args: argparse.Namespace) -> int:
+    """Score crawler rows and persist audited probability provenance."""
     from stf.data.news import load_ticker_articles
-    from stf.sentiment.dataset import build_input_text
-    from stf.sentiment.model import predict_proba
+    from stf.sentiment.dataset import (
+        build_input_text,
+        file_fingerprint,
+        frame_fingerprint,
+    )
+    from stf.sentiment.model import (
+        predict_proba,
+        reproducibility_metadata,
+        resolve_inference_config,
+        resolve_input_variant,
+    )
+
+    model_dir = Path(args.model_dir)
+    checkpoint_variant = resolve_input_variant(model_dir)
+    if args.input_variant != checkpoint_variant:
+        raise ValueError(
+            f"score-news input variant {args.input_variant!r} does not match "
+            f"checkpoint input variant {checkpoint_variant!r}."
+        )
 
     articles = load_ticker_articles()
     if args.limit is not None:
@@ -257,13 +422,34 @@ def cmd_score_news(args: argparse.Namespace) -> int:
     if articles.empty:
         print("score-news: no ticker/article rows to score.", file=sys.stderr)
         return 1
-    scored = build_input_text(articles, args.input_variant)
+    scored = build_input_text(
+        articles, args.input_variant, context_chars=args.context_chars
+    )
+    effective_strategy, effective_max_len = resolve_inference_config(
+        model_dir, truncation_strategy=args.truncation_strategy
+    )
     probs = predict_proba(
         scored["text"].tolist(),
-        Path(args.model_dir),
+        model_dir,
         batch_size=args.batch_size,
-        truncation_strategy=args.truncation_strategy,
+        truncation_strategy=effective_strategy,
+        max_len=effective_max_len,
     )
+    probability_columns = ["prob_negative", "prob_neutral", "prob_positive"]
+    probs = np.asarray(probs, dtype="float64")
+    if probs.shape != (len(scored), len(probability_columns)):
+        raise RuntimeError(
+            "score-news: checkpoint returned probabilities with an unexpected shape."
+        )
+    if (
+        not np.isfinite(probs).all()
+        or (probs < 0).any()
+        or (probs > 1).any()
+        or not np.isclose(probs.sum(axis=1), 1.0, atol=1e-6).all()
+    ):
+        raise RuntimeError(
+            "score-news: checkpoint returned invalid probability vectors."
+        )
     out = pd.DataFrame(
         {
             "ticker": scored["ticker"].to_numpy(),
@@ -277,7 +463,59 @@ def cmd_score_news(args: argparse.Namespace) -> int:
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     out.to_parquet(output_path, index=False)
-    print(f"[score-news] scored {len(out)} rows -> {output_path}")
+    manifest_path = output_path.with_suffix(".manifest.json")
+    refit_manifest_path = _checkpoint_manifest_path(model_dir)
+    manifest = {
+        "schema_version": 2,
+        "output": {
+            "path": str(output_path),
+            "sha256": file_fingerprint(output_path),
+            "rows": int(len(out)),
+        },
+        "probabilities": {
+            "columns": probability_columns,
+            "totals": {
+                column: float(out[column].sum()) for column in probability_columns
+            },
+            "validation": {
+                "finite": True,
+                "nonnegative": True,
+                "rows_summing_to_one": int(len(out)),
+                "atol": 1e-6,
+            },
+        },
+        "checkpoint": {
+            "directory": str(model_dir),
+            "directory_sha256": _directory_fingerprint(model_dir),
+            "manifest_path": str(refit_manifest_path)
+            if refit_manifest_path is not None
+            else None,
+            "manifest_sha256": file_fingerprint(refit_manifest_path)
+            if refit_manifest_path is not None
+            else None,
+        },
+        "inference": {
+            "truncation_strategy": effective_strategy,
+            "max_len": effective_max_len,
+            "batch_size": args.batch_size,
+            "runtime": reproducibility_metadata(),
+        },
+        "input": {
+            "fingerprint": frame_fingerprint(
+                scored, columns=("ticker", "url", "published_at", "text")
+            ),
+            "variant": args.input_variant,
+            "context_chars": args.context_chars,
+            "limit": args.limit,
+        },
+    }
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(
+        f"[score-news] scored {len(out)} rows -> {output_path} "
+        f"(manifest {manifest_path})"
+    )
     return 0
 
 
@@ -387,9 +625,365 @@ def cmd_forecast_smoke(args: argparse.Namespace) -> int:
         f"Forecast smoke: panel={len(labeled)} rows | "
         f"train={len(split.train)} val={len(split.val)} test={len(split.test)} | "
         f"sequences=train:{train_mask.sum()} val:{val_mask.sum()} test:{test_mask.sum()} | "
-        f"price_lstm_final_loss={history[-1]:.6f} | "
-        f"price_sentiment_lstm_final_loss={history2[-1]:.6f}"
+        f"price_lstm_final_loss={history['loss_history'][-1]:.6f} | "
+        f"price_sentiment_lstm_final_loss={history2['loss_history'][-1]:.6f}"
     )
+    return 0
+
+
+def _load_prices() -> pd.DataFrame:
+    """Concatenate every configured ticker's persisted OHLCV parquet."""
+    frames = []
+    for ticker in config.TICKERS:
+        path = config.PRICES_DIR / f"{ticker}.parquet"
+        if not path.exists():
+            raise FileNotFoundError(f"Missing price file {path}; run `stf.cli prices` first.")
+        frame = pd.read_parquet(path)
+        if "ticker" not in frame.columns:
+            frame = frame.assign(ticker=ticker)
+        frames.append(frame)
+    return pd.concat(frames, ignore_index=True)
+
+
+def cmd_forecast(args: argparse.Namespace) -> int:
+    """Run the real walk-forward forecasting ladder and export its metrics.
+
+    Without ``--news-sentiment`` every session is treated as a no-news day, which
+    yields the price-only ladder. With a scored-news parquet the two-branch arms
+    receive real sentiment and the sentiment contribution is reported as a paired
+    per-window delta with a bootstrap interval.
+    """
+    from stf.forecasting import assemble
+    from stf.forecasting.experiment import ForecastConfig, frame_hash, run_experiment
+
+    prices = _load_prices()
+    provenance: dict = {
+        "tickers": list(config.TICKERS),
+        "date_start": config.DATE_START,
+        "date_end": config.DATE_END,
+        "session_cutoff": config.SESSION_CUTOFF,
+        "timezone": config.TIMEZONE,
+        "prices_hash": frame_hash(prices),
+        "news_sentiment": None,
+    }
+
+    news = None
+    news_path_arg = args.news_sentiment or args.neutral_news_sentiment
+    if news_path_arg is not None:
+        news_path = Path(news_path_arg)
+        if not news_path.exists():
+            print(f"forecast: missing {news_path}", file=sys.stderr)
+            return 2
+        news = pd.read_parquet(news_path)
+        try:
+            score_manifest = _validated_scored_news_manifest(news_path, news)
+        except ValueError as error:
+            print(f"forecast: {error}", file=sys.stderr)
+            return 2
+        source_hash = frame_hash(news)
+        mode = "real"
+        if args.neutral_news_sentiment is not None:
+            probability_columns = [
+                "prob_negative",
+                "prob_neutral",
+                "prob_positive",
+            ]
+            missing = set(probability_columns) - set(news.columns)
+            if missing:
+                print(
+                    "forecast: neutral control is missing probability columns "
+                    f"{sorted(missing)}",
+                    file=sys.stderr,
+                )
+                return 2
+            news = news.copy()
+            news.loc[:, probability_columns] = (0.0, 1.0, 0.0)
+            mode = "neutral_prior"
+        provenance["news_sentiment"] = {
+            "mode": mode,
+            "source_path": str(news_path),
+            "source_hash": source_hash,
+            "feature_hash": frame_hash(news),
+            "rows": int(len(news)),
+            "score_manifest": score_manifest,
+        }
+
+    panel = assemble(prices, news)
+    if "alignment_report" in panel.attrs:
+        provenance["alignment_report"] = panel.attrs["alignment_report"]
+    provenance["panel_hash"] = frame_hash(panel)
+    news_days = int(panel["has_news"].sum())
+    provenance["news_coverage"] = {
+        "panel_rows": int(len(panel)),
+        "rows_with_news": news_days,
+        "fraction": round(news_days / len(panel), 6) if len(panel) else 0.0,
+    }
+
+    cfg = ForecastConfig(
+        seq_len=args.seq_len,
+        n_windows=args.windows,
+        test_size=args.test_size,
+        val_size=args.val_size,
+        expanding=not args.rolling,
+        hidden=args.hidden,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        patience=args.patience,
+        seeds=tuple(args.seeds),
+    )
+    record = run_experiment(
+        panel, cfg=cfg, output_dir=Path(args.output), provenance=provenance
+    )
+
+    print(
+        f"[forecast] panel={record['panel_rows']} rows | "
+        f"news coverage={provenance['news_coverage']['fraction']:.3f} | "
+        f"windows={len(record['windows'])} | seeds={list(cfg.seeds)} | "
+        f"chance={record['chance_level']:.3f}"
+    )
+    for arm, metrics in record["summary"].items():
+        mean = metrics["macro_f1"]["mean"]
+        std = metrics["macro_f1"]["std"]
+        bal = metrics["balanced_accuracy"]["mean"]
+        print(f"  {arm:<26} macro_f1={mean:.4f} (sd {std:.4f})  balanced_acc={bal:.4f}")
+    for pair, metrics in record["ablation"].items():
+        print(f"  D {pair}:")
+        for metric in ("macro_f1", "balanced_accuracy", "accuracy"):
+            delta = metrics[metric]
+            win = delta["window_bootstrap"]
+            date = delta["date_block_bootstrap"]
+
+            def span(ci: dict) -> str:
+                low, high = ci.get("low"), ci.get("high")
+                return "n/a" if low is None else f"[{low:+.4f}, {high:+.4f}]"
+
+            print(
+                f"      {metric:<18} {win['mean']:+.4f}  "
+                f"window-CI {span(win)}  date-CI {span(date)}"
+            )
+    print(f"[forecast] artifacts -> {args.output}")
+    return 0
+
+
+def cmd_label_candidates(args: argparse.Namespace) -> int:
+    """Draw a stratified annotation batch for expanding the in-domain label set.
+
+    Produces one random evaluation stratum, which preserves the corpus label
+    prior, plus minority-enriched training strata selected by a Vietnamese
+    financial polarity lexicon and the current checkpoint's probabilities. The
+    retrieval signals choose what a human reads; they never assign a label.
+    """
+    from stf.data.news import load_ticker_articles
+    from stf.sentiment.sampling import (
+        DEFAULT_QUOTAS,
+        SamplingPlan,
+        draw_candidates,
+        prepare_pool,
+        sampling_manifest,
+        to_label_template,
+        write_manifest,
+    )
+
+    articles = load_ticker_articles()
+    exclude: set[str] = set()
+    for path in args.exclude or []:
+        frame = pd.read_csv(path)
+        if "url" not in frame.columns:
+            print(f"label-candidates: {path} has no 'url' column.", file=sys.stderr)
+            return 2
+        exclude.update(frame["url"].dropna().astype(str))
+
+    scored = None
+    if args.news_sentiment is not None:
+        scored_path = Path(args.news_sentiment)
+        if not scored_path.exists():
+            print(f"label-candidates: missing {scored_path}", file=sys.stderr)
+            return 2
+        scored = pd.read_parquet(scored_path)
+
+    quotas = dict(DEFAULT_QUOTAS)
+    for stratum, value in (
+        ("eval_random", args.eval_random),
+        ("train_negative", args.negative),
+        ("train_positive", args.positive),
+        ("train_active", args.active),
+    ):
+        if value is not None:
+            quotas[stratum] = value
+    plan = SamplingPlan(quotas=quotas, seed=args.seed, body_context_chars=args.context_chars)
+
+    pool = prepare_pool(articles, scored=scored, exclude_urls=exclude)
+    if pool.empty:
+        print("label-candidates: candidate pool is empty.", file=sys.stderr)
+        return 1
+    candidates = draw_candidates(pool, plan)
+    template = to_label_template(candidates, plan)
+
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    template.to_csv(output, index=False)
+    manifest = sampling_manifest(pool, candidates, plan, excluded=len(exclude))
+    manifest_path = output.with_name(f"{output.stem}_manifest.json")
+    write_manifest(manifest_path, manifest)
+
+    print(
+        f"[label-candidates] pool={manifest['pool']['candidates_after_dedup']} "
+        f"(excluded {len(exclude)} already-labelled) -> drew {len(template)} rows"
+    )
+    for stratum, info in manifest["strata"].items():
+        prob = info.get("inclusion_probability")
+        share = "n/a" if prob is None else f"{prob:.4f}"
+        print(
+            f"  {stratum:<20} drawn={info['drawn']:<5} eligible={info['eligible']:<6} "
+            f"inclusion_p={share}"
+        )
+    print(f"[label-candidates] {output} + {manifest_path}")
+    return 0
+
+
+def cmd_label_audit(args: argparse.Namespace) -> int:
+    """Validate a filled annotation file and report distribution and precision."""
+    from stf.sentiment.labels import LABELS
+    from stf.sentiment.sampling import audit_labels
+
+    path = Path(args.data)
+    if not path.exists():
+        print(f"label-audit: missing {path}", file=sys.stderr)
+        return 2
+    frame = pd.read_csv(path)
+    report = audit_labels(frame, valid_labels=tuple(LABELS))
+
+    print(
+        f"[label-audit] {path}: {report['labelled']}/{report['rows']} labelled, "
+        f"{report['pending']} pending"
+    )
+    print(f"  distribution: {report['distribution']}")
+    for stratum, counts in report["by_stratum"].items():
+        print(f"    {stratum:<20} {counts}")
+    full = report["power_full"]
+    fold = report["power_5fold"]
+    print(
+        f"  smallest class n={report['smallest_class']}: recall 95% CI half-width "
+        f"+/-{full['ci_half_width']:.3f} on the full set, "
+        f"+/-{fold['ci_half_width']:.3f} per 5-fold test block"
+    )
+    if report["issues"]:
+        for issue in report["issues"]:
+            print(f"  ISSUE: {issue}", file=sys.stderr)
+        return 1
+    print("  no structural issues found")
+    return 0
+
+
+def cmd_label_finalize(args: argparse.Namespace) -> int:
+    """Mark reviewed annotation rows as human-reviewed so training accepts them.
+
+    Running this command is the act of attesting that a human has confirmed every
+    row carrying a valid label. Both provenance fields are rewritten, because the
+    training loader rejects a row when either one still marks it preliminary.
+    """
+    from stf.sentiment.labels import LABELS
+    from stf.sentiment.sampling import finalize_labels
+
+    path = Path(args.data)
+    if not path.exists():
+        print(f"label-finalize: missing {path}", file=sys.stderr)
+        return 2
+    frame = pd.read_csv(path)
+    out, report = finalize_labels(frame, valid_labels=tuple(LABELS))
+    if report["finalized"] == 0:
+        print("label-finalize: no row carries a valid label.", file=sys.stderr)
+        return 1
+
+    target = Path(args.output) if args.output else path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    out.to_csv(target, index=False)
+    print(
+        f"[label-finalize] {report['finalized']}/{report['rows']} rows marked reviewed"
+        f" ({report['left_preliminary']} left preliminary) -> {target}"
+    )
+    print(f"  distribution: {report['distribution']}")
+    if report["changed_from_prelabel"] is not None:
+        print(
+            f"  differs from preliminary label: {report['changed_from_prelabel']} rows"
+            " (diagnostic of the prelabelling step, not an inter-rater measure)"
+        )
+    return 0
+
+
+def cmd_label_merge(args: argparse.Namespace) -> int:
+    """Union several annotation files into one training file with unique ids."""
+    from stf.sentiment.labels import LABELS
+    from stf.sentiment.sampling import merge_label_files
+
+    sources: dict[str, pd.DataFrame] = {}
+    for spec in args.inputs:
+        if "=" not in spec:
+            print(
+                f"label-merge: expected <batch>=<path>, got {spec!r}", file=sys.stderr
+            )
+            return 2
+        batch, raw_path = spec.split("=", 1)
+        source = Path(raw_path)
+        if not source.exists():
+            print(f"label-merge: missing {source}", file=sys.stderr)
+            return 2
+        sources[batch] = pd.read_csv(source)
+
+    merged, report = merge_label_files(sources, valid_labels=tuple(LABELS))
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    merged.to_csv(output, index=False)
+
+    print(f"[label-merge] {report['rows']} rows -> {output}")
+    for batch, info in report["per_batch"].items():
+        print(f"  {batch:<10} {info['rows']:<5} {info['distribution']}")
+    print(f"  duplicate urls removed: {report['duplicate_urls_removed']}")
+    print(f"  total distribution:     {report['distribution']}")
+    print(
+        f"  evaluable rows:         {report['evaluable_rows']} "
+        f"{report['evaluable_distribution']}"
+    )
+    print(f"  train-only rows:        {report['train_only_rows']}")
+    full = report["power_eval_full"]
+    fold = report["power_eval_per_fold"]
+    print(
+        f"  smallest evaluable class n={full['n_minority']}: recall 95% CI half-width"
+        f" +/-{full['ci_half_width']:.3f} overall, +/-{fold['ci_half_width']:.3f} per fold"
+    )
+    return 0
+
+
+def cmd_forecast_compare(args: argparse.Namespace) -> int:
+    """Measure polarity information against a paired neutral-news control."""
+    from stf.forecasting.experiment import compare_information_gain
+
+    report = compare_information_gain(
+        Path(args.real), Path(args.control), arm=args.arm, price_arm=args.price_arm
+    )
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+
+    print(f"[forecast-compare] {args.arm} vs {args.price_arm}")
+    for metric, effect in report["effects"].items():
+        win = effect["information_gain_window_bootstrap"]
+        date = effect["information_gain_date_bootstrap"]
+        print(f"  {metric}:")
+        print(f"      price-only                 {effect['price_only']:.4f}")
+        print(f"      two-branch neutral prior   {effect['two_branch_neutral_prior']:.4f}")
+        print(f"      two-branch real sentiment  {effect['two_branch_real_sentiment']:.4f}")
+        print(
+            "      architecture + news presence/volume "
+            f"{effect['architecture_and_news_presence_volume_effect']:+.4f}"
+        )
+        print(
+            f"      information gain           {effect['information_gain']:+.4f}  "
+            f"window-CI [{win['low']:+.4f}, {win['high']:+.4f}]  "
+            f"date-CI [{date['low']:+.4f}, {date['high']:+.4f}]"
+        )
+        print(f"      naive delta (conflated)    {effect['naive_delta']:+.4f}")
+    print(f"[forecast-compare] -> {output}")
     return 0
 
 
@@ -501,7 +1095,48 @@ def main(argv: list[str] | None = None) -> int:
         "sentiment-cv", help="evaluate one PhoBERT configuration with K-fold CV"
     )
     add_experiment_args(p_cv)
+    p_cv.add_argument(
+        "--eval-strata",
+        nargs="*",
+        default=None,
+        metavar="STRATUM",
+        help=(
+            "restrict the holdout to these sampling strata (e.g. eval_random "
+            "baseline_random); minority-enriched rows then train only"
+        ),
+    )
     p_cv.set_defaults(func=cmd_sentiment_cv)
+
+    p_refit = sub.add_parser(
+        "sentiment-refit",
+        help="fit a cross-validated PhoBERT configuration on every reviewed label",
+    )
+    p_refit.add_argument("--data", required=True)
+    p_refit.add_argument(
+        "--cv-results",
+        required=True,
+        help="cv_results.json that selected this exact configuration",
+    )
+    p_refit.add_argument("--epochs", type=float, required=True)
+    p_refit.add_argument("--batch-size", type=int, required=True)
+    p_refit.add_argument("--seed", type=int, required=True)
+    p_refit.add_argument(
+        "--input-variant",
+        choices=("title", "context", "title_context"),
+        required=True,
+    )
+    p_refit.add_argument(
+        "--truncation-strategy",
+        choices=("head", "tail", "head_tail"),
+        required=True,
+    )
+    p_refit.add_argument(
+        "--class-weighting",
+        choices=("none", "inverse_frequency"),
+        required=True,
+    )
+    p_refit.add_argument("--output", required=True)
+    p_refit.set_defaults(func=cmd_sentiment_refit)
 
     p_ablation = sub.add_parser(
         "sentiment-ablation",
@@ -537,6 +1172,58 @@ def main(argv: list[str] | None = None) -> int:
     p_forecast_smoke.add_argument("--seed", type=int, default=42)
     p_forecast_smoke.set_defaults(func=cmd_forecast_smoke)
 
+    p_forecast = sub.add_parser(
+        "forecast",
+        help="run the real walk-forward forecasting ladder and export metrics",
+    )
+    news_input = p_forecast.add_mutually_exclusive_group()
+    news_input.add_argument(
+        "--news-sentiment",
+        default=None,
+        help="verified score-news parquet with observed sentiment probabilities",
+    )
+    news_input.add_argument(
+        "--neutral-news-sentiment",
+        default=None,
+        help=(
+            "verified score-news parquet; preserve article timing and volume, "
+            "force neutral probabilities"
+        ),
+    )
+    p_forecast.add_argument("--output", default="outputs/forecast", help="artifact directory")
+    p_forecast.add_argument("--seq-len", type=int, default=5)
+    p_forecast.add_argument("--windows", type=int, default=5, help="walk-forward windows")
+    p_forecast.add_argument("--test-size", type=int, default=60, help="test dates per window")
+    p_forecast.add_argument("--val-size", type=int, default=60, help="validation dates per window")
+    p_forecast.add_argument(
+        "--rolling",
+        action="store_true",
+        help="use a fixed-length rolling train window instead of an expanding one",
+    )
+    p_forecast.add_argument("--hidden", type=int, default=32)
+    p_forecast.add_argument("--epochs", type=int, default=30)
+    p_forecast.add_argument("--batch-size", type=int, default=128)
+    p_forecast.add_argument("--patience", type=int, default=5)
+    p_forecast.add_argument(
+        "--seeds", type=int, nargs="+", default=[42, 43, 44], help="seeds averaged per window"
+    )
+    p_forecast.set_defaults(func=cmd_forecast)
+
+    p_cmp = sub.add_parser(
+        "forecast-compare",
+        help="measure paired polarity information against a neutral-news control",
+    )
+    p_cmp.add_argument("--real", required=True, help="run directory with observed sentiment")
+    p_cmp.add_argument(
+        "--control",
+        required=True,
+        help="run directory with --neutral-news-sentiment from the same scored-news parquet",
+    )
+    p_cmp.add_argument("--arm", default="lstm_price_sentiment")
+    p_cmp.add_argument("--price-arm", default="lstm_price")
+    p_cmp.add_argument("--output", default="outputs/forecast/information_gain.json")
+    p_cmp.set_defaults(func=cmd_forecast_compare)
+
     p_score = sub.add_parser(
         "score-news", help="score crawled ticker articles with a trained checkpoint"
     )
@@ -556,10 +1243,86 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_score.add_argument("--batch-size", type=int, default=32)
     p_score.add_argument(
+        "--context-chars",
+        type=int,
+        default=None,
+        help="cap the article context before tokenizing, matching the annotation cap",
+    )
+    p_score.add_argument(
         "--limit", type=int, default=None, help="only score the first N rows"
     )
     p_score.add_argument("--output", required=True, help="output parquet path")
     p_score.set_defaults(func=cmd_score_news)
+
+    p_cand = sub.add_parser(
+        "label-candidates",
+        help="draw a stratified annotation batch to expand the in-domain label set",
+    )
+    p_cand.add_argument(
+        "--output",
+        default="data/labeled/indomain/to_label_batch2.csv",
+        help="annotation file to write",
+    )
+    p_cand.add_argument(
+        "--exclude",
+        nargs="*",
+        default=["data/labeled/indomain/to_label_r1.csv"],
+        help="existing label files whose urls must not be drawn again",
+    )
+    p_cand.add_argument(
+        "--news-sentiment",
+        default="data/processed/news_sentiment.parquet",
+        help="score-news parquet reused as a retrieval prior",
+    )
+    p_cand.add_argument(
+        "--eval-random",
+        type=int,
+        default=None,
+        help="uniform, model-free stratum; the only one valid for evaluation",
+    )
+    p_cand.add_argument("--negative", type=int, default=None)
+    p_cand.add_argument("--positive", type=int, default=None)
+    p_cand.add_argument(
+        "--active",
+        type=int,
+        default=None,
+        help="model-informed low-confidence stratum; train-only",
+    )
+    p_cand.add_argument("--context-chars", type=int, default=2000)
+    p_cand.add_argument("--seed", type=int, default=42)
+    p_cand.set_defaults(func=cmd_label_candidates)
+
+    p_audit = sub.add_parser(
+        "label-audit", help="validate a filled annotation file and report its power"
+    )
+    p_audit.add_argument("--data", required=True, help="annotation csv to check")
+    p_audit.set_defaults(func=cmd_label_audit)
+
+    p_final = sub.add_parser(
+        "label-finalize",
+        help="mark reviewed rows as human-reviewed so training accepts them",
+    )
+    p_final.add_argument("--data", required=True, help="reviewed annotation csv")
+    p_final.add_argument(
+        "--output", default=None, help="write here instead of editing in place"
+    )
+    p_final.set_defaults(func=cmd_label_finalize)
+
+    p_merge = sub.add_parser(
+        "label-merge", help="union annotation files into one training file"
+    )
+    p_merge.add_argument(
+        "inputs",
+        nargs="+",
+        metavar="BATCH=PATH",
+        help="labelled files to merge, e.g. r1=data/.../to_label_r1.csv",
+    )
+    p_merge.add_argument(
+        "--output",
+        default="data/labeled/indomain/labeled_merged.csv",
+        help="merged training file",
+    )
+    p_merge.set_defaults(func=cmd_label_merge)
 
     args = parser.parse_args(argv)
     return args.func(args)
