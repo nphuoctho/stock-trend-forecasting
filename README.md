@@ -252,6 +252,22 @@ The three trend classes are cut at the training window's return terciles, so the
 are balanced by construction and **the chance level is 0.333, not 0.5**. Report `macro_f1`,
 `balanced_accuracy` and macro OvR-AUC; accuracy alone is not interpretable here.
 
+## Phase 5: results dashboard
+
+`webapp` serves a read-only dashboard over the run directories under `outputs/`
+(any directory containing `forecast_results.json`):
+
+```bash
+uv run python -m stf.cli webapp --port 8000
+```
+
+The API lives under `/api` (`/api/runs`, per-run `summary`, `metrics`,
+`predictions`, `stratified`, `information-gain`; interactive docs at
+`/api/docs`). The React frontend in `web/` is built once with
+`cd web && bun install && bun run build` and then served by the same process;
+during frontend development run `bun run dev` in `web/` for the Vite dev server
+with an `/api` proxy.
+
 ## Expanding the sentiment label set
 
 `label-candidates` draws a stratified annotation batch. A uniform draw spends the budget

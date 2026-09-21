@@ -521,6 +521,17 @@ def cmd_score_news(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_webapp(args: argparse.Namespace) -> int:
+    """Serve the read-only dashboard over forecast artifacts."""
+    import uvicorn
+
+    uvicorn.run(
+        "stf.webapp.app:app", host=args.host, port=args.port, log_level="info"
+    )
+    return 0
+
+
+
 def _forecast_smoke_prices(n: int) -> pd.DataFrame:
     dates = pd.bdate_range("2024-01-02", periods=n)
     close = pd.Series(
@@ -1255,6 +1266,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_score.add_argument("--output", required=True, help="output parquet path")
     p_score.set_defaults(func=cmd_score_news)
+
+    p_web = sub.add_parser(
+        "webapp",
+        help="serve the read-only forecast dashboard over outputs/ artifacts",
+    )
+    p_web.add_argument("--host", default="127.0.0.1")
+    p_web.add_argument("--port", type=int, default=8000)
+    p_web.set_defaults(func=cmd_webapp)
 
     p_cand = sub.add_parser(
         "label-candidates",

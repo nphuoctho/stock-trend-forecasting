@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "accelerate>=1.14.0",
+    "fastapi>=0.141.1",
     "pandas>=3.0.5",
     "pyarrow>=25.0.1",
     "requests>=2.34.2",
@@ -16,6 +17,7 @@ dependencies = [
     "sentencepiece>=0.2.2",
     "torch>=2.13.0",
     "transformers>=5.15.1",
+    "uvicorn>=0.53.0",
     "vnstock>=4.0.2",
 ]
 

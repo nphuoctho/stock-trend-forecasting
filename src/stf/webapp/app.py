@@ -1,0 +1,151 @@
+"""FastAPI surface exposing forecast experiment artifacts to the dashboard.
+
+The API is read-only: every endpoint derives from files under ``outputs/`` and
+never mutates them. Run directories are discovered by the presence of
+``forecast_results.json``.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from stf import config
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+WEB_DIST = REPO_ROOT / "web" / "dist"
+
+app = FastAPI(title="stock-trend-forecasting", docs_url="/api/docs")
+
+
+def _outputs_root() -> Path:
+    return Path(config.ROOT) / "outputs"
+
+def _run_dirs() -> dict[str, Path]:
+    root = _outputs_root()
+    if not root.is_dir():
+        return {}
+    return {
+        child.name: child
+        for child in sorted(root.iterdir())
+        if child.is_dir() and (child / "forecast_results.json").is_file()
+    }
+
+
+def _run_dir(name: str) -> Path:
+    runs = _run_dirs()
+    if name not in runs:
+        raise HTTPException(status_code=404, detail=f"unknown run {name!r}")
+    return runs[name]
+
+
+def _read_json(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise HTTPException(
+            status_code=500, detail=f"cannot read artifact {path.name}"
+        ) from error
+
+
+def _read_csv_records(path: Path) -> list[dict]:
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail=f"missing artifact {path.name}")
+    frame = pd.read_csv(path)
+    return json.loads(frame.to_json(orient="records"))
+
+
+@app.get("/api/runs")
+def list_runs() -> dict:
+    """List forecast run directories with headline provenance."""
+    runs = []
+    for name, path in _run_dirs().items():
+        results = _read_json(path / "forecast_results.json")
+        provenance = results.get("provenance") or {}
+        news = provenance.get("news_sentiment") or {}
+        runs.append(
+            {
+                "name": name,
+                "panel_rows": results.get("panel_rows"),
+                "mode": news.get("mode"),
+                "date_start": provenance.get("date_start"),
+                "date_end": provenance.get("date_end"),
+                "has_information_gain": (path / "information_gain.json").is_file(),
+            }
+        )
+    return {"runs": runs}
+
+
+@app.get("/api/runs/{name}/summary")
+def run_summary(name: str) -> dict:
+    """Config, per-arm summary metrics, ablation and stratified aggregates."""
+    results = _read_json(_run_dir(name) / "forecast_results.json")
+    return {
+        "name": name,
+        "config": results.get("config"),
+        "chance_level": results.get("chance_level"),
+        "panel_rows": results.get("panel_rows"),
+        "panel_tickers": results.get("panel_tickers"),
+        "summary": results.get("summary"),
+        "ablation": results.get("ablation"),
+        "stratified_by_news": results.get("stratified_by_news"),
+        "environment": results.get("environment"),
+        "provenance": results.get("provenance"),
+    }
+
+
+@app.get("/api/runs/{name}/metrics")
+def run_metrics(name: str) -> dict:
+    """Per-arm metric table with bootstrap intervals."""
+    return {"rows": _read_csv_records(_run_dir(name) / "forecast_metrics.csv")}
+
+
+@app.get("/api/runs/{name}/predictions")
+def run_predictions(
+    name: str,
+    arm: str | None = Query(default=None),
+    ticker: str | None = Query(default=None),
+    window: int | None = Query(default=None),
+    limit: int = Query(default=500, ge=1, le=5000),
+    offset: int = Query(default=0, ge=0),
+) -> dict:
+    """Paginated per-row predictions, filterable by arm/ticker/window."""
+    rows = _read_csv_records(_run_dir(name) / "forecast_predictions.csv")
+    if arm is not None:
+        rows = [row for row in rows if row.get("arm") == arm]
+    if ticker is not None:
+        rows = [row for row in rows if row.get("ticker") == ticker]
+    if window is not None:
+        rows = [row for row in rows if row.get("window") == window]
+    return {"total": len(rows), "rows": rows[offset : offset + limit]}
+
+
+@app.get("/api/runs/{name}/stratified")
+def run_stratified(name: str) -> dict:
+    """Per-window metrics split by news presence."""
+    return {"rows": _read_csv_records(_run_dir(name) / "forecast_stratified.csv")}
+
+
+@app.get("/api/runs/{name}/information-gain")
+def run_information_gain(name: str) -> dict:
+    """Paired decomposition of the sentiment contribution for one run."""
+    path = _run_dir(name) / "information_gain.json"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="run has no information_gain.json")
+    return _read_json(path)
+
+
+def mount_frontend() -> None:
+    """Serve the built dashboard when ``web/dist`` exists."""
+    if not WEB_DIST.is_dir():
+        return
+    app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="web")
+
+
+mount_frontend()
