@@ -142,9 +142,10 @@ cấu hình, chạy `sentiment-cv` để tạo artifact xác thực chéo. Check
 phải được tạo bằng `sentiment-refit`, lệnh này khóa cấu hình và tệp nhãn theo
 `cv_results.json`, rồi học lại trên toàn bộ nhãn đã duyệt mà không dùng outer holdout.
 
-Không dùng nhãn hoặc giá tương lai để tạo đầu vào cảm xúc. Tập CafeF chỉ có
-tiêu đề nên không đủ để kết luận riêng về `context`; cần dùng tệp Vietstock đã
-gán nhãn có nội dung bài viết.
+Không dùng nhãn hoặc giá tương lai để tạo đầu vào cảm xúc. Khi đánh giá cuốn chiếu, phải
+tinh chỉnh lại trong từng cửa sổ chỉ bằng nhãn quá khứ hoặc dùng một điểm kiểm đóng băng
+được huấn luyện trước ngày kiểm thử đầu tiên. Tập CafeF chỉ có tiêu đề nên không đủ để kết
+luận riêng về `context`; cần dùng tệp Vietstock đã gán nhãn có nội dung bài viết.
 
 ### Gán nhãn cảm xúc cho tin đã crawl
 
@@ -177,16 +178,21 @@ uv run python -m stf.cli score-news \
 
 ## Phase 4: forecasting experiment
 
-`forecast-smoke` only proves the code runs. `forecast` is the command that produces
-reportable numbers: it loads the real price parquets, optionally a `score-news` parquet,
-and runs the full ladder on walk-forward windows.
+`forecast-smoke` chỉ chứng minh mã chạy được. `forecast` tải parquet giá thực tế, tùy chọn
+một parquet từ `score-news`, rồi chạy thang đầy đủ trên các cửa sổ cuốn chiếu.
+
+Để báo cáo kết quả ngoài mẫu, parquet cảm xúc phải được tạo bởi điểm kiểm phù hợp thời
+điểm của từng cửa sổ. Một điểm kiểm tinh chỉnh trên toàn bộ tệp nhãn chỉ phù hợp cho phân
+tích hồi cứu; nó không được dùng để kết luận hiệu quả dự báo trên các ngày có nhãn tương lai.
 
 ```bash
-# Đối chứng chỉ giá: mọi phiên nhận prior trung tính. Giữ cùng cấu hình phía dưới
-# để hai lần chạy chỉ khác thông tin đi vào nhánh cảm xúc.
-uv run python -m stf.cli forecast --windows 5 --test-size 60 --val-size 60 \
-  --epochs 40 --patience 6 --seeds 42 43 44 \
-  --output outputs/forecast_merged_control
+# Đối chứng trung tính ghép cặp: giữ nguyên bài tin, thời điểm và khối lượng tin,
+# chỉ thay ba xác suất thành prior trung tính. Hai lần chạy vì thế chỉ khác
+# thông tin phân cực cảm xúc.
+uv run python -m stf.cli forecast \
+  --neutral-news-sentiment data/processed/news_sentiment_merged.parquet \
+  --windows 5 --test-size 60 --val-size 60 --epochs 40 --patience 6 \
+  --seeds 42 43 44 --output outputs/forecast_merged_control
 
 # Thang đầy đủ với cảm xúc; hai nhánh dùng cùng cửa sổ, hạt giống và hàng kiểm thử.
 uv run python -m stf.cli forecast \
@@ -213,13 +219,14 @@ window interval has only 5 blocks and is coarse enough to exclude zero by accide
 `forecast-compare` exists because comparing the two-branch arm against the single-branch
 price model conflates two changes: the extra branch, and the information it carries. The
 
-control run keeps the architecture and removes only the information, so
-`architecture_effect + information_gain = naive_delta` exactly.
+control run keeps the architecture, article timing and news volume fixed, and removes
+only probability information, so `architecture_effect + information_gain = naive_delta`
+exactly.
 
-Trước khi tính chênh lệch, `forecast-compare` bắt buộc hai lần chạy có cùng cấu hình,
-mã băm dữ liệu giá, các ngày kiểm thử và khóa dự đoán `(window, seed, ticker,
-target_date, y_true)`. Vì vậy không thể ghép một artifact cũ hoặc tập kiểm thử khác
-vào phép đo giá trị thông tin.
+Trước khi tính chênh lệch, `forecast-compare` bắt buộc hai lần chạy có cùng nguồn
+tin đã chấm, mã băm dữ liệu giá, cấu hình, ngày kiểm thử và khóa dự đoán
+`(window, seed, ticker, target_date, y_true)`. Vì vậy không thể ghép một artifact
+cũ, nguồn tin khác hoặc tập kiểm thử khác vào phép đo giá trị thông tin.
 
 Artifacts written to `--output`:
 

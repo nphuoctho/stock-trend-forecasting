@@ -748,18 +748,33 @@ def test_information_gain_decomposition_is_exact_and_guards_config_drift(tmp_pat
     cfg = ForecastConfig(
         n_windows=2, test_size=6, val_size=6, epochs=3, batch_size=32, seeds=(42,)
     )
+    neutral_news = news.assign(
+        prob_negative=0.0,
+        prob_neutral=1.0,
+        prob_positive=0.0,
+    )
     real_dir, control_dir = tmp_path / "real", tmp_path / "control"
     run_experiment(
         assemble(prices, news),
         cfg=cfg,
         output_dir=real_dir,
-        provenance={"news_sentiment": {"rows": len(news)}, "prices_hash": "prices-v1"},
+        provenance={
+            "news_sentiment": {"mode": "real", "source_hash": "news-v1", "rows": len(news)},
+            "prices_hash": "prices-v1",
+        },
     )
     run_experiment(
-        assemble(prices),
+        assemble(prices, neutral_news),
         cfg=cfg,
         output_dir=control_dir,
-        provenance={"prices_hash": "prices-v1"},
+        provenance={
+            "news_sentiment": {
+                "mode": "neutral_prior",
+                "source_hash": "news-v1",
+                "rows": len(news),
+            },
+            "prices_hash": "prices-v1",
+        },
     )
 
     report = compare_information_gain(real_dir, control_dir)
@@ -769,17 +784,24 @@ def test_information_gain_decomposition_is_exact_and_guards_config_drift(tmp_pat
     )
     assert len(effect["information_gain_per_window"]) == 2
 
-    # A control run that actually had sentiment cannot isolate the architecture.
-    with pytest.raises(ValueError, match="without --news-sentiment"):
+    # A run with observed probabilities cannot be its own neutralized control.
+    with pytest.raises(ValueError, match="preserve the scored-news rows"):
         compare_information_gain(real_dir, real_dir)
 
     # Matching parameters alone are insufficient if the underlying prices changed.
     price_drift = tmp_path / "price-drift"
     run_experiment(
-        assemble(prices),
+        assemble(prices, neutral_news),
         cfg=cfg,
         output_dir=price_drift,
-        provenance={"prices_hash": "prices-v2"},
+        provenance={
+            "news_sentiment": {
+                "mode": "neutral_prior",
+                "source_hash": "news-v1",
+                "rows": len(news),
+            },
+            "prices_hash": "prices-v2",
+        },
     )
     with pytest.raises(ValueError, match="different price provenance"):
         compare_information_gain(real_dir, price_drift)

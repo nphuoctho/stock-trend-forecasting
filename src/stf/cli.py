@@ -478,16 +478,38 @@ def cmd_forecast(args: argparse.Namespace) -> int:
     }
 
     news = None
-    if args.news_sentiment is not None:
-        news_path = Path(args.news_sentiment)
+    news_path_arg = args.news_sentiment or args.neutral_news_sentiment
+    if news_path_arg is not None:
+        news_path = Path(news_path_arg)
         if not news_path.exists():
             print(f"forecast: missing {news_path}", file=sys.stderr)
             return 2
         news = pd.read_parquet(news_path)
+        source_hash = frame_hash(news)
+        mode = "real"
+        if args.neutral_news_sentiment is not None:
+            probability_columns = [
+                "prob_negative",
+                "prob_neutral",
+                "prob_positive",
+            ]
+            missing = set(probability_columns) - set(news.columns)
+            if missing:
+                print(
+                    "forecast: neutral control is missing probability columns "
+                    f"{sorted(missing)}",
+                    file=sys.stderr,
+                )
+                return 2
+            news = news.copy()
+            news.loc[:, probability_columns] = (0.0, 1.0, 0.0)
+            mode = "neutral_prior"
         provenance["news_sentiment"] = {
-            "path": str(news_path),
+            "mode": mode,
+            "source_path": str(news_path),
+            "source_hash": source_hash,
+            "feature_hash": frame_hash(news),
             "rows": int(len(news)),
-            "hash": frame_hash(news),
         }
 
     panel = assemble(prices, news)
@@ -957,10 +979,16 @@ def main(argv: list[str] | None = None) -> int:
         "forecast",
         help="run the real walk-forward forecasting ladder and export metrics",
     )
-    p_forecast.add_argument(
+    news_input = p_forecast.add_mutually_exclusive_group()
+    news_input.add_argument(
         "--news-sentiment",
         default=None,
-        help="parquet from score-news; omit to run the price-only ladder",
+        help="parquet from score-news with observed sentiment probabilities",
+    )
+    news_input.add_argument(
+        "--neutral-news-sentiment",
+        default=None,
+        help="parquet from score-news; preserve article timing and volume, force neutral probabilities",
     )
     p_forecast.add_argument("--output", default="outputs/forecast", help="artifact directory")
     p_forecast.add_argument("--seq-len", type=int, default=5)
@@ -985,8 +1013,12 @@ def main(argv: list[str] | None = None) -> int:
         "forecast-compare",
         help="split the two-branch gain into architecture and information effects",
     )
-    p_cmp.add_argument("--real", required=True, help="run directory with --news-sentiment")
-    p_cmp.add_argument("--control", required=True, help="run directory without sentiment")
+    p_cmp.add_argument("--real", required=True, help="run directory with observed sentiment")
+    p_cmp.add_argument(
+        "--control",
+        required=True,
+        help="run directory with --neutral-news-sentiment from the same scored-news parquet",
+    )
     p_cmp.add_argument("--arm", default="lstm_price_sentiment")
     p_cmp.add_argument("--price-arm", default="lstm_price")
     p_cmp.add_argument("--output", default="outputs/forecast/information_gain.json")

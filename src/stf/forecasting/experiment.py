@@ -700,12 +700,12 @@ def compare_information_gain(
     seed: int = 7,
 ) -> dict:
     """Split a two-branch arm's apparent gain into architecture and information.
-
-    ``control_dir`` must come from a run with no sentiment parquet, where the
-    sentiment branch receives the constant neutral prior. Comparing the two-branch
-    arm against the single-branch price model conflates two changes: the extra
-    branch and parameters, and the information the branch carries. The control run
-    holds the architecture fixed and removes only the information, so
+    ``control_dir`` must use the same scored-news parquet as ``real_dir``. It
+    preserves every article's timing and volume while replacing only its
+    probabilities with the constant neutral prior. Comparing the two-branch arm
+    against the single-branch price model conflates two changes: the extra branch,
+    and the information it carries. The neutralized control holds the architecture,
+    news presence and volume fixed, so
 
         architecture effect = control(two-branch) - control(price-only)
         information gain    = real(two-branch)    - control(two-branch)
@@ -719,8 +719,23 @@ def compare_information_gain(
     )
     if real["config"] != control["config"]:
         raise ValueError("Runs have different configs; the difference is not attributable.")
-    if control["provenance"].get("news_sentiment") is not None:
-        raise ValueError("control_dir must be a run without --news-sentiment.")
+    real_news = real.get("provenance", {}).get("news_sentiment")
+    control_news = control.get("provenance", {}).get("news_sentiment")
+    if not isinstance(real_news, dict) or real_news.get("mode") != "real":
+        raise ValueError("real_dir must use observed sentiment probabilities.")
+    if not isinstance(control_news, dict) or control_news.get("mode") != "neutral_prior":
+        raise ValueError(
+            "control_dir must preserve the scored-news rows with neutral probabilities."
+        )
+    if (
+        not real_news.get("source_hash")
+        or not control_news.get("source_hash")
+        or real_news["source_hash"] != control_news["source_hash"]
+        or real_news.get("rows") != control_news.get("rows")
+    ):
+        raise ValueError(
+            "Runs use different scored-news sources; the information gain is not attributable."
+        )
     real_price_hash = real.get("provenance", {}).get("prices_hash")
     control_price_hash = control.get("provenance", {}).get("prices_hash")
     if not real_price_hash or not control_price_hash:
