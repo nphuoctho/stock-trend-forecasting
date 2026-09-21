@@ -108,12 +108,14 @@ Mã băm nguồn nhãn giống nhau trong các tệp kết quả, nên các cấ
 
 Quy trình xác thực chéo được cài đặt tại [`src/stf/sentiment/experiments.py`](../src/stf/sentiment/experiments.py), còn thứ tự nhãn được cố định tại [`src/stf/sentiment/labels.py`](../src/stf/sentiment/labels.py). Tập outer holdout chỉ dùng để đánh giá; một phần của outer train được dùng làm validation để chọn checkpoint.
 
-## 3. Ánh xạ tệp kết quả
+## 3. Ánh xạ artifact lịch sử
+
+Ánh xạ dưới đây được giữ để truy nguyên các bảng CV/ablation 306 nhãn. Các tệp tương ứng
+không nằm trong working tree hiện tại, vì vậy tên được ghi như bản kê lịch sử, không phải
+liên kết tái lập trực tiếp.
 
 Hai tệp không có hậu tố là kết quả chạy riêng cấu hình `title_context + head_tail`:
-
-- [`outputs/cv_results.json`](../outputs/cv_results.json)
-- [`outputs/cv_results.csv`](../outputs/cv_results.csv)
+`outputs/cv_results.json` và `outputs/cv_results.csv`.
 
 Chín cặp tệp có hậu tố là kết quả của ma trận ablation:
 
@@ -129,14 +131,12 @@ Chín cặp tệp có hậu tố là kết quả của ma trận ablation:
 | `cv_results (8)` | `title_context` | `head_tail`    |
 | `cv_results (9)` | `title_context` | `tail`         |
 
-`cv_results.json` và `cv_results (8).json` là cùng một kết quả. Hai tệp CSV tương ứng cũng là bản sao. Vì vậy, khi tổng hợp số liệu, chỉ tính một trong hai bản.
+`cv_results.json` và `cv_results (8).json` là cùng một kết quả; hai CSV tương ứng cũng
+là bản sao. Bảng xếp hạng lịch sử là `outputs/ablation_summary.csv`.
 
-Bảng xếp hạng đầy đủ nằm tại [`outputs/ablation_summary.csv`](../outputs/ablation_summary.csv).
-
-Kết quả có trọng số được lưu trong hai tệp nén:
-
-- `outputs/title_context__head_tail__cw-inverse_frequency__e5.zip`: chạy riêng cấu hình `title_context + head_tail`, có đầy đủ `fold-*/best/`.
-- `outputs/ablation__cw-inverse_frequency__e5.zip`: ma trận chín cấu hình, chỉ lưu số liệu và manifest.
+Artifact CV hiện có của lần chạy 1.306 nhãn là
+`outputs/sentiment-cv-merged/cv_results.{json,csv}`; archive được giữ là
+`outputs/merged__title_context__head_tail__inverse_frequency__e5.zip`.
 
 ## 4. Kết quả tổng hợp
 

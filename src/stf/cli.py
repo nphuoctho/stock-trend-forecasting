@@ -10,6 +10,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -285,16 +287,25 @@ def cmd_sentiment_ablation(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_score_news(args: argparse.Namespace) -> int:
-    """Score crawled ticker articles with a trained PhoBERT checkpoint.
+def _directory_fingerprint(path: Path) -> str | None:
+    """Return a deterministic SHA-256 for the complete checkpoint directory."""
+    if not path.is_dir():
+        return None
+    digest = hashlib.sha256()
+    for item in sorted(path.rglob("*")):
+        if not item.is_file():
+            continue
+        digest.update(item.relative_to(path).as_posix().encode("utf-8"))
+        with item.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1 << 20), b""):
+                digest.update(chunk)
+    return digest.hexdigest()
 
-    Loads the persisted listing/article join, builds the selected model input
-    variant, and writes per-article sentiment probabilities to a parquet file.
-    Requires a checkpoint produced by sentiment-train or sentiment-cv; ablation
-    outputs metrics for selection and removes its fold models to limit disk use.
-    """
+
+def cmd_score_news(args: argparse.Namespace) -> int:
+    """Score crawler rows and persist audited probability provenance."""
     from stf.data.news import load_ticker_articles
-    from stf.sentiment.dataset import build_input_text
+    from stf.sentiment.dataset import build_input_text, file_fingerprint
     from stf.sentiment.model import predict_proba
 
     articles = load_ticker_articles()
@@ -306,12 +317,28 @@ def cmd_score_news(args: argparse.Namespace) -> int:
     scored = build_input_text(
         articles, args.input_variant, context_chars=args.context_chars
     )
+    model_dir = Path(args.model_dir)
     probs = predict_proba(
         scored["text"].tolist(),
-        Path(args.model_dir),
+        model_dir,
         batch_size=args.batch_size,
         truncation_strategy=args.truncation_strategy,
     )
+    probability_columns = ["prob_negative", "prob_neutral", "prob_positive"]
+    probs = np.asarray(probs, dtype="float64")
+    if probs.shape != (len(scored), len(probability_columns)):
+        raise RuntimeError(
+            "score-news: checkpoint returned probabilities with an unexpected shape."
+        )
+    if (
+        not np.isfinite(probs).all()
+        or (probs < 0).any()
+        or (probs > 1).any()
+        or not np.isclose(probs.sum(axis=1), 1.0, atol=1e-6).all()
+    ):
+        raise RuntimeError(
+            "score-news: checkpoint returned invalid probability vectors."
+        )
     out = pd.DataFrame(
         {
             "ticker": scored["ticker"].to_numpy(),
@@ -325,7 +352,51 @@ def cmd_score_news(args: argparse.Namespace) -> int:
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     out.to_parquet(output_path, index=False)
-    print(f"[score-news] scored {len(out)} rows -> {output_path}")
+    manifest_path = output_path.with_suffix(".manifest.json")
+    refit_manifest_path = model_dir.parent / "manifest.json"
+    manifest = {
+        "schema_version": 1,
+        "output": {
+            "path": str(output_path),
+            "sha256": file_fingerprint(output_path),
+            "rows": int(len(out)),
+        },
+        "probabilities": {
+            "columns": probability_columns,
+            "totals": {
+                column: float(out[column].sum()) for column in probability_columns
+            },
+            "validation": {
+                "finite": True,
+                "nonnegative": True,
+                "rows_summing_to_one": int(len(out)),
+                "atol": 1e-6,
+            },
+        },
+        "checkpoint": {
+            "directory": str(model_dir),
+            "directory_sha256": _directory_fingerprint(model_dir),
+            "manifest_path": str(refit_manifest_path)
+            if refit_manifest_path.is_file()
+            else None,
+            "manifest_sha256": file_fingerprint(refit_manifest_path)
+            if refit_manifest_path.is_file()
+            else None,
+        },
+        "input": {
+            "variant": args.input_variant,
+            "context_chars": args.context_chars,
+            "truncation_strategy": args.truncation_strategy,
+            "batch_size": args.batch_size,
+        },
+    }
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(
+        f"[score-news] scored {len(out)} rows -> {output_path} "
+        f"(manifest {manifest_path})"
+    )
     return 0
 
 
@@ -759,9 +830,7 @@ def cmd_label_merge(args: argparse.Namespace) -> int:
 
 
 def cmd_forecast_compare(args: argparse.Namespace) -> int:
-    """Split the two-branch arm's gain into architecture and information effects."""
-    import json as _json
-
+    """Measure polarity information against a paired neutral-news control."""
     from stf.forecasting.experiment import compare_information_gain
 
     report = compare_information_gain(
@@ -769,7 +838,7 @@ def cmd_forecast_compare(args: argparse.Namespace) -> int:
     )
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(_json.dumps(report, indent=2, default=str), encoding="utf-8")
+    output.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
 
     print(f"[forecast-compare] {args.arm} vs {args.price_arm}")
     for metric, effect in report["effects"].items():
@@ -779,7 +848,10 @@ def cmd_forecast_compare(args: argparse.Namespace) -> int:
         print(f"      price-only                 {effect['price_only']:.4f}")
         print(f"      two-branch neutral prior   {effect['two_branch_neutral_prior']:.4f}")
         print(f"      two-branch real sentiment  {effect['two_branch_real_sentiment']:.4f}")
-        print(f"      architecture effect        {effect['architecture_effect']:+.4f}")
+        print(
+            "      architecture + news presence "
+            f"{effect['architecture_and_news_presence_effect']:+.4f}"
+        )
         print(
             f"      information gain           {effect['information_gain']:+.4f}  "
             f"window-CI [{win['low']:+.4f}, {win['high']:+.4f}]  "
@@ -1011,7 +1083,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_cmp = sub.add_parser(
         "forecast-compare",
-        help="split the two-branch gain into architecture and information effects",
+        help="measure paired polarity information against a neutral-news control",
     )
     p_cmp.add_argument("--real", required=True, help="run directory with observed sentiment")
     p_cmp.add_argument(

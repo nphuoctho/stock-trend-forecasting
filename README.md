@@ -176,6 +176,10 @@ uv run python -m stf.cli score-news \
   --output data/processed/news_sentiment_merged.parquet
 ```
 
+`score-news` also writes `data/processed/news_sentiment_merged.manifest.json`. The
+sidecar records row count, probability totals and validation, SHA-256 hashes of the
+parquet and checkpoint, optional refit manifest hash, and the exact input settings.
+
 ## Phase 4: forecasting experiment
 
 `forecast-smoke` chỉ chứng minh mã chạy được. `forecast` tải parquet giá thực tế, tùy chọn
@@ -217,16 +221,17 @@ per-window delta bootstrapped over the 5 windows, and as a bootstrap over the ~3
 window interval has only 5 blocks and is coarse enough to exclude zero by accident.
 
 `forecast-compare` exists because comparing the two-branch arm against the single-branch
-price model conflates two changes: the extra branch, and the information it carries. The
-
-control run keeps the architecture, article timing and news volume fixed, and removes
-only probability information, so `architecture_effect + information_gain = naive_delta`
-exactly.
+price model conflates the added branch with news presence and volume. The neutral control
+keeps article timing, news volume, and probability-independent features fixed, replacing
+only the probability vector. Consequently,
+`architecture_and_news_presence_effect + information_gain = naive_delta` exactly; only
+`information_gain` isolates polarity information.
 
 Trước khi tính chênh lệch, `forecast-compare` bắt buộc hai lần chạy có cùng nguồn
 tin đã chấm, mã băm dữ liệu giá, cấu hình, ngày kiểm thử và khóa dự đoán
-`(window, seed, ticker, target_date, y_true)`. Vì vậy không thể ghép một artifact
-cũ, nguồn tin khác hoặc tập kiểm thử khác vào phép đo giá trị thông tin.
+`(window, seed, ticker, target_date, y_true)`. Nó cũng yêu cầu prediction và metric của
+nhánh chỉ giá trùng khớp, nên không thể ghép một artifact cũ, nguồn tin khác hoặc lượt
+chạy bị lệch vào phép đo giá trị thông tin.
 
 Artifacts written to `--output`:
 

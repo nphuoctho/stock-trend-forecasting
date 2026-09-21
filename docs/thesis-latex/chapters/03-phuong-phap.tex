@@ -379,11 +379,12 @@ công cụ và cấu hình được ghi lại.
 
 \subsection{Chia dữ liệu và huấn luyện}
 
-Tập cảm xúc được chia theo thời gian hoặc theo nguyên tắc không trùng nguồn trước
-khi huấn luyện. Tập huấn luyện dùng để cập nhật tham số, tập xác thực dùng để chọn
-vòng huấn luyện, tốc độ học, trọng số lớp và dừng sớm, còn tập kiểm thử chỉ dùng một lần cho cấu
-hình đã khóa. Các bài trùng hoặc gần trùng phải được phát hiện trước khi chia tập; nếu
-không, mô hình có thể ghi nhớ câu chữ và tạo ra đánh giá lạc quan.
+Xác thực chéo PhoBERT hiện có là \emph{StratifiedKFold} ngẫu nhiên với năm phần chia,
+giữ tỷ lệ ba lớp trong mỗi outer holdout. Nó chỉ đo hiệu năng phân loại trong miền dữ
+liệu; không phải đánh giá point-in-time của nhánh dự báo. Một phần outer train được rút
+ngẫu nhiên có phân tầng để chọn checkpoint; outer holdout không tham gia lựa chọn đó.
+Các bài trùng hoặc gần trùng được phát hiện trước khi chia tập để hạn chế mô hình ghi nhớ
+câu chữ và tạo đánh giá lạc quan.
 
 Khi mô hình cảm xúc được dùng trong cuốn chiếu theo thời gian, có hai cách hợp lệ: tinh chỉnh lại
 trong từng phần chia bằng nhãn của quá khứ, hoặc dùng một điểm kiểm đóng băng được huấn
@@ -708,16 +709,16 @@ xúc cải thiện chỉ số đó trong giao thức hiện tại, không phải
 ích trong mọi bối cảnh.
 
 Công thức~\eqref{eq:ablation-delta} một mình chưa tách được nguồn của chênh lệch, vì mô
-hình hai nhánh khác mô hình chỉ giá ở cả kiến trúc lẫn thông tin đầu vào. Vì vậy giao thức
-bổ sung một lần chạy đối chứng giữ nguyên kiến trúc hai nhánh nhưng thay véc-tơ xác suất
-cảm xúc bằng một phân phối tiên nghiệm trung tính hằng số. Khi đó
+hình hai nhánh khác mô hình chỉ giá ở cả kiến trúc lẫn thông tin đầu vào. Đối chứng bổ sung
+giữ nguyên kiến trúc hai nhánh, bài tin, thời điểm và khối lượng tin, rồi thay véc-tơ xác
+suất bằng một phân phối tiên nghiệm trung tính hằng số. Khi đó
 \begin{align}
-  \text{hiệu ứng kiến trúc} &= m(\text{hai nhánh, tiên nghiệm trung tính}) - m(\text{chỉ giá}),\\
-  \text{đóng góp thông tin} &= m(\text{hai nhánh, cảm xúc thật}) - m(\text{hai nhánh, tiên nghiệm trung tính}),
+  \text{hiệu ứng kiến trúc và sự hiện diện tin} &= m(\text{hai nhánh, tiên nghiệm trung tính}) - m(\text{chỉ giá}),\\
+  \text{đóng góp thông tin phân cực} &= m(\text{hai nhánh, cảm xúc thật}) - m(\text{hai nhánh, tiên nghiệm trung tính}),
 \end{align}
-và tổng của hai thành phần bằng đúng $\Delta_m$. Điều kiện để phép tách có hiệu lực là hai
-lần chạy phải dùng cùng cấu hình, cùng cửa sổ và cùng hạt giống, nên các mô hình chỉ giá
-của hai lần chạy phải cho kết quả trùng khớp.
+và tổng của hai thành phần bằng đúng $\Delta_m$. Điều kiện để phép tách có hiệu lực là
+hai lần chạy dùng cùng cấu hình, cùng cửa sổ, cùng hạt giống và cho dự đoán nhánh chỉ giá
+trùng khớp.
 
 \subsection{Phân tích độ bền và điều kiện phát huy tín hiệu}
 

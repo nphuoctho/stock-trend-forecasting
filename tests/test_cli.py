@@ -56,12 +56,15 @@ def test_score_news_scores_articles_without_a_real_model(monkeypatch, tmp_path):
 
     monkeypatch.setattr(model_module, "predict_proba", fake_predict_proba)
 
+    model_dir = tmp_path / "fake-model"
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text("{}", encoding="utf-8")
     output = tmp_path / "scored.parquet"
     rc = main(
         [
             "score-news",
             "--model-dir",
-            str(tmp_path / "fake-model"),
+            str(model_dir),
             "--output",
             str(output),
         ]
@@ -71,3 +74,26 @@ def test_score_news_scores_articles_without_a_real_model(monkeypatch, tmp_path):
     result = pd.read_parquet(output)
     assert result["ticker"].tolist() == ["FPT", "VNM"]
     assert result["prob_positive"].tolist() == pytest.approx([0.1, 0.7])
+    manifest = pd.read_json(output.with_suffix(".manifest.json"), typ="series")
+    assert manifest["output"]["rows"] == 2
+    assert manifest["probabilities"]["totals"]["prob_neutral"] == pytest.approx(0.4)
+    assert manifest["checkpoint"]["directory_sha256"]
+    assert manifest["input"]["variant"] == "title"
+
+    monkeypatch.setattr(
+        model_module,
+        "predict_proba",
+        lambda *_args, **_kwargs: np.array([[1.0, 0.1, -0.1], [0.0, 0.0, 1.0]]),
+    )
+    invalid_output = tmp_path / "invalid.parquet"
+    with pytest.raises(RuntimeError, match="invalid probability vectors"):
+        main(
+            [
+                "score-news",
+                "--model-dir",
+                str(model_dir),
+                "--output",
+                str(invalid_output),
+            ]
+        )
+    assert not invalid_output.exists()

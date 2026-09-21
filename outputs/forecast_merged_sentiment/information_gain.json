@@ -26,7 +26,7 @@
       "price_only": 0.37971969824478435,
       "two_branch_neutral_prior": 0.38411359361640224,
       "two_branch_real_sentiment": 0.3907292068024242,
-      "architecture_effect": 0.004393895371617884,
+      "architecture_and_news_presence_effect": 0.004393895371617884,
       "information_gain": 0.00661561318602194,
       "naive_delta": 0.011009508557639824,
       "information_gain_per_window": [
@@ -52,7 +52,7 @@
       "price_only": 0.3915234951383306,
       "two_branch_neutral_prior": 0.3953795592868226,
       "two_branch_real_sentiment": 0.39810396379082186,
-      "architecture_effect": 0.003856064148491989,
+      "architecture_and_news_presence_effect": 0.003856064148491989,
       "information_gain": 0.002724404503999245,
       "naive_delta": 0.006580468652491234,
       "information_gain_per_window": [
@@ -78,7 +78,7 @@
       "price_only": 0.42999999999999994,
       "two_branch_neutral_prior": 0.432,
       "two_branch_real_sentiment": 0.4295555555555555,
-      "architecture_effect": 0.0020000000000000573,
+      "architecture_and_news_presence_effect": 0.0020000000000000573,
       "information_gain": -0.0024444444444444713,
       "naive_delta": -0.000444444444444414,
       "information_gain_per_window": [

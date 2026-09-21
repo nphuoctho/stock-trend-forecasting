@@ -690,6 +690,40 @@ def _paired_arm_predictions(
     return real_arm, control_arm
 
 
+def _require_identical_price_arm(
+    real: dict,
+    control: dict,
+    real_dir: Path,
+    control_dir: Path,
+    *,
+    price_arm: str,
+) -> None:
+    """Require price-only predictions and metrics to be identical across paired runs."""
+    real_price, control_price = _paired_arm_predictions(
+        real_dir, control_dir, arm=price_arm
+    )
+    key_columns = ["window", "seed", "ticker", "target_date", "y_true"]
+    real_price = real_price.sort_values(key_columns).reset_index(drop=True)
+    control_price = control_price.sort_values(key_columns).reset_index(drop=True)
+    for column in ("y_pred", "has_news"):
+        if not real_price[column].equals(control_price[column]):
+            raise ValueError(
+                "Runs have different price-arm predictions; the decomposition is not attributable."
+            )
+    if real["summary"].get(price_arm) != control["summary"].get(price_arm):
+        raise ValueError(
+            "Runs have different price-arm summary metrics; the decomposition is not attributable."
+        )
+    for real_window, control_window in zip(real["windows"], control["windows"]):
+        if (
+            real_window["metrics"].get(price_arm)
+            != control_window["metrics"].get(price_arm)
+        ):
+            raise ValueError(
+                "Runs have different price-arm window metrics; the decomposition is not attributable."
+            )
+
+
 def compare_information_gain(
     real_dir: Path,
     control_dir: Path,
@@ -699,19 +733,15 @@ def compare_information_gain(
     samples: int = 2000,
     seed: int = 7,
 ) -> dict:
-    """Split a two-branch arm's apparent gain into architecture and information.
+    """Measure polarity information against a neutralized, paired news control.
+
     ``control_dir`` must use the same scored-news parquet as ``real_dir``. It
     preserves every article's timing and volume while replacing only its
-    probabilities with the constant neutral prior. Comparing the two-branch arm
-    against the single-branch price model conflates two changes: the extra branch,
-    and the information it carries. The neutralized control holds the architecture,
-    news presence and volume fixed, so
-
-        architecture effect = control(two-branch) - control(price-only)
-        information gain    = real(two-branch)    - control(two-branch)
-
-    The runs must share their configuration, otherwise the difference is not
-    attributable and this raises.
+    probabilities with the constant neutral prior. The price-only arm lacks the
+    news-presence and volume features retained by this control, so its difference
+    from the neutral two-branch arm is an architecture-and-news-presence effect.
+    The runs must share their configuration and identical price-arm predictions,
+    otherwise the difference is not attributable and this raises.
     """
     real = json.loads((Path(real_dir) / "forecast_results.json").read_text(encoding="utf-8"))
     control = json.loads(
@@ -753,6 +783,9 @@ def compare_information_gain(
     ):
         raise ValueError("Runs have different test windows; the difference is not attributable.")
     real_arm, control_arm = _paired_arm_predictions(real_dir, control_dir, arm=arm)
+    _require_identical_price_arm(
+        real, control, real_dir, control_dir, price_arm=price_arm
+    )
 
     levels = {
         "price_only": real["summary"][price_arm],
@@ -773,7 +806,7 @@ def compare_information_gain(
             "price_only": price,
             "two_branch_neutral_prior": neutral,
             "two_branch_real_sentiment": actual,
-            "architecture_effect": neutral - price,
+            "architecture_and_news_presence_effect": neutral - price,
             "information_gain": actual - neutral,
             "naive_delta": actual - price,
             "information_gain_per_window": per_window,

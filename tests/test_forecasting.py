@@ -732,7 +732,7 @@ def test_experiment_writes_every_artifact(tmp_path):
 
 
 def test_information_gain_decomposition_is_exact_and_guards_config_drift(tmp_path):
-    """Architecture and information effects must sum to the naive delta."""
+    """Matched neutral controls must preserve both fused and price-only predictions."""
     prices = pd.concat([_prices("FPT", n=120), _prices("VNM", n=120)], ignore_index=True)
     news = pd.DataFrame(
         {
@@ -779,8 +779,9 @@ def test_information_gain_decomposition_is_exact_and_guards_config_drift(tmp_pat
 
     report = compare_information_gain(real_dir, control_dir)
     effect = report["effects"]["macro_f1"]
-    assert effect["architecture_effect"] + effect["information_gain"] == pytest.approx(
-        effect["naive_delta"]
+    assert (
+        effect["architecture_and_news_presence_effect"] + effect["information_gain"]
+        == pytest.approx(effect["naive_delta"])
     )
     assert len(effect["information_gain_per_window"]) == 2
 
@@ -809,22 +810,21 @@ def test_information_gain_decomposition_is_exact_and_guards_config_drift(tmp_pat
     # A stale run with different observations cannot supply a paired information gain.
     control_predictions = pd.read_csv(control_dir / "forecast_predictions.csv")
     row = control_predictions["arm"].eq("lstm_price_sentiment").idxmax()
+    original_target = control_predictions.loc[row, "y_true"]
     control_predictions.loc[row, "y_true"] = (
-        "UP" if control_predictions.loc[row, "y_true"] != "UP" else "DOWN"
+        "UP" if original_target != "UP" else "DOWN"
     )
     control_predictions.to_csv(control_dir / "forecast_predictions.csv", index=False)
     with pytest.raises(ValueError, match="different prediction keys"):
         compare_information_gain(real_dir, control_dir)
 
-    # Differing configs make the difference unattributable and must be refused.
-    other = tmp_path / "other"
-    run_experiment(
-        assemble(prices),
-        cfg=ForecastConfig(
-            n_windows=2, test_size=6, val_size=6, epochs=4, batch_size=32, seeds=(42,)
-        ),
-        output_dir=other,
-        provenance={},
+    # The control's price-only arm must remain identical, not merely have matching keys.
+    control_predictions.loc[row, "y_true"] = original_target
+    price_row = control_predictions["arm"].eq("lstm_price").idxmax()
+    original_prediction = control_predictions.loc[price_row, "y_pred"]
+    control_predictions.loc[price_row, "y_pred"] = (
+        "UP" if original_prediction != "UP" else "DOWN"
     )
-    with pytest.raises(ValueError, match="different configs"):
-        compare_information_gain(real_dir, other)
+    control_predictions.to_csv(control_dir / "forecast_predictions.csv", index=False)
+    with pytest.raises(ValueError, match="different price-arm predictions"):
+        compare_information_gain(real_dir, control_dir)

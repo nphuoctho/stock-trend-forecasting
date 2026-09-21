@@ -13,9 +13,9 @@ mã cổ phiếu, ngày giao dịch và mốc cắt thông tin, sau đó đượ
 Quy trình gồm thu thập dữ liệu, kiểm tra thông tin truy nguyên và bản ghi trùng, gán nhãn
 cảm xúc, sinh xác suất của ba lớp, tổng hợp đặc trưng theo mã và ngày, tạo nhãn UP, FLAT
 và DOWN, huấn luyện, đánh giá cuốn chiếu theo thời gian và phân tích loại bỏ đặc trưng.
-Tiền xử lý của nhánh giá chỉ học từ tập huấn luyện, mốc cắt thông tin là 15 giờ và tập
-giữ lại cuối được khóa. Tuy nhiên, lượt hồi cứu hiện tại dùng điểm kiểm cảm xúc học từ
-nhãn gồm cả giai đoạn kiểm thử, nên không được diễn giải là dự báo ngoài mẫu hoàn toàn.
+Tiền xử lý của nhánh giá chỉ học từ tập huấn luyện, mốc cắt thông tin là 15 giờ và năm
+đoạn kiểm thử cuốn chiếu không chồng lấn. Tuy nhiên, lượt hồi cứu hiện tại dùng điểm kiểm
+cảm xúc học từ nhãn gồm cả giai đoạn kiểm thử, nên không được diễn giải là dự báo ngoài mẫu.
 
 \section{Đối chiếu với mục tiêu và câu hỏi nghiên cứu}
 
@@ -37,10 +37,11 @@ Lượt tinh chỉnh lại không tạo chỉ số kiểm thử mới.
 
 Mục tiêu thứ ba và thứ tư là kết hợp hai nguồn dữ liệu và huấn luyện mô hình dự báo. Mục
 tiêu này \textbf{đã được thực hiện hồi cứu với LSTM} và \textbf{chưa thực hiện với TFT}.
-Mô hình LSTM chỉ giá đạt F1 vĩ mô 0,3797, balanced accuracy 0,3915 và OvR-AUC 0,5721,
-vượt rõ mốc ngẫu nhiên 0,3289 và mốc lớp phổ biến 0,1603. Như vậy tồn tại tín hiệu dự báo
-từ đặc trưng giá, ở mức khiêm tốn. Các điểm số của nhánh có cảm xúc dùng bộ sinh học từ
-nhãn tương lai tương đối với các cửa sổ kiểm thử, nên chỉ có giá trị mô tả hồi cứu
+Mô hình LSTM chỉ giá đạt F1 vĩ mô 0,3797, độ chính xác cân bằng 0,3915 và AUC-ROC
+một-chống-còn-lại 0,5721, vượt rõ mốc ngẫu nhiên 0,3289 và mốc lớp phổ biến
+0,1603. Như vậy tồn tại tín hiệu dự báo từ đặc trưng giá, ở mức khiêm tốn. Các điểm
+số của nhánh có cảm xúc dùng bộ sinh học từ nhãn tương lai tương đối với các cửa sổ
+kiểm thử, nên chỉ có giá trị mô tả hồi cứu
 \cite{Halder2022_221107392v1,Gu2024_240716150v1}.
 
 Mục tiêu thứ năm là đo phần đóng góp riêng của tín hiệu cảm xúc. Phép đo ghép cặp \textbf{đã
@@ -51,9 +52,9 @@ tiên nghiệm trung tính. Kết quả:
 
 \begin{itemize}[nosep]
   \item hiệu số trực tiếp: $+0{,}0110$ F1 vĩ mô;
-  \item trong đó hiệu ứng kiến trúc: $+0{,}0044$;
-  \item đóng góp thông tin thực của cảm xúc: $+0{,}0066$ theo cửa sổ; ước lượng theo ngày
-        là $+0{,}0014$, khoảng tin cậy 95\% $[-0{,}0087; +0{,}0116]$.
+  \item trong đó hiệu ứng kiến trúc và sự hiện diện tin: $+0{,}0044$;
+  \item đóng góp thông tin phân cực: $+0{,}0066$ theo cửa sổ; ước lượng theo ngày là
+        $+0{,}0014$, khoảng tin cậy 95\% $[-0{,}0087; +0{,}0116]$.
 \end{itemize}
 
 Khoảng tin cậy theo ngày chứa 0 ở cả ba chỉ số. Hơn nữa, bộ sinh cảm xúc đã học từ nhãn

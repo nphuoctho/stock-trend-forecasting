@@ -383,42 +383,65 @@ chạy (5 cửa sổ $\times$ 3 hạt giống), kèm độ lệch chuẩn của 
 \noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment/forecast\_metrics.csv}.}
 \end{table}
 
-Cả hai mô hình LSTM và hồi quy logistic đều vượt rõ hai mốc đối chứng bắt buộc: F1 vĩ mô
-0,3907 của LSTM hai nhánh so với 0,3289 của mốc ngẫu nhiên và 0,1603 của mốc lớp phổ biến;
-độ chính xác cân bằng đạt 0,3981. LSTM chỉ giá vẫn có AUC-ROC OvR cao nhất, 0,5721. Như
-vậy tồn tại tín hiệu dự báo từ đặc trưng giá và tin, nhưng đóng góp riêng của xác suất cảm
-xúc phải được xét bằng đối chứng ghép cặp bên dưới.
+Mô hình chỉ giá vượt rõ hai mốc đối chứng bắt buộc: LSTM chỉ giá đạt F1 vĩ mô 0,3797,
+so với 0,3289 của mốc ngẫu nhiên và 0,1603 của mốc lớp phổ biến; AUC-ROC OvR cũng cao
+nhất, 0,5721. Điểm số hai nhánh được giữ để mô tả lần chạy hồi cứu, nhưng không là bằng
+chứng độc lập về giá trị của tin hay cảm xúc vì bộ sinh xác suất đã học từ nhãn tương lai
+tương đối với các cửa sổ kiểm thử.
 
 \subsection{Báo cáo chỉ số theo lớp}
 
 Dự đoán chi tiết theo từng mã, ngày, cửa sổ và hạt giống được lưu tại
-\texttt{outputs/forecast\_merged\_sentiment/forecast\_predictions.csv}. Chỉ số tổng hợp
+\path{outputs/forecast_merged_sentiment/forecast_predictions.csv}. Chỉ số tổng hợp
 trong Bảng~\ref{tab:ket-qua} là trung bình trên 15 lần chạy; không thay bằng một bảng
 gộp dự đoán vì cách gộp làm đổi trọng số các cửa sổ. Các lớp vẫn được tạo bằng ngưỡng học
 từ từng tập huấn luyện, do đó F1 vĩ mô và độ chính xác cân bằng mới là chỉ số chính thay
 vì độ chính xác đơn lẻ.
 
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Chỉ số theo lớp, trung bình 15 lượt chạy; nhánh hai có cảm xúc là kết quả hồi cứu.}
+  \label{tab:kq-theo-lop}
+  \begin{tabular}{l rrr rrr}
+    \toprule
+    & \multicolumn{3}{c}{LSTM chỉ giá} & \multicolumn{3}{c}{LSTM hai nhánh} \\
+    \cmidrule(lr){2-4}\cmidrule(lr){5-7}
+    Lớp & P & R & F1 & P & R & F1 \\
+    \midrule
+    DOWN & 0,3631 & 0,2608 & 0,2929 & 0,3605 & 0,2861 & 0,3143 \\
+    FLAT & 0,4389 & 0,6017 & 0,5060 & 0,4453 & 0,5626 & 0,4960 \\
+    UP   & 0,3871 & 0,3121 & 0,3402 & 0,3950 & 0,3456 & 0,3619 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Giá trị là trung bình của chỉ số tính riêng trên mỗi tổ hợp cửa sổ--hạt giống,
+nên nhất quán với Bảng~\ref{tab:ket-qua}; chúng không suy ra từ một bảng dự đoán
+đã gộp.
+
 \subsection{Đo phần đóng góp của cảm xúc}
 \label{sec:kq-donggop}
 
-So sánh trực tiếp mô hình hai nhánh với mô hình một nhánh chỉ giá \textbf{trộn lẫn hai thay
-đổi}: thêm một nhánh mạng với tham số mới, và thêm thông tin cảm xúc. Để tách hai phần này,
-đề tài chạy một đối chứng có cấu hình giống hệt. Đối chứng dùng chính các liên kết tin đã
-chấm, giữ nguyên ngày, thời điểm, số lượng tin và cờ \texttt{has\_news}, nhưng thay ba xác
-suất của mỗi bài bằng phân phối tiên nghiệm trung tính. Kiến trúc được giữ nguyên, chỉ thông
-tin phân cực bị lấy đi:
+So sánh trực tiếp mô hình hai nhánh với mô hình một nhánh chỉ giá \textbf{trộn lẫn} thêm
+nhánh mạng với sự hiện diện, khối lượng và xác suất của tin. Đối chứng dùng chính các liên
+kết tin đã chấm, giữ nguyên ngày, thời điểm, số lượng tin và cờ \texttt{has\_news}, nhưng
+thay ba xác suất của mỗi bài bằng phân phối tiên nghiệm trung tính. Vì mô hình chỉ giá
+không có đặc trưng hiện diện hoặc khối lượng tin, hiệu số thứ nhất bên dưới không phải hiệu
+ứng kiến trúc thuần:
 \begin{align}
-  \text{hiệu ứng kiến trúc} &= m(\text{hai nhánh, phân phối tiên nghiệm trung tính}) - m(\text{chỉ giá}), \\
-  \text{đóng góp thông tin} &= m(\text{hai nhánh, cảm xúc thật}) - m(\text{hai nhánh, phân phối tiên nghiệm trung tính}).
+  E_{\text{kiến trúc--tin}} &= m_{\text{trung tính}} - m_{\text{chỉ giá}}, \\
+  I_{\text{phân cực}} &= m_{\text{cảm xúc thật}} - m_{\text{trung tính}}.
 \end{align}
 
 Tệp kết quả kiểm tra cùng mã băm tệp tin đầu vào, cùng số dòng, cùng mã băm giá, cùng cấu
-hình và cùng khóa dự đoán theo cửa sổ, hạt giống, mã và ngày. Vì vậy phép ghép cặp không
-trộn lẫn khác biệt về độ phủ tin với khác biệt về xác suất cảm xúc.
+hình, cùng khóa dự đoán theo cửa sổ, hạt giống, mã và ngày, đồng thời yêu cầu dự đoán và
+chỉ số của nhánh chỉ giá trùng khớp. Vì vậy phép ghép cặp không trộn lẫn khác biệt về độ
+phủ tin với khác biệt về xác suất cảm xúc.
 
 \begin{table}[H]
   \centering
-  \caption{Tách hiệu ứng kiến trúc và đóng góp thông tin của cảm xúc, F1 vĩ mô.}
+  \caption{Tách hiệu ứng kiến trúc--sự hiện diện tin và đóng góp thông tin phân cực, F1 vĩ mô.}
   \label{tab:kq-ablation}
   \begin{tabular}{p{7.6cm} c}
     \toprule
@@ -428,12 +451,12 @@ trộn lẫn khác biệt về độ phủ tin với khác biệt về xác su�
     LSTM hai nhánh, phân phối tiên nghiệm trung tính & 0,3841 \\
     LSTM hai nhánh, cảm xúc thật & 0,3907 \\
     \midrule
-    Hiệu ứng kiến trúc & $+0{,}0044$ \\
-    \textbf{Đóng góp thông tin của cảm xúc} & $\mathbf{+0{,}0066}$ \\
+    Hiệu ứng kiến trúc và sự hiện diện tin & $+0{,}0044$ \\
+    \textbf{Đóng góp thông tin phân cực} & $\mathbf{+0{,}0066}$ \\
     Hiệu số trực tiếp (trộn lẫn hai thành phần) & $+0{,}0110$ \\
     \bottomrule
   \end{tabular}
-\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment/information\_gain.json}.}
+\noindent\textit{Nguồn: \path{outputs/forecast_merged_sentiment/information_gain.json}.}
 \end{table}
 
 Trên trung bình năm cửa sổ, cảm xúc thật cao hơn đối chứng trung tính $0{,}0066$ F1 vĩ
@@ -514,18 +537,16 @@ thử ngoài cho độ bao phủ 0,6803, thay vì 0,0619 trên 31 mẫu của l�
 bằng chứng chất lượng phân loại tốt hơn của cấu hình có trọng số trên tập mở rộng, không
 phải bằng chứng rằng tín hiệu cảm xúc đã cải thiện dự báo giá.
 
-\textbf{Câu hỏi thứ hai} --- cảm xúc có cải thiện dự báo hay không, và mức bao nhiêu. Sau
-khi tách hiệu ứng kiến trúc, ước lượng theo cửa sổ của đóng góp thông tin là $+0{,}0066$
-F1 vĩ mô. Tuy nhiên, ước lượng theo ngày là $+0{,}0014$ với khoảng tin cậy
-$[-0{,}0087; +0{,}0116]$ chứa 0. Kết luận: \textbf{chưa có bằng chứng đủ mạnh rằng đặc
-trưng cảm xúc cải thiện dự báo xu hướng phiên kế tiếp} trong giao thức này. Đây là kết luận
-âm, nhưng đã được định lượng: dữ liệu hiện tại không loại trừ cả cải thiện nhỏ lẫn suy giảm
-nhỏ.
+\textbf{Câu hỏi thứ hai} --- xác suất cảm xúc có cải thiện dự báo hay không, và mức bao
+nhiêu. Khi so với đối chứng trung tính ghép cặp, ước lượng theo cửa sổ của đóng góp thông
+tin phân cực là $+0{,}0066$ F1 vĩ mô. Tuy nhiên, ước lượng theo ngày là $+0{,}0014$ với
+khoảng tin cậy $[-0{,}0087; +0{,}0116]$ chứa 0. Kết luận: \textbf{chưa có bằng chứng đủ
+mạnh rằng đặc trưng cảm xúc cải thiện dự báo xu hướng phiên kế tiếp} trong giao thức hồi
+cứu này. Dữ liệu hiện tại không loại trừ cả cải thiện nhỏ lẫn suy giảm nhỏ.
 
-Một điểm phương pháp luận đáng lưu ý: hiệu số trực tiếp $+0{,}0110$ trộn lẫn hiệu ứng kiến
-trúc $+0{,}0044$ với đóng góp thông tin $+0{,}0066$. Đối chứng trung tính ghép cặp giữ
-nguyên sự hiện diện và khối lượng tin, nên tránh quy phần chênh do nhánh mạng hoặc độ phủ
-tin cho xác suất cảm xúc.
+Hiệu số trực tiếp $+0{,}0110$ trộn lẫn kiến trúc, sự hiện diện/khối lượng tin và xác suất
+cảm xúc. Đối chứng trung tính ghép cặp giữ nguyên sự hiện diện và khối lượng tin, nên chỉ
+hiệu số $+0{,}0066$ giữa hai nhánh là phép đo của xác suất cảm xúc.
 
 \textbf{Câu hỏi thứ ba} --- điều kiện nào cảm xúc phát huy tác dụng. Chưa có ước lượng ghép
 cặp phân tầng riêng theo điều kiện thị trường, ngày sự kiện hoặc mật độ tin. Vì vậy, đề tài
@@ -550,9 +571,9 @@ Các điểm kiểm tra sau được thực hiện và ghi nhận kết quả th
         sổ (Bảng~\ref{tab:kq-windows}) xác nhận điều này. Có kiểm thử tự động cho bất biến
         này.
   \item \textbf{Số tham số}: mô hình một nhánh có 5.091 tham số, mô hình hai nhánh có
-        11.203 tham số, tức gấp 2,20 lần (thêm 6.112 tham số). Đây chính là lý do phải chạy
-        đối chứng phân phối tiên nghiệm trung tính; hiệu ứng kiến trúc được đo riêng và
-        bằng $+0{,}0044$ F1 vĩ mô.
+        11.203 tham số, tức gấp 2,20 lần (thêm 6.112 tham số). Đối chứng phân phối tiên
+        nghiệm trung tính tách đóng góp thông tin phân cực; chênh lệch $+0{,}0044$ F1 vĩ
+        mô còn bao gồm cả kiến trúc và đặc trưng sự hiện diện tin.
   \item \textbf{Tính tái lập}: hai lần chạy độc lập cho kết quả trùng khớp đến từng chữ số ở
         các mô hình chỉ giá. Trong quá trình thực nghiệm đã phát hiện và sửa một lỗi tái lập:
         trọng số mạng được khởi tạo trước khi gieo hạt giống, khiến kết quả của một cửa sổ phụ
@@ -682,9 +703,9 @@ Bảng~\ref{tab:kq-artifact} liệt kê lệnh và tệp kết quả tương ứ
     \toprule
     Bảng & Lệnh và tệp kết quả \\
     \midrule
-    \ref{tab:kq-sentiment}, \ref{tab:kq-sentiment-class} & \texttt{stf.cli sentiment-cv}; \texttt{outputs/sentiment-cv-merged/cv\_results.json} và tệp nén lần chạy có trọng số \\
-    \ref{tab:kq-windows}, \ref{tab:kq-price-stats}, \ref{tab:ket-qua} & \texttt{stf.cli forecast -{}-news-sentiment ...}; \texttt{outputs/forecast\_merged\_sentiment/forecast\_metrics.csv} \\
-    \ref{tab:kq-ablation}, \ref{tab:kq-ablation-ci} & \texttt{stf.cli forecast -{}-neutral-news-sentiment ...}, \texttt{stf.cli forecast-compare}; \texttt{outputs/forecast\_merged\_sentiment/information\_gain.json} \\
+    \ref{tab:kq-sentiment}, \ref{tab:kq-sentiment-class} & \texttt{stf.cli sentiment-cv}; \path{outputs/sentiment-cv-merged/cv_results.json} và tệp nén lần chạy có trọng số \\
+    \ref{tab:kq-windows}, \ref{tab:kq-price-stats}, \ref{tab:ket-qua} & \texttt{stf.cli forecast --news-sentiment ...}; \path{outputs/forecast_merged_sentiment/forecast_metrics.csv} \\
+    \ref{tab:kq-ablation}, \ref{tab:kq-ablation-ci} & \texttt{stf.cli forecast --neutral-news-sentiment ...}, \texttt{stf.cli forecast-compare}; \path{outputs/forecast_merged_sentiment/information_gain.json} \\
     \ref{tab:kq-strata} & \texttt{stf.cli label-candidates}; \texttt{to\_label\_batch2\_manifest.json} \\
     \bottomrule
   \end{tabular}
