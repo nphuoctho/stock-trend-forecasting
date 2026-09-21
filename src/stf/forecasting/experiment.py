@@ -653,6 +653,43 @@ def _summary_table(summary: dict, ablation: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+
+
+def _paired_arm_predictions(
+    real_dir: Path,
+    control_dir: Path,
+    *,
+    arm: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Load one arm from paired runs and require identical test observations."""
+    key_columns = ["window", "seed", "ticker", "target_date", "y_true"]
+    real_preds = pd.read_csv(Path(real_dir) / "forecast_predictions.csv")
+    control_preds = pd.read_csv(Path(control_dir) / "forecast_predictions.csv")
+    required = set(key_columns + ["arm"])
+    for name, predictions in (("real", real_preds), ("control", control_preds)):
+        missing = required - set(predictions.columns)
+        if missing:
+            raise ValueError(
+                f"{name} predictions lack required pairing columns: {sorted(missing)}."
+            )
+
+    real_arm = real_preds[real_preds["arm"] == arm].copy()
+    control_arm = control_preds[control_preds["arm"] == arm].copy()
+    for name, predictions in (("real", real_arm), ("control", control_arm)):
+        if predictions.empty:
+            raise ValueError(f"{name} predictions contain no rows for arm {arm!r}.")
+        if predictions.duplicated(key_columns).any():
+            raise ValueError(f"{name} predictions duplicate a pairing key.")
+
+    real_keys = real_arm[key_columns].sort_values(key_columns).reset_index(drop=True)
+    control_keys = control_arm[key_columns].sort_values(key_columns).reset_index(drop=True)
+    if not real_keys.equals(control_keys):
+        raise ValueError(
+            "Runs have different prediction keys; the information gain is not attributable."
+        )
+    return real_arm, control_arm
+
+
 def compare_information_gain(
     real_dir: Path,
     control_dir: Path,
@@ -684,6 +721,23 @@ def compare_information_gain(
         raise ValueError("Runs have different configs; the difference is not attributable.")
     if control["provenance"].get("news_sentiment") is not None:
         raise ValueError("control_dir must be a run without --news-sentiment.")
+    real_price_hash = real.get("provenance", {}).get("prices_hash")
+    control_price_hash = control.get("provenance", {}).get("prices_hash")
+    if not real_price_hash or not control_price_hash:
+        raise ValueError("Runs lack prices_hash provenance; the difference is not attributable.")
+    if real_price_hash != control_price_hash:
+        raise ValueError("Runs have different price provenance; the difference is not attributable.")
+    real_test_dates = {window["window"]: window["test_dates"] for window in real["windows"]}
+    control_test_dates = {
+        window["window"]: window["test_dates"] for window in control["windows"]
+    }
+    if (
+        len(real_test_dates) != len(real["windows"])
+        or len(control_test_dates) != len(control["windows"])
+        or real_test_dates != control_test_dates
+    ):
+        raise ValueError("Runs have different test windows; the difference is not attributable.")
+    real_arm, control_arm = _paired_arm_predictions(real_dir, control_dir, arm=arm)
 
     levels = {
         "price_only": real["summary"][price_arm],
@@ -696,8 +750,9 @@ def compare_information_gain(
         neutral = levels["two_branch_neutral_prior"][metric]["mean"]
         actual = levels["two_branch_real_sentiment"][metric]["mean"]
         per_window = [
-            wr["metrics"][arm]["window_mean"][metric] - wc["metrics"][arm]["window_mean"][metric]
-            for wr, wc in zip(real["windows"], control["windows"])
+            real["windows"][index]["metrics"][arm]["window_mean"][metric]
+            - control["windows"][index]["metrics"][arm]["window_mean"][metric]
+            for index in range(len(real["windows"]))
         ]
         effects[metric] = {
             "price_only": price,
@@ -712,12 +767,10 @@ def compare_information_gain(
             ),
         }
 
-    real_preds = pd.read_csv(Path(real_dir) / "forecast_predictions.csv")
-    control_preds = pd.read_csv(Path(control_dir) / "forecast_predictions.csv")
     paired = pd.concat(
         [
-            real_preds[real_preds["arm"] == arm].assign(arm="real"),
-            control_preds[control_preds["arm"] == arm].assign(arm="neutral"),
+            real_arm.assign(arm="real"),
+            control_arm.assign(arm="neutral"),
         ],
         ignore_index=True,
     )

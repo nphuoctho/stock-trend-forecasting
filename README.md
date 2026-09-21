@@ -212,8 +212,14 @@ window interval has only 5 blocks and is coarse enough to exclude zero by accide
 
 `forecast-compare` exists because comparing the two-branch arm against the single-branch
 price model conflates two changes: the extra branch, and the information it carries. The
+
 control run keeps the architecture and removes only the information, so
 `architecture_effect + information_gain = naive_delta` exactly.
+
+Trước khi tính chênh lệch, `forecast-compare` bắt buộc hai lần chạy có cùng cấu hình,
+mã băm dữ liệu giá, các ngày kiểm thử và khóa dự đoán `(window, seed, ticker,
+target_date, y_true)`. Vì vậy không thể ghép một artifact cũ hoặc tập kiểm thử khác
+vào phép đo giá trị thông tin.
 
 Artifacts written to `--output`:
 

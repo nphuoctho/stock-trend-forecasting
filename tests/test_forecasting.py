@@ -753,9 +753,14 @@ def test_information_gain_decomposition_is_exact_and_guards_config_drift(tmp_pat
         assemble(prices, news),
         cfg=cfg,
         output_dir=real_dir,
-        provenance={"news_sentiment": {"rows": len(news)}},
+        provenance={"news_sentiment": {"rows": len(news)}, "prices_hash": "prices-v1"},
     )
-    run_experiment(assemble(prices), cfg=cfg, output_dir=control_dir, provenance={})
+    run_experiment(
+        assemble(prices),
+        cfg=cfg,
+        output_dir=control_dir,
+        provenance={"prices_hash": "prices-v1"},
+    )
 
     report = compare_information_gain(real_dir, control_dir)
     effect = report["effects"]["macro_f1"]
@@ -767,6 +772,27 @@ def test_information_gain_decomposition_is_exact_and_guards_config_drift(tmp_pat
     # A control run that actually had sentiment cannot isolate the architecture.
     with pytest.raises(ValueError, match="without --news-sentiment"):
         compare_information_gain(real_dir, real_dir)
+
+    # Matching parameters alone are insufficient if the underlying prices changed.
+    price_drift = tmp_path / "price-drift"
+    run_experiment(
+        assemble(prices),
+        cfg=cfg,
+        output_dir=price_drift,
+        provenance={"prices_hash": "prices-v2"},
+    )
+    with pytest.raises(ValueError, match="different price provenance"):
+        compare_information_gain(real_dir, price_drift)
+
+    # A stale run with different observations cannot supply a paired information gain.
+    control_predictions = pd.read_csv(control_dir / "forecast_predictions.csv")
+    row = control_predictions["arm"].eq("lstm_price_sentiment").idxmax()
+    control_predictions.loc[row, "y_true"] = (
+        "UP" if control_predictions.loc[row, "y_true"] != "UP" else "DOWN"
+    )
+    control_predictions.to_csv(control_dir / "forecast_predictions.csv", index=False)
+    with pytest.raises(ValueError, match="different prediction keys"):
+        compare_information_gain(real_dir, control_dir)
 
     # Differing configs make the difference unattributable and must be refused.
     other = tmp_path / "other"
