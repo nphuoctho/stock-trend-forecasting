@@ -191,6 +191,7 @@ def test_score_news_scores_articles_without_a_real_model(monkeypatch, tmp_path):
             [[0.5000011, 0.5, 0.0], [0.5000011, 0.5, 0.0]]
         ),
     )
+    over_tolerance_output = tmp_path / "over-tolerance.parquet"
     with pytest.raises(RuntimeError, match="invalid probability vectors"):
         main(
             [
@@ -198,10 +199,11 @@ def test_score_news_scores_articles_without_a_real_model(monkeypatch, tmp_path):
                 "--model-dir",
                 str(model_dir),
                 "--output",
-                str(tmp_path / "over-tolerance.parquet"),
+                str(over_tolerance_output),
             ]
         )
     assert not invalid_output.exists()
+    assert not over_tolerance_output.exists()
 
 
 def test_forecast_binds_verified_score_manifest(monkeypatch, tmp_path, capsys):
@@ -293,3 +295,7 @@ def test_forecast_binds_verified_score_manifest(monkeypatch, tmp_path, capsys):
     news.to_parquet(news_path, index=False)
     assert main(["forecast", "--news-sentiment", str(news_path)]) == 2
     assert "parquet hash does not match manifest" in capsys.readouterr().err
+
+    manifest_path.write_text("[]", encoding="utf-8")
+    assert main(["forecast", "--news-sentiment", str(news_path)]) == 2
+    assert "invalid score-news manifest" in capsys.readouterr().err

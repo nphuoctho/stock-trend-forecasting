@@ -181,6 +181,25 @@ def test_resolve_input_variant_rejects_malformed_manifest(tmp_path, manifest):
     with pytest.raises(ValueError, match="lacks a valid selected input_variant"):
         model.resolve_input_variant(model_dir)
 
+def test_resolve_input_variant_rejects_non_utf8_manifest(tmp_path):
+    model_dir = tmp_path / "checkpoint"
+    model_dir.mkdir()
+    (model_dir / "manifest.json").write_bytes(b"\xff\xfe{}")
+
+    with pytest.raises(ValueError, match="lacks a valid selected input_variant"):
+        model.resolve_input_variant(model_dir)
+
+
+def test_inference_config_tolerates_malformed_manifest_sections(tmp_path):
+    model_dir = tmp_path / "checkpoint"
+    model_dir.mkdir()
+    (model_dir / "manifest.json").write_text(
+        json.dumps({"config": [], "selection": None}), encoding="utf-8"
+    )
+
+    assert model.resolve_truncation_strategy(model_dir) == "head"
+    assert model.resolve_inference_config(model_dir) == ("head", model.MAX_LEN)
+
 
 def test_full_refit_reference_requires_the_evaluated_configuration(tmp_path):
     source = tmp_path / "labels.csv"

@@ -155,7 +155,7 @@ def _load_manifest(model_dir: Path) -> dict | None:
         if candidate.is_file():
             try:
                 manifest = json.loads(candidate.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, UnicodeDecodeError, OSError):
                 return None
             return manifest if isinstance(manifest, dict) else None
     return None

@@ -321,8 +321,10 @@ def _validated_scored_news_manifest(news_path: Path, news: pd.DataFrame) -> dict
         )
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ValueError(f"invalid score-news manifest {manifest_path}.") from error
+    if not isinstance(manifest, dict):
+        raise ValueError(f"invalid score-news manifest {manifest_path}.")
     if manifest.get("schema_version") != 2:
         raise ValueError(
             f"unsupported score-news manifest schema at {manifest_path}; rerun score-news."
