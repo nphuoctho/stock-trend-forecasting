@@ -8,6 +8,17 @@ import {
   metricLabel,
   prettyPair,
 } from '../format'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { cn } from '@/lib/utils'
 
 const ARM_ORDER = [
   'majority',
@@ -39,24 +50,26 @@ export default function MetricsTable({
   const ablationPairs = Object.keys(ablation)
 
   return (
-    <section className="panel">
-      <h2>Kết quả theo nhánh mô hình</h2>
-      <p className="panel-note">
-        Trung bình ± độ lệch chuẩn trên các cửa sổ walk-forward × seed. Hàng tô sáng là
-        nhánh hai luồng có đặc trưng tin tức.
-      </p>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Nhánh</th>
-              <th>macro-F1</th>
-              <th>balanced accuracy</th>
-              <th>accuracy</th>
-              <th>macro OvR AUC</th>
-            </tr>
-          </thead>
-          <tbody>
+    <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <CardHeader>
+        <CardTitle>Kết quả theo nhánh mô hình</CardTitle>
+        <CardDescription>
+          Trung bình ± độ lệch chuẩn trên các cửa sổ walk-forward × seed. Hàng tô sáng
+          là nhánh hai luồng có đặc trưng tin tức.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nhánh</TableHead>
+              <TableHead>macro-F1</TableHead>
+              <TableHead>balanced accuracy</TableHead>
+              <TableHead>accuracy</TableHead>
+              <TableHead>macro OvR AUC</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {arms.map((arm) => {
               const s = summary.summary?.[arm]
               const row = byArm.get(arm)
@@ -67,71 +80,95 @@ export default function MetricsTable({
                   })
                 : '—'
               return (
-                <tr key={arm} className={isSentimentArm(arm) ? 'row-sentiment' : ''}>
-                  <td>
+                <TableRow
+                  key={arm}
+                  className={cn(isSentimentArm(arm) && 'bg-primary/10 hover:bg-primary/15')}
+                >
+                  <TableCell className="font-medium">
                     {armLabel(arm)}
-                    {isSentimentArm(arm) && <span className="tag">+ tin tức</span>}
-                  </td>
-                  <td title={`CI theo cửa sổ: ${f1ci}`}>{fmtMeanStd(s?.macro_f1)}</td>
-                  <td>{fmtMeanStd(s?.balanced_accuracy)}</td>
-                  <td>{fmtMeanStd(s?.accuracy)}</td>
-                  <td>{fmtMeanStd(s?.macro_ovr_auc)}</td>
-                </tr>
+                    {isSentimentArm(arm) && (
+                      <Badge variant="real" className="ml-2">
+                        + tin tức
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell title={`CI theo cửa sổ: ${f1ci}`} className="tabular-nums">
+                    {fmtMeanStd(s?.macro_f1)}
+                  </TableCell>
+                  <TableCell className="tabular-nums">
+                    {fmtMeanStd(s?.balanced_accuracy)}
+                  </TableCell>
+                  <TableCell className="tabular-nums">{fmtMeanStd(s?.accuracy)}</TableCell>
+                  <TableCell className="tabular-nums">
+                    {fmtMeanStd(s?.macro_ovr_auc)}
+                  </TableCell>
+                </TableRow>
               )
             })}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
 
-      {ablationPairs.length > 0 && (
-        <>
-          <h3>Ablation: nhánh tin tức − nhánh chỉ giá</h3>
-          <p className="panel-note">
-            Chênh lệch ghép cặp theo cửa sổ; khoảng tin cậy bootstrap theo cửa sổ và theo
-            khối ngày.
-          </p>
-          {ablationPairs.map((pair) => {
-            const { left, right } = prettyPair(pair)
-            const metrics = ablation[pair]
-            return (
-              <div className="table-wrap" key={pair}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th colSpan={4}>
+        {ablationPairs.length > 0 && (
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold">
+                Ablation: nhánh tin tức − nhánh chỉ giá
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Chênh lệch ghép cặp theo cửa sổ; khoảng tin cậy bootstrap theo cửa sổ và
+                theo khối ngày.
+              </p>
+            </div>
+            {ablationPairs.map((pair) => {
+              const { left, right } = prettyPair(pair)
+              const metrics = ablation[pair]
+              return (
+                <Table key={pair}>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead colSpan={4} className="normal-case">
                         {left} − {right}
-                      </th>
-                    </tr>
-                    <tr>
-                      <th>Chỉ số</th>
-                      <th>Δ trung bình (cửa sổ)</th>
-                      <th>CI bootstrap cửa sổ</th>
-                      <th>CI bootstrap khối ngày</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                      </TableHead>
+                    </TableRow>
+                    <TableRow>
+                      <TableHead>Chỉ số</TableHead>
+                      <TableHead>Δ trung bình (cửa sổ)</TableHead>
+                      <TableHead>CI bootstrap cửa sổ</TableHead>
+                      <TableHead>CI bootstrap khối ngày</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {Object.entries(metrics).map(([metric, m]) => (
-                      <tr key={metric}>
-                        <td>{metricLabel(metric)}</td>
-                        <td className={deltaClass(m.window_bootstrap?.mean)}>
+                      <TableRow key={metric}>
+                        <TableCell>{metricLabel(metric)}</TableCell>
+                        <TableCell
+                          className={cn(
+                            'tabular-nums',
+                            m.window_bootstrap?.mean != null &&
+                              (m.window_bootstrap.mean > 0
+                                ? 'text-primary'
+                                : m.window_bootstrap.mean < 0
+                                  ? 'text-destructive'
+                                  : ''),
+                          )}
+                        >
                           {fmtSigned(m.window_bootstrap?.mean)}
-                        </td>
-                        <td>{fmtCI(m.window_bootstrap)}</td>
-                        <td>{fmtCI(m.date_block_bootstrap)}</td>
-                      </tr>
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          {fmtCI(m.window_bootstrap)}
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          {fmtCI(m.date_block_bootstrap)}
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )
-          })}
-        </>
-      )}
-    </section>
+                  </TableBody>
+                </Table>
+              )
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
-}
-
-function deltaClass(v: number | null | undefined): string {
-  if (v === null || v === undefined) return ''
-  return v > 0 ? 'pos' : v < 0 ? 'neg' : ''
 }

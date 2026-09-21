@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  api,
-  InformationGain,
-  MetricsRow,
-  RunInfo,
-  RunSummary,
-  StratifiedRow,
-} from './api'
+  AlertCircleIcon,
+  ChartLineData01Icon,
+  Loading03Icon,
+} from '@hugeicons/core-free-icons'
+import { api, RunInfo } from './api'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import OverviewCards from './components/OverviewCards'
 import MetricsTable from './components/MetricsTable'
 import InformationGainSection from './components/InformationGainSection'
@@ -15,132 +24,133 @@ import PredictionsExplorer from './components/PredictionsExplorer'
 import ProvenanceFooter from './components/ProvenanceFooter'
 
 function ModeBadge({ mode }: { mode: RunInfo['mode'] }) {
-  if (mode === 'real') return <span className="badge badge-real">tin tức thật</span>
-  if (mode === 'neutral_prior')
-    return <span className="badge badge-neutral">neutral prior</span>
-  return <span className="badge badge-muted">không tin tức</span>
+  if (mode === 'real') return <Badge variant="real">tin tức thật</Badge>
+  if (mode === 'neutral_prior') return <Badge variant="neutral">neutral prior</Badge>
+  return <Badge variant="muted">không tin tức</Badge>
 }
 
 export default function App() {
-  const [runs, setRuns] = useState<RunInfo[] | null>(null)
-  const [runsError, setRunsError] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
 
-  const [summary, setSummary] = useState<RunSummary | null>(null)
-  const [metricRows, setMetricRows] = useState<MetricsRow[]>([])
-  const [stratRows, setStratRows] = useState<StratifiedRow[]>([])
-  const [ig, setIg] = useState<InformationGain | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [detailError, setDetailError] = useState<string | null>(null)
+  const runsQuery = useQuery({ queryKey: ['runs'], queryFn: api.runs })
+  const runs = runsQuery.data?.runs
 
   useEffect(() => {
-    let cancelled = false
-    api
-      .runs()
-      .then((data) => {
-        if (cancelled) return
-        setRuns(data.runs)
-        const preferred =
-          data.runs.find((r) => r.has_information_gain && r.mode === 'real') ??
-          data.runs.find((r) => r.has_information_gain) ??
-          data.runs[0]
-        if (preferred) setSelected(preferred.name)
-      })
-      .catch((e: Error) => {
-        if (!cancelled) setRunsError(e.message)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    if (selected || !runs?.length) return
+    const preferred =
+      runs.find((r) => r.has_information_gain && r.mode === 'real') ??
+      runs.find((r) => r.has_information_gain) ??
+      runs[0]
+    setSelected(preferred.name)
+  }, [runs, selected])
 
-  useEffect(() => {
-    if (!selected) return
-    let cancelled = false
-    setDetailLoading(true)
-    setDetailError(null)
-    setSummary(null)
-    setIg(null)
-    Promise.all([
-      api.summary(selected),
-      api.metrics(selected),
-      api.stratified(selected),
-      api.informationGain(selected),
-    ])
-      .then(([s, m, st, gain]) => {
-        if (cancelled) return
-        setSummary(s)
-        setMetricRows(m.rows)
-        setStratRows(st.rows)
-        setIg(gain)
-      })
-      .catch((e: Error) => {
-        if (!cancelled) setDetailError(e.message)
-      })
-      .finally(() => {
-        if (!cancelled) setDetailLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [selected])
+  const detailQuery = useQuery({
+    queryKey: ['run-detail', selected],
+    enabled: !!selected,
+    queryFn: async () => {
+      const [summary, metrics, stratified, ig] = await Promise.all([
+        api.summary(selected!),
+        api.metrics(selected!),
+        api.stratified(selected!),
+        api.informationGain(selected!),
+      ])
+      return { summary, metrics, stratified, ig }
+    },
+  })
 
+  const summary = detailQuery.data?.summary ?? null
   const currentRun = runs?.find((r) => r.name === selected) ?? null
 
   return (
-    <div className="page">
-      <header className="header">
-        <div>
-          <h1>Dự báo xu hướng cổ phiếu</h1>
-          <p className="subtitle">
-            Bảng kết quả thực nghiệm — so sánh mô hình chỉ dùng giá và mô hình hai nhánh
-            kết hợp tin tức
-          </p>
+    <div className="mx-auto max-w-6xl px-6 py-8">
+      <header className="mb-8 flex flex-wrap items-start justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-500">
+        <div className="flex items-start gap-3">
+          <div className="mt-1 flex size-10 items-center justify-center rounded-lg bg-primary/15 text-primary">
+            <HugeiconsIcon icon={ChartLineData01Icon} className="size-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Dự báo xu hướng cổ phiếu
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Bảng kết quả thực nghiệm — so sánh mô hình chỉ dùng giá và mô hình hai
+              nhánh kết hợp tin tức
+            </p>
+          </div>
         </div>
-        <div className="run-picker">
-          <label htmlFor="run-select">Lần chạy</label>
-          <div className="run-picker-row">
-            <select
-              id="run-select"
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Lần chạy
+          </span>
+          <div className="flex items-center gap-2">
+            <Select
               value={selected ?? ''}
-              onChange={(e) => setSelected(e.target.value)}
+              onValueChange={setSelected}
               disabled={!runs || runs.length === 0}
             >
-              {!runs && <option>Đang tải…</option>}
-              {runs?.map((r) => (
-                <option key={r.name} value={r.name}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Đang tải…" />
+              </SelectTrigger>
+              <SelectContent>
+                {runs?.map((r) => (
+                  <SelectItem key={r.name} value={r.name}>
+                    {r.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {currentRun && <ModeBadge mode={currentRun.mode} />}
           </div>
         </div>
       </header>
 
-      {runsError && (
-        <div className="alert alert-error">
-          Không tải được danh sách lần chạy: {runsError}. Kiểm tra API tại{' '}
-          <code>/api/runs</code>.
+      {runsQuery.isError && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive animate-in fade-in">
+          <HugeiconsIcon icon={AlertCircleIcon} className="size-4 shrink-0" />
+          Không tải được danh sách lần chạy: {runsQuery.error.message}. Kiểm tra API tại{' '}
+          <code className="font-mono">/api/runs</code>.
         </div>
       )}
       {runs && runs.length === 0 && (
-        <div className="alert">Chưa có lần chạy nào trong thư mục outputs.</div>
+        <div className="mb-6 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+          Chưa có lần chạy nào trong thư mục outputs.
+        </div>
       )}
 
-      {detailError && (
-        <div className="alert alert-error">Lỗi tải dữ liệu: {detailError}</div>
+      {detailQuery.isError && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive animate-in fade-in">
+          <HugeiconsIcon icon={AlertCircleIcon} className="size-4 shrink-0" />
+          Lỗi tải dữ liệu: {detailQuery.error.message}
+        </div>
       )}
-      {detailLoading && <div className="alert">Đang tải dữ liệu lần chạy…</div>}
+      {detailQuery.isLoading && (
+        <div className="space-y-4" aria-busy="true">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <HugeiconsIcon icon={Loading03Icon} className="size-4 animate-spin" />
+            Đang tải dữ liệu lần chạy…
+          </div>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-24" />
+            ))}
+          </div>
+          <Skeleton className="h-64" />
+        </div>
+      )}
 
-      {summary && !detailLoading && (
-        <main>
+      {summary && !detailQuery.isLoading && (
+        <main className="space-y-6">
           <OverviewCards summary={summary} run={currentRun} />
-          <MetricsTable summary={summary} metricRows={metricRows} />
-          {ig && <InformationGainSection ig={ig} />}
+          <MetricsTable
+            summary={summary}
+            metricRows={detailQuery.data?.metrics.rows ?? []}
+          />
+          {detailQuery.data?.ig && (
+            <InformationGainSection ig={detailQuery.data.ig} />
+          )}
           <StratifiedSection
             stratifiedByNews={summary.stratified_by_news}
-            rows={stratRows}
+            rows={detailQuery.data?.stratified.rows ?? []}
           />
           <PredictionsExplorer
             runName={summary.name}
@@ -149,7 +159,10 @@ export default function App() {
             nWindows={
               typeof summary.config?.n_windows === 'number'
                 ? (summary.config.n_windows as number)
-                : stratRows.reduce((m, r) => Math.max(m, r.window), 0)
+                : (detailQuery.data?.stratified.rows ?? []).reduce(
+                    (m, r) => Math.max(m, r.window),
+                    0,
+                  )
             }
           />
           <ProvenanceFooter

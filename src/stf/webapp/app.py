@@ -61,6 +61,40 @@ def _read_csv_records(path: Path) -> list[dict]:
     return json.loads(frame.to_json(orient="records"))
 
 
+def _normalize_news_sentiment(news: dict) -> dict:
+    """Map pre-rename artifact keys onto the canonical schema.
+
+    Runs produced before the provenance rename store ``path``/``hash`` and no
+    ``mode``; a present path implies real scored news.
+    """
+    normalized = dict(news)
+    if "source_path" not in normalized and "path" in normalized:
+        normalized["source_path"] = normalized.pop("path")
+    else:
+        normalized.pop("path", None)
+    if "source_hash" not in normalized and "hash" in normalized:
+        normalized["source_hash"] = normalized.pop("hash")
+    else:
+        normalized.pop("hash", None)
+    if normalized.get("mode") is None and normalized.get("source_path"):
+        normalized["mode"] = "real"
+    return normalized
+
+
+def _normalize_information_gain(payload: dict) -> dict:
+    """Rename the pre-rename effect key to the canonical one."""
+    effects = payload.get("effects")
+    if isinstance(effects, dict):
+        for effect in effects.values():
+            if isinstance(effect, dict) and "architecture_effect" in effect:
+                effect.setdefault(
+                    "architecture_and_news_presence_volume_effect",
+                    effect.pop("architecture_effect"),
+                )
+    return payload
+
+
+
 @app.get("/api/runs")
 def list_runs() -> dict:
     """List forecast run directories with headline provenance."""
@@ -68,7 +102,7 @@ def list_runs() -> dict:
     for name, path in _run_dirs().items():
         results = _read_json(path / "forecast_results.json")
         provenance = results.get("provenance") or {}
-        news = provenance.get("news_sentiment") or {}
+        news = _normalize_news_sentiment(provenance.get("news_sentiment") or {})
         runs.append(
             {
                 "name": name,
@@ -86,6 +120,12 @@ def list_runs() -> dict:
 def run_summary(name: str) -> dict:
     """Config, per-arm summary metrics, ablation and stratified aggregates."""
     results = _read_json(_run_dir(name) / "forecast_results.json")
+    provenance = results.get("provenance") or {}
+    if isinstance(provenance.get("news_sentiment"), dict):
+        provenance = dict(provenance)
+        provenance["news_sentiment"] = _normalize_news_sentiment(
+            provenance["news_sentiment"]
+        )
     return {
         "name": name,
         "config": results.get("config"),
@@ -96,7 +136,7 @@ def run_summary(name: str) -> dict:
         "ablation": results.get("ablation"),
         "stratified_by_news": results.get("stratified_by_news"),
         "environment": results.get("environment"),
-        "provenance": results.get("provenance"),
+        "provenance": provenance or None,
     }
 
 
@@ -138,7 +178,7 @@ def run_information_gain(name: str) -> dict:
     path = _run_dir(name) / "information_gain.json"
     if not path.is_file():
         raise HTTPException(status_code=404, detail="run has no information_gain.json")
-    return _read_json(path)
+    return _normalize_information_gain(_read_json(path))
 
 
 def mount_frontend() -> None:
