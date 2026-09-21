@@ -154,9 +154,10 @@ def _load_manifest(model_dir: Path) -> dict | None:
     for candidate in (model_dir / "manifest.json", model_dir.parent / "manifest.json"):
         if candidate.is_file():
             try:
-                return json.loads(candidate.read_text(encoding="utf-8"))
+                manifest = json.loads(candidate.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 return None
+            return manifest if isinstance(manifest, dict) else None
     return None
 
 
@@ -177,8 +178,9 @@ def resolve_truncation_strategy(
             )
         return override
     manifest = _load_manifest(model_dir)
-    if manifest:
-        saved = manifest.get("config", {}).get("truncation_strategy")
+    config = manifest.get("config") if manifest else None
+    if isinstance(config, dict):
+        saved = config.get("truncation_strategy")
         if saved in TRUNCATION_STRATEGIES:
             return saved
     return "head"
@@ -203,8 +205,9 @@ def resolve_inference_config(
             raise ValueError("max_len must be at least 1.")
         return strategy, max_len
     manifest = _load_manifest(model_dir)
-    if manifest:
-        saved = manifest.get("config", {}).get("max_len")
+    config = manifest.get("config") if manifest else None
+    if isinstance(config, dict):
+        saved = config.get("max_len")
         if isinstance(saved, int) and saved >= 1:
             return strategy, saved
     return strategy, MAX_LEN
@@ -213,7 +216,8 @@ def resolve_inference_config(
 def resolve_input_variant(model_dir: Path) -> str:
     """Read the model-input variant selected for a deployable checkpoint."""
     manifest = _load_manifest(model_dir)
-    variant = manifest.get("selection", {}).get("input_variant") if manifest else None
+    selection = manifest.get("selection") if manifest else None
+    variant = selection.get("input_variant") if isinstance(selection, dict) else None
     if variant not in dataset.INPUT_VARIANTS:
         raise ValueError(
             "Checkpoint manifest lacks a valid selected input_variant; "

@@ -165,6 +165,23 @@ def test_compute_class_weights_rejects_missing_class():
 
 
 
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        [],
+        {"selection": None},
+        {"selection": []},
+    ],
+)
+def test_resolve_input_variant_rejects_malformed_manifest(tmp_path, manifest):
+    model_dir = tmp_path / "checkpoint"
+    model_dir.mkdir()
+    (model_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="lacks a valid selected input_variant"):
+        model.resolve_input_variant(model_dir)
+
+
 def test_full_refit_reference_requires_the_evaluated_configuration(tmp_path):
     source = tmp_path / "labels.csv"
     source.write_text("text,label\na,NEGATIVE\nb,NEUTRAL\nc,POSITIVE\n", encoding="utf-8")

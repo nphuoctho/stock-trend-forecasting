@@ -183,6 +183,24 @@ def test_score_news_scores_articles_without_a_real_model(monkeypatch, tmp_path):
                 str(invalid_output),
             ]
         )
+
+    monkeypatch.setattr(
+        model_module,
+        "predict_proba",
+        lambda *_args, **_kwargs: np.array(
+            [[0.5000011, 0.5, 0.0], [0.5000011, 0.5, 0.0]]
+        ),
+    )
+    with pytest.raises(RuntimeError, match="invalid probability vectors"):
+        main(
+            [
+                "score-news",
+                "--model-dir",
+                str(model_dir),
+                "--output",
+                str(tmp_path / "over-tolerance.parquet"),
+            ]
+        )
     assert not invalid_output.exists()
 
 

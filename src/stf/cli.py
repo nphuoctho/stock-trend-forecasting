@@ -356,7 +356,7 @@ def _validated_scored_news_manifest(news_path: Path, news: pd.DataFrame) -> dict
         not np.isfinite(probabilities).all()
         or (probabilities < 0).any()
         or (probabilities > 1).any()
-        or not np.isclose(probabilities.sum(axis=1), 1.0, atol=1e-6).all()
+        or not np.isclose(probabilities.sum(axis=1), 1.0, rtol=0, atol=1e-6).all()
     ):
         raise ValueError("score-news parquet has invalid probability vectors.")
 
@@ -445,7 +445,7 @@ def cmd_score_news(args: argparse.Namespace) -> int:
         not np.isfinite(probs).all()
         or (probs < 0).any()
         or (probs > 1).any()
-        or not np.isclose(probs.sum(axis=1), 1.0, atol=1e-6).all()
+        or not np.isclose(probs.sum(axis=1), 1.0, rtol=0, atol=1e-6).all()
     ):
         raise RuntimeError(
             "score-news: checkpoint returned invalid probability vectors."
