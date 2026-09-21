@@ -1,0 +1,104 @@
+{
+  "arm": "lstm_price_sentiment",
+  "price_arm": "lstm_price",
+  "config": {
+    "seq_len": 5,
+    "n_windows": 5,
+    "test_size": 60,
+    "val_size": 60,
+    "expanding": true,
+    "hidden": 32,
+    "num_layers": 1,
+    "epochs": 40,
+    "batch_size": 128,
+    "lr": 0.001,
+    "patience": 6,
+    "seeds": [
+      42,
+      43,
+      44
+    ],
+    "bootstrap_samples": 2000,
+    "bootstrap_seed": 7
+  },
+  "effects": {
+    "macro_f1": {
+      "price_only": 0.37971969824478435,
+      "two_branch_neutral_prior": 0.38411359361640224,
+      "two_branch_real_sentiment": 0.3907292068024242,
+      "architecture_effect": 0.004393895371617884,
+      "information_gain": 0.00661561318602194,
+      "naive_delta": 0.011009508557639824,
+      "information_gain_per_window": [
+        0.01848396950946024,
+        0.008157106412085724,
+        0.0032860214270996613,
+        0.005084084235809361,
+        -0.0019331156543442307
+      ],
+      "information_gain_window_bootstrap": {
+        "mean": 0.006615613186022151,
+        "low": 0.0011287561752305387,
+        "high": 0.012764402838257949
+      },
+      "information_gain_date_bootstrap": {
+        "mean": 0.001353658504003541,
+        "low": -0.008656600629698339,
+        "high": 0.011563042881904633,
+        "n_blocks": 300
+      }
+    },
+    "balanced_accuracy": {
+      "price_only": 0.3915234951383306,
+      "two_branch_neutral_prior": 0.3953795592868226,
+      "two_branch_real_sentiment": 0.39810396379082186,
+      "architecture_effect": 0.003856064148491989,
+      "information_gain": 0.002724404503999245,
+      "naive_delta": 0.006580468652491234,
+      "information_gain_per_window": [
+        -0.0030502757747378206,
+        0.005953518453518436,
+        0.0034485572529051045,
+        0.005576074406867471,
+        0.0016941481814425896
+      ],
+      "information_gain_window_bootstrap": {
+        "mean": 0.002724404503999156,
+        "low": -0.0003761209471806803,
+        "high": 0.005301548594735384
+      },
+      "information_gain_date_bootstrap": {
+        "mean": -0.0007834953579446413,
+        "low": -0.010224356587989722,
+        "high": 0.008872361887183076,
+        "n_blocks": 300
+      }
+    },
+    "accuracy": {
+      "price_only": 0.42999999999999994,
+      "two_branch_neutral_prior": 0.432,
+      "two_branch_real_sentiment": 0.4295555555555555,
+      "architecture_effect": 0.0020000000000000573,
+      "information_gain": -0.0024444444444444713,
+      "naive_delta": -0.000444444444444414,
+      "information_gain_per_window": [
+        -0.025555555555555554,
+        0.0033333333333334103,
+        0.005555555555555647,
+        0.004999999999999949,
+        -0.0005555555555555314
+      ],
+      "information_gain_window_bootstrap": {
+        "mean": -0.0024444444444444158,
+        "low": -0.014336111111111088,
+        "high": 0.004777777777777781
+      },
+      "information_gain_date_bootstrap": {
+        "mean": -0.0024444444444443603,
+        "low": -0.01177777777777772,
+        "high": 0.006777777777777773,
+        "n_blocks": 300
+      }
+    }
+  }
+}

@@ -25,17 +25,17 @@ thay vì để trống:
 \begin{enumerate}[nosep]
   \item \textbf{Temporal Fusion Transformer.} Chương~\ref{ch:phuong-phap} đã đặt TFT ở vị
         trí mở rộng có điều kiện, chỉ thực hiện sau khi mức sàn đạt cổng chất lượng. Kết quả
-        ở Chương~\ref{ch:ket-qua} cho thấy đóng góp thông tin của cảm xúc không khác 0, nên
-        thay LSTM bằng một kiến trúc phức tạp hơn khó làm thay đổi kết luận về câu hỏi
-        trung tâm. Ưu tiên đúng là nâng chất lượng tín hiệu đầu vào trước, rồi mới tăng độ
-        phức tạp của bộ dự báo. Khi thực hiện, TFT cần được cấu hình cho phân loại ba lớp và
-        chạy trên đúng tập giữ lại; phần quan trọng của biến và cơ chế chú ý chỉ được diễn
-        giải như mô tả phụ thuộc mô hình, không phải bằng chứng nhân quả.
-  \item \textbf{Biến thể PhoBERT kết hợp CNN hoặc BiLSTM.} Xác thực chéo mới trên 1.306
-        mẫu đã cho mức đo lớp NEGATIVE tốt hơn, nhưng chưa truyền bộ sinh mới sang nhánh
-        dự báo. Trước hết cần tinh chỉnh lại hoặc tổ hợp các điểm kiểm hiện có, chấm lại
-        kho tin và chạy lại đối chứng; sau đó mới so sánh các biến thể kiến trúc ở
-        Mục~\ref{sec:kq-mornhan}.
+        hồi cứu ở Chương~\ref{ch:ket-qua} chưa cung cấp bằng chứng ngoài mẫu về đóng góp của
+        cảm xúc, nên ưu tiên đúng là hoàn tất đánh giá không rò rỉ thời điểm trước khi tăng
+        độ phức tạp của bộ dự báo. Khi thực hiện, TFT cần được cấu hình cho phân loại ba lớp
+        và chạy trên đúng các đoạn kiểm thử cuốn chiếu; phần quan trọng của biến và cơ chế
+        chú ý chỉ được diễn giải như mô tả phụ thuộc mô hình, không phải bằng chứng nhân quả.
+  \item \textbf{Biến thể PhoBERT kết hợp CNN hoặc BiLSTM.} Xác thực chéo trên 1.306 mẫu
+        đã cho mức đo lớp NEGATIVE tốt hơn. Điểm kiểm triển khai đã được truyền sang nhánh
+        dự báo hồi cứu, nhưng đánh giá ngoài mẫu còn thiếu vì điểm kiểm này chứa nhãn sau
+        các ngày kiểm thử. Trước khi so sánh biến thể kiến trúc, cần tinh chỉnh lại trong
+        từng cửa sổ chỉ bằng nhãn quá khứ, hoặc đóng băng một điểm kiểm trước ngày kiểm thử
+        đầu tiên, rồi chấm lại kho tin và chạy đối chứng.
   \item \textbf{Hệ thống demo trực quan hóa.} Toàn bộ quy trình hiện được điều khiển qua
         giao diện dòng lệnh và ghi artifact ra tệp, đủ cho mục đích nghiên cứu và tái lập.
         Một giao diện trực quan hóa sẽ hữu ích cho việc thăm dò dữ liệu, nhưng không bổ sung
@@ -43,10 +43,10 @@ thay vì để trống:
         của kết quả.
 \end{enumerate}
 
-Ưu tiên cao nhất trong số các hướng của chương này là truyền bộ sinh cảm xúc đã đánh giá
-qua toàn bộ chuỗi dự báo: tinh chỉnh lại hoặc tổ hợp các điểm kiểm, chấm lại kho tin theo
-mốc cắt thông tin, rồi chạy lại dự báo và đối chứng. Chỉ chuỗi thực nghiệm hoàn chỉnh này
-mới có thể tách tín hiệu cảm xúc yếu khỏi ảnh hưởng của bộ sinh lịch sử.
+Ưu tiên cao nhất trong số các hướng của chương này là đánh giá không rò rỉ thời điểm: tinh
+chỉnh lại bộ sinh cảm xúc trong từng cửa sổ chỉ bằng nhãn quá khứ, hoặc dùng một điểm kiểm
+đóng băng trước ngày kiểm thử đầu tiên, sau đó chấm lại kho tin và chạy lại dự báo cùng đối
+chứng. Chỉ chuỗi thực nghiệm này mới cung cấp bằng chứng ngoài mẫu về tín hiệu cảm xúc.
 
 \section{Củng cố dữ liệu và giao thức point-in-time}
 
@@ -61,11 +61,11 @@ thiếu bằng một thời điểm được suy đoán.
 
 Mốc cắt 15 giờ có thể được kiểm tra độ nhạy bằng một thực nghiệm riêng. Có thể so
 sánh tin trước giờ đóng cửa với tin sau giờ đóng cửa được chuyển sang phiên kế tiếp,
-nhưng mỗi mốc cắt phải tạo ra bảng đặc trưng và tập giữ lại riêng. Không được chọn mốc cắt
-theo điểm kiểm thử tốt nhất mà không ghi số lần thử. Tương tự, có thể so sánh ngưỡng phân vị
-với ngưỡng cố định, nhưng cách xác định ngưỡng phải tuân thủ tập huấn luyện-only ở mọi trường
-hợp. Việc kiểm tra độ nhạy chỉ có ý nghĩa nếu các mô hình trong các cấu hình vẫn dùng
-cùng ngày đánh giá và cùng cách tính chỉ số.
+nhưng mỗi mốc cắt phải tạo ra bảng đặc trưng và các đoạn kiểm thử riêng. Không được chọn
+mốc cắt theo điểm kiểm thử tốt nhất mà không ghi số lần thử. Tương tự, có thể so sánh
+ngưỡng phân vị với ngưỡng cố định, nhưng cách xác định ngưỡng phải tuân thủ tập
+huấn luyện-only ở mọi trường hợp. Việc kiểm tra độ nhạy chỉ có ý nghĩa nếu các mô hình
+trong các cấu hình vẫn dùng cùng ngày đánh giá và cùng cách tính chỉ số.
 
 Một hướng khác là làm giàu annotation. Bộ nhãn có thể bổ sung cường độ, chủ thể, loại
 sự kiện và mức độ chắc chắn nếu có hướng dẫn cùng đánh giá độ đồng thuận. Nhãn sự kiện
@@ -86,11 +86,11 @@ thấy hợp nhất động có thể giữ được tương tác phong phú hơ
 \cite{Omranpour2024_241210540v1,Elahi2024_241101368v1}.
 
 Hợp nhất động có nhiều tham số hơn và có thể học nhiễu khi số mã hoặc số ngày có tin còn
-ít. Mỗi biến thể phải được so sánh bằng cùng tập giữ lại, ngân sách thử, loại bỏ đặc trưng và chỉ số.
-Cần báo cáo số tham số, thời gian huấn luyện, độ nhạy theo hạt giống, số ngày có tin thực sự
-được sử dụng và khoảng tin cậy. Nếu một biến thể chỉ tốt ở một phần chia hoặc chỉ tốt ở nhóm
-có rất nhiều tin, không nên gọi đó là cải tiến ổn định trước khi kiểm tra kích thước mẫu
-và các yếu tố đồng thời.
+ít. Mỗi biến thể phải được so sánh bằng cùng các đoạn kiểm thử, ngân sách thử, loại bỏ đặc
+trưng và chỉ số. Cần báo cáo số tham số, thời gian huấn luyện, độ nhạy theo hạt giống, số
+ngày có tin thực sự được sử dụng và khoảng tin cậy. Nếu một biến thể chỉ tốt ở một phần
+chia hoặc chỉ tốt ở nhóm có rất nhiều tin, không nên gọi đó là cải tiến ổn định trước khi
+kiểm tra kích thước mẫu đủ lớn.
 
 TFT cũng có thể được mở rộng thành mô hình đa nhiệm, trong đó một tầng phân loại dự báo lớp xu
 hướng và một tầng phân loại dự báo độ biến động hoặc xác suất không có tin. Hướng này chỉ phù hợp
@@ -134,13 +134,12 @@ trượt giá, tỷ trọng, thanh khoản và giới hạn vị thế. Quy tắ
 thành vị thế cũng phải được khóa trước khi xem kết quả. Các chỉ số có thể gồm lợi suất tích lũy,
 lợi suất năm hóa, tỷ số Sharpe, mức suy giảm tối đa, vòng quay danh mục và độ ổn định theo
 giai đoạn.
-
-Kiểm thử quá khứ phải dùng dự đoán ngoài mẫu từ cuốn chiếu theo thời gian. Không dùng dự đoán của tập giữ lại để
-điều chỉnh chiến lược rồi báo cáo lại trên chính tập giữ lại. Nếu so sánh nhiều chiến lược,
-số lần thử phải được ghi lại và kết luận cần thận trọng trước kiểm định nhiều lần. Các
-nghiên cứu dùng mô phỏng giao dịch cho thấy đánh giá kinh tế có thể bổ sung cho chỉ số
-phân loại, nhưng kết quả vẫn phụ thuộc giả định mô phỏng và thị trường
-\cite{Chen2021_210708721v1,Feng2018_181009936v2}.
+Kiểm thử quá khứ phải dùng dự đoán ngoài mẫu từ cuốn chiếu theo thời gian. Không dùng dự
+đoán của các đoạn kiểm thử để điều chỉnh chiến lược rồi báo cáo lại trên chính các đoạn đó.
+Nếu so sánh nhiều chiến lược, số lần thử phải được ghi lại và kết luận cần thận trọng trước
+kiểm định nhiều lần. Các nghiên cứu dùng mô phỏng giao dịch cho thấy đánh giá kinh tế có
+thể bổ sung cho chỉ số phân loại, nhưng kết quả vẫn phụ thuộc giả định mô phỏng và thị
+trường \cite{Chen2021_210708721v1,Feng2018_181009936v2}.
 
 Kiểm thử quá khứ không thuộc mức sàn vì nó mở rộng câu hỏi từ dự báo sang quyết định giao dịch.
 Khi thực hiện, chương trình sinh dự đoán và chương trình mô phỏng nên tách nhau để thay
@@ -213,7 +212,7 @@ Lộ trình phát triển được đề xuất như sau:
 
 \begin{enumerate}[nosep]
   \item Hoàn thiện cổng chất lượng dữ liệu, mốc cắt, nhãn và kiểm tra rò rỉ;
-  \item Khóa đối chứng cơ sở, LSTM hai nhánh, loại bỏ đặc trưng và khoảng tin cậy theo lấy mẫu lặp trên tập giữ lại;
+  \item Khóa đối chứng cơ sở, LSTM hai nhánh, loại bỏ đặc trưng và khoảng tin cậy theo lấy mẫu lặp trên các đoạn kiểm thử;
   \item Kiểm tra độ bền theo hạt giống, cửa sổ, mã và độ bao phủ tin;
   \item Thử TFT phân loại nếu còn dữ liệu, thời gian và tài nguyên;
   \item Bổ sung hợp nhất động hoặc tín hiệu ở mức sự kiện khi giao thức đã ổn định;

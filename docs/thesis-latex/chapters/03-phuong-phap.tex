@@ -436,7 +436,7 @@ lệ bằng không, đồng thời đặt \texttt{has\_news}=0 trong cấu hình
 trung tính vẫn có số tin dương và \texttt{has\_news}=1, nên hai trường hợp được phân
 biệt. Ngoài cấu hình chính, có thể so sánh việc đặt vector bằng không hoặc giữ giá trị
 gần nhất trong một giới hạn thời gian trên tập xác thực. Không được chọn cách biểu
-diễn ngày không có tin dựa trên điểm của tập giữ lại.
+diễn ngày không có tin dựa trên điểm của đoạn kiểm thử.
 
 Các đặc trưng được tổng hợp sau mốc cắt. Không dùng số tin hoặc xác suất của bài đăng
 sau mốc cắt để mô tả ngày đã kết thúc. Nếu một bài gắn với nhiều mã, cách nhân bản đặc
@@ -600,8 +600,8 @@ lỗi và còn đủ nguồn lực. Mô hình nhận các biến thời gian, bi
 theo cấu hình rõ ràng, dùng kích thước đầu ra bằng 3 và hàm mất mát phân loại. Các biến không được
 khai báo chỉ vì chúng có sẵn trong một bảng dữ liệu, mà phải được kiểm tra theo thời
 điểm có thể quan sát. Kết quả TFT chỉ được so sánh với các tầng trước khi dùng cùng
-tập giữ lại và quy tắc tạo nhãn. Nếu không kiểm soát được hàm mất mát hoặc thời gian chạy, TFT
-được loại khỏi thực nghiệm chính mà không ảnh hưởng đến mức sàn.
+các đoạn kiểm thử và quy tắc tạo nhãn. Nếu không kiểm soát được hàm mất mát hoặc thời gian
+chạy, TFT được loại khỏi thực nghiệm chính mà không ảnh hưởng đến mức sàn.
 
 \subsection{Huấn luyện và kiểm soát độ phức tạp}
 
@@ -617,8 +617,8 @@ không được dùng để điều chỉnh kiến trúc sau mỗi lần chạy.
 
 Đánh giá là phần trung tâm của phương pháp. Một chia tập theo thời gian chưa đủ bảo đảm
 kết quả sạch nếu bộ chuẩn hóa, ngưỡng, lựa chọn đặc trưng hoặc điểm kiểm đã nhìn thấy dữ
-liệu tương lai. Giao thức vì vậy dùng cuốn chiếu theo thời gian, khóa tập giữ lại cuối và kiểm tra các phép
-biến đổi.
+liệu tương lai. Giao thức vì vậy dùng cuốn chiếu theo thời gian với các đoạn kiểm thử tách
+biệt và kiểm tra các phép biến đổi.
 
 \subsection{Cuốn chiếu theo thời gian}
 
@@ -662,7 +662,7 @@ Bảng kiểm rò rỉ gồm các hạng mục:
   \item Ngưỡng $q^-_w$, $q^+_w$ chỉ tính từ lợi suất tập huấn luyện;
   \item Nhãn cảm xúc dùng để tinh chỉnh và điểm kiểm của từng phần chia;
   \item Loại trùng không để cùng bài hoặc bản sao gần giống xuất hiện ở hai chia tập;
-  \item Lựa chọn siêu tham số chỉ dùng tập huấn luyện và xác thực, không dùng tập giữ lại.
+  \item Lựa chọn siêu tham số chỉ dùng tập huấn luyện và xác thực, không dùng đoạn kiểm thử.
 \end{itemize}
 
 Mỗi phần chia cần lưu một số ví dụ kiểm tra bằng tay, gồm tin trước mốc cắt, tin sau mốc cắt, tin
@@ -761,7 +761,7 @@ Bảng~\ref{tab:cau-hinh} tóm tắt các quyết định thiết kế chính c�
     Phạm vi & 10 mã VN30 trên HOSE, dữ liệu từ năm 2020 đến hết năm 2025 \\
     Mốc cắt & 15 giờ theo múi giờ Việt Nam, tin sau giờ đóng cửa chuyển sang phiên kế tiếp \\
     Nhãn & Lợi suất phiên kế tiếp, ngưỡng chỉ ước lượng trên tập huấn luyện \\
-    Đánh giá & Cuốn chiếu theo thời gian, tập giữ lại khóa cuối, F1 vĩ mô là chỉ số chính \\
+    Đánh giá & Cuốn chiếu theo thời gian, năm đoạn kiểm thử tách biệt, F1 vĩ mô là chỉ số chính \\
     \bottomrule
   \end{tabular}
 \noindent\textit{Nguồn: Tác giả xây dựng.}

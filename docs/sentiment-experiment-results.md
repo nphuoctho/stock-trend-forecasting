@@ -1,8 +1,14 @@
 # Bản ghi thực nghiệm phân loại cảm xúc
 
-> **Trạng thái:** Kết quả xác thực chéo theo tầng trên 1.306 nhãn đã rà soát là kết quả sẵn sàng đưa vào báo cáo. Các phần về 306 mẫu bên dưới chỉ là bản ghi lịch sử của đường cơ sở và ablation.
+> **Trạng thái:** Xác thực chéo theo tầng trên 1.306 nhãn, điểm kiểm tinh chỉnh cuối,
+> chấm lại kho tin và phép đối chứng dự báo ghép cặp đã hoàn thành. Lượt dự báo này là
+> **hồi cứu**: điểm kiểm được học từ toàn bộ tập nhãn, trong đó có bài sau các ngày kiểm
+> thử dự báo. Các phần về 306 mẫu bên dưới chỉ là bản ghi lịch sử của đường cơ sở và ablation.
 >
-> **Nguồn số liệu hiện tại:** [`../outputs/sentiment-cv-merged/cv_results.json`](../outputs/sentiment-cv-merged/cv_results.json) và [`cv_results.csv`](../outputs/sentiment-cv-merged/cv_results.csv), được trích từ archive Kaggle đã kiểm tra toàn vẹn.
+> **Nguồn số liệu hiện tại:** [`../outputs/sentiment-cv-merged/cv_results.json`](../outputs/sentiment-cv-merged/cv_results.json),
+> `outputs/merged-refit.zip`, `outputs/forecast_merged_sentiment/forecast_results.json`,
+> `outputs/forecast_merged_control/forecast_results.json` và
+> `outputs/forecast_merged_sentiment/information_gain.json`.
 
 ## Kết quả hiện tại: xác thực chéo theo tầng trên 1.306 nhãn
 
@@ -23,10 +29,40 @@ Lần chạy dùng `title_context + head_tail`, 5 epoch, kích thước lô 16, 
 | `NEUTRAL` | 0.881565 | 0.835858 | 463 |
 | `POSITIVE` | 0.704119 | 0.790598 | 134 |
 
-Lần chạy này đánh giá chất lượng bộ phân loại, không chọn checkpoint bằng chỉ số
-outer holdout và chưa sinh lại đặc trưng cảm xúc cho nhánh dự báo giá. Bước kế tiếp là
-tinh chỉnh lại trên toàn bộ tập với quy tắc validation-only hoặc tổ hợp năm checkpoint,
-chấm lại kho tin theo mốc cắt thông tin, rồi chạy lại dự báo và đối chứng.
+Xác thực chéo chỉ đánh giá bộ phân loại; nó không tự chứng minh tín hiệu cảm xúc cải thiện
+dự báo giá. Cấu hình này được khóa trước khi tinh chỉnh checkpoint triển khai.
+
+## Tinh chỉnh cuối, chấm lại tin và dự báo ghép cặp hồi cứu
+
+Điểm kiểm `full_data_refit` được tinh chỉnh trên toàn bộ 1.306 nhãn với cấu hình đã khóa,
+5 epoch cố định, trọng số nghịch đảo tần suất và hạt giống 42. Manifest xác nhận mã băm
+nguồn `18d896d8c6b0e9badc91828030e205f2c523704bf38ed4fcde8a52a895eb0b56`, 194/771/341
+mẫu ba lớp và môi trường `torch 2.10.0+cu128`, `transformers 5.15.1`. Đây là lượt huấn
+luyện triển khai hậu xác thực chéo, không sinh chỉ số kiểm thử mới.
+
+Điểm kiểm đã chấm lại 12.624 liên kết tin--mã bằng `title_context`, `head_tail` và
+`context-chars 400`. Có 12.613 liên kết được neo theo mốc 15:00, 11 liên kết không neo
+được bị loại, và 6.950 trên 14.990 dòng mã--phiên có tin. Nhánh cảm xúc và đối chứng đều
+dùng đúng cùng parquet đã chấm; đối chứng chỉ thay xác suất mỗi bài thành
+`(NEGATIVE=0, NEUTRAL=1, POSITIVE=0)`, nên giữ nguyên thời điểm, số lượng tin và cờ có tin.
+
+| Chỉ số LSTM | Chỉ giá | Hai nhánh trung tính | Hai nhánh cảm xúc thật | Đóng góp thông tin |
+| --- | ---: | ---: | ---: | ---: |
+| F1 vĩ mô | 0.3797 | 0.3841 | 0.3907 | +0.0066 |
+| Độ chính xác cân bằng | 0.3915 | 0.3954 | 0.3981 | +0.0027 |
+| Độ chính xác | 0.4300 | 0.4320 | 0.4296 | -0.0024 |
+
+Ước lượng đóng góp F1 vĩ mô theo năm cửa sổ là $+0{,}0066$ với khoảng 95\%
+`[+0.0011, +0.0128]`; nhưng khoảng lấy mẫu theo 300 ngày là
+`[-0.0087, +0.0116]`. Khoảng theo ngày là căn cứ chính vì các mã cùng ngày được lấy mẫu
+cùng nhau; nó chứa 0, như hai chỉ số còn lại.
+
+**Giới hạn thời điểm:** `labeled_merged.csv` có bài năm 2025, trong khi cửa sổ kiểm thử
+đầu tiên bắt đầu ngày 2024-10-22. Vì vậy điểm kiểm đã học từ văn bản và nhãn tương lai so
+với một phần ngày đánh giá. Phép đối chứng ghép cặp vẫn là đo lường hồi cứu nhất quán giữa
+xác suất thật và prior trung tính, nhưng không là bằng chứng dự báo ngoài mẫu. Cần tinh
+chỉnh lại từng cửa sổ chỉ bằng nhãn quá khứ, hoặc dùng điểm kiểm đóng băng được huấn luyện
+trước ngày kiểm thử đầu tiên, rồi chấm lại và chạy lại phép so sánh.
 
 ## Thực nghiệm lịch sử trên 306 mẫu
 
@@ -291,15 +327,15 @@ suy luận trên nội dung đầy đủ, đầu vào sẽ dài hơn hẳn miề
 - Recall `NEGATIVE` của bộ sinh lịch sử là `0.0619`; tin xấu bị nhận diện rất yếu.
 - Đặc trưng đưa vào nhánh dự báo là **phân phối xác suất mềm**, không phải nhãn cứng, nên
   nhiễu ở lớp thiểu số làm suy giảm tín hiệu thay vì tạo nhãn sai dứt khoát.
-- Các kết luận dự báo hiện tại chỉ gắn với bộ sinh lịch sử; chúng phải được kiểm tra lại
-  sau khi chấm lại kho tin bằng bộ sinh mới.
+- Các kết luận của artifact 306 mẫu chỉ có giá trị lịch sử; chúng đã được thay bằng lượt
+  chấm lại và đối chứng hồi cứu ở đầu tài liệu.
 
-### 7.4. Kế hoạch lịch sử, nay đã hoàn thành hoặc thay thế
+### 7.4. Hạng mục còn lại để đánh giá ngoài mẫu
 
-Việc mở rộng nhãn trong miền dữ liệu đã hoàn thành với 1.306 mẫu đã rà soát và xác thực
-chéo theo tầng được báo cáo ở đầu tài liệu. Bước còn lại không phải gộp thêm CafeF vào
-đánh giá, mà là tinh chỉnh lại hoặc tổ hợp bộ sinh mới, chấm lại kho tin theo mốc cắt
-thông tin, rồi chạy lại dự báo và đối chứng.
+Việc mở rộng nhãn trong miền dữ liệu, tinh chỉnh lại điểm kiểm triển khai, chấm lại kho
+tin và chạy đối chứng đã hoàn thành. Hạng mục còn lại là đánh giá không rò rỉ thời điểm:
+tinh chỉnh lại trong từng cửa sổ chỉ bằng nhãn quá khứ, hoặc đóng băng một điểm kiểm trước
+ngày kiểm thử đầu tiên; sau đó chấm lại kho tin và chạy lại dự báo cùng đối chứng.
 
 ## 8. Tệp cần lưu trữ
 

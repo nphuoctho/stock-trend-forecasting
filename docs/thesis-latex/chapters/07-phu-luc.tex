@@ -33,9 +33,9 @@ khóa cấu hình và kiểm tra các báo cáo sinh ra từ quy trình. Các ch
 
 \subsection{Sơ đồ luồng xử lý}
 
-Sơ đồ dưới đây mô tả luồng xử lý của hệ thống. Khối đánh giá chỉ nhận dữ liệu dự báo
-ngoài mẫu và bản kê của cùng một lần chạy; không dùng dữ liệu tập giữ lại để điều chỉnh
-ngược cấu hình.
+Sơ đồ dưới đây mô tả luồng xử lý của hệ thống. Khối đánh giá chấm mỗi đoạn kiểm thử cuốn
+chiếu đúng một lần cùng bản kê của lần chạy; cấu hình không được điều chỉnh ngược theo
+kết quả của các đoạn kiểm thử.
 
 \begin{figure}[H]
   \centering
@@ -55,7 +55,7 @@ ngược cấu hình.
     \node[block, below=of input] (quality) {Kiểm tra lược đồ, mốc thời gian, mã và bản ghi trùng};
     \node[decision, below=of quality] (features) {Tạo đặc trưng cảm xúc và đặc trưng thị trường theo mã, ngày};
     \node[decision, below=of features] (models) {Huấn luyện đối chứng cơ sở, mô hình chỉ giá và LSTM hai nhánh};
-    \node[block, below=of models] (evaluation) {Cuốn chiếu theo thời gian, tập giữ lại, loại bỏ đặc trưng và phân tích sai số};
+    \node[block, below=of models] (evaluation) {Cuốn chiếu theo thời gian, năm đoạn kiểm thử, loại bỏ đặc trưng và phân tích sai số};
     \node[block, below=of evaluation] (report) {Chỉ số, biểu đồ, bản kê và báo cáo tái lập};
     \draw[arr] (input) -- (quality);
     \draw[arr] (quality) -- (features);
@@ -92,9 +92,10 @@ Mỗi lần chạy cần lưu phiên bản mã nguồn, phiên bản thư viện
 phạm vi ngày, danh sách mã, mã băm dữ liệu và các tham số huấn luyện. Bản kê là nguồn
 đối chiếu chính cho mọi con số xuất hiện trong phần kết quả thực nghiệm.
 
-Tiền xử lý chỉ được ước lượng trên phần tập huấn luyện của từng cửa sổ. Tập giữ lại cuối chỉ được đọc ở
-bước báo cáo. Nếu thay đổi nguồn dữ liệu, mốc cắt, ngưỡng tạo nhãn hoặc cách chia tập,
-phải tạo bản kê mới và không gộp kết quả giữa hai cấu hình.
+Tiền xử lý chỉ được ước lượng trên phần tập huấn luyện của từng cửa sổ. Mỗi đoạn kiểm thử
+chỉ được đọc khi báo cáo chỉ số của chính đoạn đó; không có tập giữ lại cuối tách riêng. Nếu
+thay đổi nguồn dữ liệu, mốc cắt, ngưỡng tạo nhãn hoặc cách chia tập, phải tạo bản kê mới và
+không gộp kết quả giữa hai cấu hình.
 
 \section{Cài đặt và chạy hệ thống}
 

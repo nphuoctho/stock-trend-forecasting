@@ -13,9 +13,9 @@ mã cổ phiếu, ngày giao dịch và mốc cắt thông tin, sau đó đượ
 Quy trình gồm thu thập dữ liệu, kiểm tra thông tin truy nguyên và bản ghi trùng, gán nhãn
 cảm xúc, sinh xác suất của ba lớp, tổng hợp đặc trưng theo mã và ngày, tạo nhãn UP, FLAT
 và DOWN, huấn luyện, đánh giá cuốn chiếu theo thời gian và phân tích loại bỏ đặc trưng.
-Trong đó, tiền xử lý chỉ học từ tập huấn luyện, mốc cắt thông tin 15 giờ và tập giữ lại
-cuối cùng được khóa là các điều kiện cần để kết quả có thể được diễn giải như dự báo
-ngoài mẫu.
+Tiền xử lý của nhánh giá chỉ học từ tập huấn luyện, mốc cắt thông tin là 15 giờ và tập
+giữ lại cuối được khóa. Tuy nhiên, lượt hồi cứu hiện tại dùng điểm kiểm cảm xúc học từ
+nhãn gồm cả giai đoạn kiểm thử, nên không được diễn giải là dự báo ngoài mẫu hoàn toàn.
 
 \section{Đối chiếu với mục tiêu và câu hỏi nghiên cứu}
 
@@ -31,44 +31,42 @@ nhãn đã rà soát đã hoàn thành: cấu hình có trọng số nghịch đ
 tham chiếu 85--90\% của đề cương. Năm tập kiểm thử ngoài có tổng 59 mẫu NEGATIVE và độ
 bao phủ trung bình 0,6803, nên lớp này đã được đo nhưng bất định vẫn lớn hơn hai lớp
 còn lại. Kết quả có trọng số là phép so sánh trên tập mở rộng, không phải mô hình cuối.
-Phần chưa hoàn thành là tinh chỉnh lại hoặc tổ hợp các điểm kiểm, chấm lại kho tin và
-chạy lại dự báo cùng đối chứng; sau đó mới đánh giá biến thể PhoBERT kết hợp CNN hoặc BiLSTM.
+Sau khi khóa cấu hình, checkpoint triển khai đã được tinh chỉnh lại trên toàn bộ 1.306
+nhãn với năm epoch cố định, chấm lại 12.624 liên kết tin--mã và dùng làm đầu vào của dự báo.
+Lượt tinh chỉnh lại không tạo chỉ số kiểm thử mới.
 
 Mục tiêu thứ ba và thứ tư là kết hợp hai nguồn dữ liệu và huấn luyện mô hình dự báo. Mục
-tiêu này \textbf{đã hoàn thành với LSTM} và \textbf{chưa thực hiện với TFT}. Mô hình LSTM
-chỉ giá đạt F1 vĩ mô 0,3797, balanced accuracy 0,3915 và OvR-AUC 0,5721, vượt rõ mốc ngẫu
-nhiên 0,3289 và mốc lớp phổ biến 0,1603. Như vậy tồn tại tín hiệu dự báo thật từ đặc trưng
-giá, ở mức khiêm tốn. Cấu hình này kế thừa ý tưởng kết hợp tín hiệu cảm xúc với LSTM trong
-các nghiên cứu quốc tế, nhưng được đặt trong bối cảnh ngôn ngữ, thị trường, mục tiêu ba lớp
-và giao thức thời gian khác \cite{Halder2022_221107392v1,Gu2024_240716150v1}.
+tiêu này \textbf{đã được thực hiện hồi cứu với LSTM} và \textbf{chưa thực hiện với TFT}.
+Mô hình LSTM chỉ giá đạt F1 vĩ mô 0,3797, balanced accuracy 0,3915 và OvR-AUC 0,5721,
+vượt rõ mốc ngẫu nhiên 0,3289 và mốc lớp phổ biến 0,1603. Như vậy tồn tại tín hiệu dự báo
+từ đặc trưng giá, ở mức khiêm tốn. Các điểm số của nhánh có cảm xúc dùng bộ sinh học từ
+nhãn tương lai tương đối với các cửa sổ kiểm thử, nên chỉ có giá trị mô tả hồi cứu
+\cite{Halder2022_221107392v1,Gu2024_240716150v1}.
 
-Mục tiêu thứ năm là đo phần đóng góp riêng của tín hiệu cảm xúc. Mục tiêu này \textbf{đã
-hoàn thành, và là kết quả trung tâm của đồ án}. Phép đo được thực hiện trên cùng cửa sổ,
-cùng ba hạt giống, cùng quy trình tiền xử lý và cùng tập dòng kiểm thử. Điểm quan trọng về
-phương pháp: so sánh trực tiếp mô hình hai nhánh với mô hình chỉ giá trộn lẫn hai thay đổi
---- thêm nhánh mạng và thêm thông tin. Đồ án tách hai phần này bằng một lần chạy đối chứng
-giữ nguyên kiến trúc nhưng thay cảm xúc thật bằng prior trung tính hằng số. Kết quả:
+Mục tiêu thứ năm là đo phần đóng góp riêng của tín hiệu cảm xúc. Phép đo ghép cặp \textbf{đã
+hoàn thành ở dạng hồi cứu}. Phép đo được thực hiện trên cùng cửa sổ, cùng ba hạt giống,
+cùng quy trình tiền xử lý và cùng tập dòng kiểm thử. Đối chứng giữ nguyên kiến trúc hai
+nhánh, cùng bài tin, thời điểm và số lượng tin, nhưng thay xác suất cảm xúc bằng phân phối
+tiên nghiệm trung tính. Kết quả:
 
 \begin{itemize}[nosep]
-  \item hiệu số trực tiếp: $+0{,}0028$ F1 vĩ mô;
-  \item trong đó hiệu ứng kiến trúc: $+0{,}0051$;
-  \item đóng góp thông tin thực của cảm xúc: $\mathbf{-0{,}0024}$, khoảng tin cậy 95\% theo
-        ngày là $[-0{,}0113; +0{,}0111]$.
+  \item hiệu số trực tiếp: $+0{,}0110$ F1 vĩ mô;
+  \item trong đó hiệu ứng kiến trúc: $+0{,}0044$;
+  \item đóng góp thông tin thực của cảm xúc: $+0{,}0066$ theo cửa sổ; ước lượng theo ngày
+        là $+0{,}0014$, khoảng tin cậy 95\% $[-0{,}0087; +0{,}0116]$.
 \end{itemize}
 
-Nghĩa là toàn bộ phần cải thiện biểu kiến thuộc về số tham số tăng thêm của mạng hai nhánh,
-không thuộc về thông tin cảm xúc. Khoảng tin cậy chứa 0 ở cả ba chỉ số, nên kết luận là
-\textbf{chưa có bằng chứng rằng đặc trưng cảm xúc cải thiện dự báo xu hướng phiên kế tiếp}
-trong quy trình này. Đây không phải phủ định khả năng tín hiệu cảm xúc hữu ích ở bối cảnh
-khác.
+Khoảng tin cậy theo ngày chứa 0 ở cả ba chỉ số. Hơn nữa, bộ sinh cảm xúc đã học từ nhãn
+trong giai đoạn kiểm thử. Vì vậy không có bằng chứng ngoài mẫu về hiệu quả dự báo của
+cảm xúc; các số liệu chỉ cho thấy chênh lệch hồi cứu trong cấu hình này.
 
 Mục tiêu thứ sáu là hệ thống demo hoàn chỉnh. Mục tiêu này \textbf{chưa thực hiện}; toàn bộ
 quy trình hiện được điều khiển qua giao diện dòng lệnh.
 
-Câu hỏi thứ ba của đề cương --- điều kiện nào cảm xúc phát huy tác dụng --- được trả lời một
-phần. Phân tầng theo cờ \texttt{has\_news} cho hiệu số $-0{,}0009$ trên riêng nhóm phiên có
-tin, tức giả thuyết ``tín hiệu bị pha loãng bởi 53,64\% phiên không có tin'' bị loại trừ.
-Phân tầng theo giai đoạn thị trường và theo ngày sự kiện chưa được thực hiện.
+Câu hỏi thứ ba của đề cương --- điều kiện nào cảm xúc phát huy tác dụng --- chưa được trả
+lời bằng ước lượng ghép cặp phân tầng. Đối chứng mới đã kiểm soát sự hiện diện và khối
+lượng tin trên toàn bộ mẫu; phân tầng theo giai đoạn thị trường, ngày sự kiện và mật độ tin
+chưa được thực hiện.
 
 \section{Đóng góp và ý nghĩa}
 
@@ -102,13 +100,12 @@ Bài viết bị thiếu thời gian hoặc được cập nhật nhiều lần 
 Mốc cắt thông tin bảo thủ giúp giảm nguy cơ sử dụng dữ liệu tương lai, nhưng cũng có thể
 làm trễ một phần tín hiệu được thị trường nhìn thấy trước phiên kế tiếp.
 
-Thứ ba, và là giới hạn quyết định: \textbf{chất lượng bộ sinh cảm xúc là một biến gây nhiễu
-chưa tách được hoàn toàn}. Độ bao phủ NEGATIVE 0,6803 trên 59 mẫu kiểm thử ngoài cho thấy
-cấu hình mới tốt hơn lượt lịch sử, nhưng xác thực chéo chỉ đánh giá chất lượng phân loại.
-Để kiểm tra liệu kết luận ``chưa có bằng chứng cải thiện'' do tín hiệu cảm xúc yếu hay do
-bộ sinh lịch sử yếu, cần tinh chỉnh lại hoặc tổ hợp điểm kiểm mới, chấm lại kho tin theo
-mốc cắt thông tin, rồi chạy lại dự báo và đối chứng. Ngoài ra, nhãn ba lớp buộc phải nén
-các bài có nhiều sự kiện trái chiều về một lớp duy nhất.
+Thứ ba, và là giới hạn quyết định: \textbf{điểm kiểm cảm xúc được tinh chỉnh trên toàn bộ
+1.306 nhãn, gồm cả bài sau các ngày kiểm thử dự báo}. Các xác suất dùng trong nhánh có tin
+vì vậy có thể chịu ảnh hưởng gián tiếp từ dữ liệu tương lai. Cần tinh chỉnh lại trong từng
+cửa sổ chỉ bằng nhãn quá khứ, hoặc dùng một điểm kiểm đóng băng trước ngày kiểm thử đầu
+tiên. Chỉ sau đó mới có thể dùng khoảng tin cậy để kết luận về hiệu quả ngoài mẫu. Ngoài
+ra, nhãn ba lớp buộc phải nén các bài có nhiều sự kiện trái chiều về một lớp duy nhất.
 
 Thứ tư, dự báo phiên kế tiếp chỉ quan sát một khoảng thời gian ngắn. Tin về kế hoạch dài
 hạn, chất lượng quản trị hoặc thay đổi ngành có thể chưa thể hiện trong lợi suất của phiên
@@ -133,19 +130,17 @@ tiếng Việt vào dự báo xu hướng giá cổ phiếu. PhoBERT được l�
 LSTM hai nhánh được lựa chọn làm cấu hình cơ sở để so sánh mô hình chỉ dùng giá với mô
 hình có cảm xúc, còn TFT được giữ ở vị trí mở rộng sau khi cấu hình cơ sở được xác minh.
 
-Đồ án \textbf{đã đưa ra kết luận định lượng}. Mô hình dự báo dùng đặc trưng giá vượt rõ hai
-mốc đối chứng bắt buộc, xác nhận tồn tại tín hiệu dự báo thật ở mức khiêm tốn. Đặc trưng
-cảm xúc \textbf{không cho bằng chứng cải thiện}: sau khi tách hiệu ứng kiến trúc, đóng góp
-thông tin là $-0{,}0024$ F1 vĩ mô với khoảng tin cậy $[-0{,}0113; +0{,}0111]$, và hiệu số
-trên riêng nhóm phiên có tin cũng không dương.
+Đồ án \textbf{đã đưa ra kết quả định lượng hồi cứu}. Mô hình dự báo dùng đặc trưng giá
+vượt rõ hai mốc đối chứng bắt buộc, xác nhận tồn tại tín hiệu dự báo thật ở mức khiêm tốn.
+Với đối chứng giữ nguyên kiến trúc, thời điểm và số lượng tin, đóng góp thông tin theo cửa
+sổ là $+0{,}0066$ F1 vĩ mô; ước lượng theo ngày là $+0{,}0014$ với khoảng tin cậy
+$[-0{,}0087; +0{,}0116]$. Khoảng này chứa 0.
 
-Giá trị của đồ án nằm ở chỗ kết luận âm này được \textbf{định lượng và có kiểm soát}, đúng
-như ghi chú trung thực của đề cương rằng việc đo được phần đóng góp của cảm xúc vẫn là một
-kết quả có giá trị kể cả khi mức cải thiện nhỏ. Cụ thể, đồ án xác định được rằng nếu cảm
-xúc có tác dụng trong giao thức này thì tác dụng đó nhỏ hơn khoảng $\pm0{,}011$ F1 vĩ mô.
-Đồng thời, đồ án chỉ ra một cạm bẫy phương pháp luận có thể làm sai lệch kết luận: nếu chỉ
-báo cáo hiệu số trực tiếp giữa mô hình hai nhánh và mô hình chỉ giá, phần cải thiện do tăng
-số tham số sẽ bị hiểu thành đóng góp của thông tin cảm xúc.
+Kết quả nhánh có cảm xúc không phải bằng chứng dự báo ngoài mẫu vì điểm kiểm cảm xúc học từ
+nhãn trong giai đoạn kiểm thử. Giá trị của đồ án nằm ở việc ghi rõ giới hạn này, cùng một
+đối chứng giữ nguyên kiến trúc và độ phủ tin để phép so sánh hồi cứu không quy chênh lệch
+do nhánh mạng hoặc sự hiện diện của tin cho xác suất cảm xúc. Phép đo ngoài mẫu hợp lệ cần
+được chạy lại với điểm kiểm phù hợp thời điểm.
 
 Mọi diễn giải phải giữ đúng phạm vi 10 mã HOSE, giai đoạn 2020--2025, nguồn tin Vietstock và
 chân trời một phiên. Kết luận không được suy rộng thành lời hứa hiệu năng ngoài dữ liệu, và
