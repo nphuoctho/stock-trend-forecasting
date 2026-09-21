@@ -383,8 +383,9 @@ Xác thực chéo PhoBERT hiện có là \emph{StratifiedKFold} ngẫu nhiên v�
 giữ tỷ lệ ba lớp trong mỗi outer holdout. Nó chỉ đo hiệu năng phân loại trong miền dữ
 liệu; không phải đánh giá point-in-time của nhánh dự báo. Một phần outer train được rút
 ngẫu nhiên có phân tầng để chọn checkpoint; outer holdout không tham gia lựa chọn đó.
-Các bài trùng hoặc gần trùng được phát hiện trước khi chia tập để hạn chế mô hình ghi nhớ
-câu chữ và tạo đánh giá lạc quan.
+Các bài có đầu vào mô hình trùng khớp hoàn toàn bị loại trước khi chia tập để hạn chế mô
+hình ghi nhớ câu chữ và tạo đánh giá lạc quan. Bản gần trùng hoặc các bài cùng nguồn chưa
+được phát hiện tự động, nên vẫn là một giới hạn của giao thức.
 
 Khi mô hình cảm xúc được dùng trong cuốn chiếu theo thời gian, có hai cách hợp lệ: tinh chỉnh lại
 trong từng phần chia bằng nhãn của quá khứ, hoặc dùng một điểm kiểm đóng băng được huấn
@@ -713,8 +714,10 @@ hình hai nhánh khác mô hình chỉ giá ở cả kiến trúc lẫn thông t
 giữ nguyên kiến trúc hai nhánh, bài tin, thời điểm và khối lượng tin, rồi thay véc-tơ xác
 suất bằng một phân phối tiên nghiệm trung tính hằng số. Khi đó
 \begin{align}
-  \text{hiệu ứng kiến trúc và sự hiện diện tin} &= m(\text{hai nhánh, tiên nghiệm trung tính}) - m(\text{chỉ giá}),\\
-  \text{đóng góp thông tin phân cực} &= m(\text{hai nhánh, cảm xúc thật}) - m(\text{hai nhánh, tiên nghiệm trung tính}),
+  \substack{\text{hiệu ứng kiến trúc, sự hiện diện}\\\text{và khối lượng tin}} &= m(\text{hai nhánh, tiên nghiệm trung tính})\\
+  &\quad - m(\text{chỉ giá}),\\
+  \text{đóng góp thông tin phân cực} &= m(\text{hai nhánh, cảm xúc thật})\\
+  &\quad - m(\text{hai nhánh, tiên nghiệm trung tính}),
 \end{align}
 và tổng của hai thành phần bằng đúng $\Delta_m$. Điều kiện để phép tách có hiệu lực là
 hai lần chạy dùng cùng cấu hình, cùng cửa sổ, cùng hạt giống và cho dự đoán nhánh chỉ giá

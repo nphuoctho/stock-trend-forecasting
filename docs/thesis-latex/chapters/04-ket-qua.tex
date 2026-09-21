@@ -442,7 +442,7 @@ phủ tin với khác biệt về xác suất cảm xúc.
 
 \begin{table}[H]
   \centering
-  \caption{Tách hiệu ứng kiến trúc--sự hiện diện tin và đóng góp thông tin phân cực, F1 vĩ mô.}
+  \caption{Tách hiệu ứng kiến trúc--sự hiện diện--khối lượng tin và đóng góp thông tin phân cực, F1 vĩ mô.}
   \label{tab:kq-ablation}
   \begin{tabular}{p{7.6cm} c}
     \toprule
@@ -452,7 +452,7 @@ phủ tin với khác biệt về xác suất cảm xúc.
     LSTM hai nhánh, phân phối tiên nghiệm trung tính & 0,3841 \\
     LSTM hai nhánh, cảm xúc thật & 0,3907 \\
     \midrule
-    Hiệu ứng kiến trúc và sự hiện diện tin & $+0{,}0044$ \\
+    Hiệu ứng kiến trúc, sự hiện diện và khối lượng tin & $+0{,}0044$ \\
     \textbf{Đóng góp thông tin phân cực} & $\mathbf{+0{,}0066}$ \\
     Hiệu số trực tiếp (trộn lẫn hai thành phần) & $+0{,}0110$ \\
     \bottomrule
@@ -574,7 +574,7 @@ Các điểm kiểm tra sau được thực hiện và ghi nhận kết quả th
   \item \textbf{Số tham số}: mô hình một nhánh có 5.091 tham số, mô hình hai nhánh có
         11.203 tham số, tức gấp 2,20 lần (thêm 6.112 tham số). Đối chứng phân phối tiên
         nghiệm trung tính tách đóng góp thông tin phân cực; chênh lệch $+0{,}0044$ F1 vĩ
-        mô còn bao gồm cả kiến trúc và đặc trưng sự hiện diện tin.
+        mô còn bao gồm cả kiến trúc và đặc trưng sự hiện diện, khối lượng tin.
   \item \textbf{Tính tái lập}: hai lần chạy độc lập cho kết quả trùng khớp đến từng chữ số ở
         các mô hình chỉ giá. Trong quá trình thực nghiệm đã phát hiện và sửa một lỗi tái lập:
         trọng số mạng được khởi tạo trước khi gieo hạt giống, khiến kết quả của một cửa sổ phụ

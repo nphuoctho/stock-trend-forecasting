@@ -176,9 +176,11 @@ uv run python -m stf.cli score-news \
   --output data/processed/news_sentiment_merged.parquet
 ```
 
-`score-news` also writes `data/processed/news_sentiment_merged.manifest.json`. The
-sidecar records row count, probability totals and validation, SHA-256 hashes of the
-parquet and checkpoint, optional refit manifest hash, and the exact input settings.
+`score-news` cũng ghi `data/processed/news_sentiment_merged.manifest.json` theo lược đồ
+phiên bản 2. Sidecar ghi số dòng, tổng và kiểm tra xác suất, mã băm parquet/điểm kiểm,
+fingerprint bất biến theo thứ tự của nội dung đã chấm sau `--limit`, cấu hình suy luận hiệu
+lực và phiên bản môi trường. `forecast` chỉ nhận parquet có sidecar khớp mã băm, rồi chép
+mã băm sidecar, điểm kiểm và cấu hình suy luận vào `forecast_results.json`.
 
 ## Phase 4: forecasting experiment
 
@@ -224,8 +226,8 @@ window interval has only 5 blocks and is coarse enough to exclude zero by accide
 price model conflates the added branch with news presence and volume. The neutral control
 keeps article timing, news volume, and probability-independent features fixed, replacing
 only the probability vector. Consequently,
-`architecture_and_news_presence_effect + information_gain = naive_delta` exactly; only
-`information_gain` isolates polarity information.
+`architecture_and_news_presence_volume_effect + information_gain = naive_delta` exactly;
+only `information_gain` isolates polarity information.
 
 Trước khi tính chênh lệch, `forecast-compare` bắt buộc hai lần chạy có cùng nguồn
 tin đã chấm, mã băm dữ liệu giá, cấu hình, ngày kiểm thử và khóa dự đoán
