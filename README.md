@@ -160,7 +160,7 @@ uv run python -m stf.cli sentiment-refit \
   --truncation-strategy head_tail \
   --class-weighting inverse_frequency \
   --epochs 5 --batch-size 16 --seed 42 \
-  --output models/sentiment/merged-refit-v2
+  --output models/sentiment/merged-refit
 ```
 
 `--context-chars` giữ độ dài ngữ cảnh khớp với tệp nhãn đã huấn luyện. Tệp nhãn chặn
@@ -173,19 +173,18 @@ trên tiêu đề--ngữ cảnh.
 
 ```bash
 uv run python -m stf.cli score-news \
-  --model-dir models/sentiment/merged-refit-v2/best \
+  --model-dir models/sentiment/merged-refit/best \
   --input-variant title_context \
   --context-chars 400 \
   --batch-size 64 \
-  --output data/processed/news_sentiment_merged_v2.parquet
+  --output data/processed/news_sentiment_merged.parquet
 ```
 
-`score-news` cũng ghi `data/processed/news_sentiment_merged_v2.manifest.json` theo lược đồ
+`score-news` cũng ghi `data/processed/news_sentiment_merged.manifest.json` theo lược đồ
 phiên bản 2. Sidecar ghi số dòng, tổng và kiểm tra xác suất, mã băm parquet/điểm kiểm,
 fingerprint bất biến theo thứ tự của nội dung đã chấm sau `--limit`, cấu hình suy luận hiệu
 lực và phiên bản môi trường. `forecast` chỉ nhận parquet có sidecar khớp mã băm, rồi chép
-mã băm sidecar, điểm kiểm và cấu hình suy luận vào `forecast_results.json`. Không ghi đè
-checkpoint, parquet hoặc forecast lịch sử; chỉ thay thế tên artifact chuẩn sau khi lượt chạy mới hoàn tất kiểm tra.
+mã băm sidecar, điểm kiểm và cấu hình suy luận vào `forecast_results.json`.
 
 ## Phase 4: forecasting experiment
 
@@ -201,21 +200,21 @@ tích hồi cứu; nó không được dùng để kết luận hiệu quả d�
 # chỉ thay ba xác suất thành prior trung tính. Hai lần chạy vì thế chỉ khác
 # thông tin phân cực cảm xúc.
 uv run python -m stf.cli forecast \
-  --neutral-news-sentiment data/processed/news_sentiment_merged_v2.parquet \
+  --neutral-news-sentiment data/processed/news_sentiment_merged.parquet \
   --windows 5 --test-size 60 --val-size 60 --epochs 40 --patience 6 \
-  --seeds 42 43 44 --output outputs/forecast_merged_control_v2
+  --seeds 42 43 44 --output outputs/forecast_merged_control
 
 # Thang đầy đủ với cảm xúc; hai nhánh dùng cùng cửa sổ, hạt giống và hàng kiểm thử.
 uv run python -m stf.cli forecast \
-  --news-sentiment data/processed/news_sentiment_merged_v2.parquet \
+  --news-sentiment data/processed/news_sentiment_merged.parquet \
   --windows 5 --test-size 60 --val-size 60 --epochs 40 --patience 6 \
-  --seeds 42 43 44 --output outputs/forecast_merged_sentiment_v2
+  --seeds 42 43 44 --output outputs/forecast_merged_sentiment
 
 # Tách ảnh hưởng kiến trúc và giá trị thông tin.
 uv run python -m stf.cli forecast-compare \
-  --real outputs/forecast_merged_sentiment_v2 \
-  --control outputs/forecast_merged_control_v2 \
-  --output outputs/forecast_merged_sentiment_v2/information_gain.json
+  --real outputs/forecast_merged_sentiment \
+  --control outputs/forecast_merged_control \
+  --output outputs/forecast_merged_sentiment/information_gain.json
 ```
 
 The ladder is `majority`, `random`, `logreg_price`, `logreg_price_sentiment`,

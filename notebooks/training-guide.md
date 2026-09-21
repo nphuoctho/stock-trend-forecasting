@@ -158,13 +158,12 @@ uv run python -m stf.cli sentiment-refit \
   --truncation-strategy head_tail \
   --class-weighting inverse_frequency \
   --epochs 5 --batch-size 16 --seed 42 \
-  --output models/sentiment/merged-refit-v2
+  --output models/sentiment/merged-refit
 ```
 
 Lệnh bắt buộc mã băm dữ liệu, cấu hình và kích thước mẫu phải khớp artifact CV. Nó
 huấn luyện trên toàn bộ nhãn đã duyệt với số epoch cố định, không tạo hoặc ghi chỉ số kiểm
-thử mới từ lượt refit; manifest chỉ tham chiếu kết quả CV đã khóa. Luôn dùng thư mục đầu ra
-phiên bản mới như `merged-refit-v2`; không ghi đè checkpoint đã kiểm tra. Sau khi tải checkpoint
+thử mới từ lượt refit; manifest chỉ tham chiếu kết quả CV đã khóa. Sau khi tải checkpoint
 về, chạy `score-news`, hai lệnh `forecast` và `forecast-compare` theo `README.md`.
 
 ## Cải thiện tùy chọn
