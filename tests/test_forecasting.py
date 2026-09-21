@@ -6,6 +6,8 @@ value leaks into a feature column.
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -784,6 +786,20 @@ def test_information_gain_decomposition_is_exact_and_guards_config_drift(tmp_pat
         == pytest.approx(effect["naive_delta"])
     )
     assert len(effect["information_gain_per_window"]) == 2
+
+    # Window records are keyed by their identifier, not their JSON list position.
+    control_results_path = control_dir / "forecast_results.json"
+    control_results = json.loads(control_results_path.read_text(encoding="utf-8"))
+    control_results["windows"].reverse()
+    control_results_path.write_text(json.dumps(control_results), encoding="utf-8")
+    assert compare_information_gain(real_dir, control_dir) == report
+
+    duplicated_results = json.loads(control_results_path.read_text(encoding="utf-8"))
+    duplicated_results["windows"].append(duplicated_results["windows"][0])
+    control_results_path.write_text(json.dumps(duplicated_results), encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicates a window identifier"):
+        compare_information_gain(real_dir, control_dir)
+    control_results_path.write_text(json.dumps(control_results), encoding="utf-8")
 
     # A run with observed probabilities cannot be its own neutralized control.
     with pytest.raises(ValueError, match="preserve the scored-news rows"):

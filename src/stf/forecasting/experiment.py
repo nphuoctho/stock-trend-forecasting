@@ -690,6 +690,26 @@ def _paired_arm_predictions(
     return real_arm, control_arm
 
 
+def _windows_by_id(record: dict, *, name: str) -> dict:
+    """Index forecast windows by their stable identifier and reject duplicates."""
+    windows = record.get("windows")
+    if not isinstance(windows, list):
+        raise ValueError(f"{name} run lacks a window list; the difference is not attributable.")
+    indexed = {}
+    for window in windows:
+        if not isinstance(window, dict) or "window" not in window:
+            raise ValueError(
+                f"{name} run has an invalid window record; the difference is not attributable."
+            )
+        window_id = window["window"]
+        if window_id in indexed:
+            raise ValueError(
+                f"{name} run duplicates a window identifier; the difference is not attributable."
+            )
+        indexed[window_id] = window
+    return indexed
+
+
 def _require_identical_price_arm(
     real: dict,
     control: dict,
@@ -714,10 +734,16 @@ def _require_identical_price_arm(
         raise ValueError(
             "Runs have different price-arm summary metrics; the decomposition is not attributable."
         )
-    for real_window, control_window in zip(real["windows"], control["windows"]):
+    real_windows = _windows_by_id(real, name="real")
+    control_windows = _windows_by_id(control, name="control")
+    if real_windows.keys() != control_windows.keys():
+        raise ValueError(
+            "Runs have different test windows; the decomposition is not attributable."
+        )
+    for window_id, real_window in real_windows.items():
         if (
             real_window["metrics"].get(price_arm)
-            != control_window["metrics"].get(price_arm)
+            != control_windows[window_id]["metrics"].get(price_arm)
         ):
             raise ValueError(
                 "Runs have different price-arm window metrics; the decomposition is not attributable."
@@ -772,15 +798,17 @@ def compare_information_gain(
         raise ValueError("Runs lack prices_hash provenance; the difference is not attributable.")
     if real_price_hash != control_price_hash:
         raise ValueError("Runs have different price provenance; the difference is not attributable.")
-    real_test_dates = {window["window"]: window["test_dates"] for window in real["windows"]}
-    control_test_dates = {
-        window["window"]: window["test_dates"] for window in control["windows"]
+    real_windows = _windows_by_id(real, name="real")
+    control_windows = _windows_by_id(control, name="control")
+    if real_windows.keys() != control_windows.keys():
+        raise ValueError("Runs have different test windows; the difference is not attributable.")
+    real_test_dates = {
+        window_id: window["test_dates"] for window_id, window in real_windows.items()
     }
-    if (
-        len(real_test_dates) != len(real["windows"])
-        or len(control_test_dates) != len(control["windows"])
-        or real_test_dates != control_test_dates
-    ):
+    control_test_dates = {
+        window_id: window["test_dates"] for window_id, window in control_windows.items()
+    }
+    if real_test_dates != control_test_dates:
         raise ValueError("Runs have different test windows; the difference is not attributable.")
     real_arm, control_arm = _paired_arm_predictions(real_dir, control_dir, arm=arm)
     _require_identical_price_arm(
@@ -798,9 +826,9 @@ def compare_information_gain(
         neutral = levels["two_branch_neutral_prior"][metric]["mean"]
         actual = levels["two_branch_real_sentiment"][metric]["mean"]
         per_window = [
-            real["windows"][index]["metrics"][arm]["window_mean"][metric]
-            - control["windows"][index]["metrics"][arm]["window_mean"][metric]
-            for index in range(len(real["windows"]))
+            real_window["metrics"][arm]["window_mean"][metric]
+            - control_windows[window_id]["metrics"][arm]["window_mean"][metric]
+            for window_id, real_window in real_windows.items()
         ]
         effects[metric] = {
             "price_only": price,
