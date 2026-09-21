@@ -283,6 +283,7 @@ def validate_full_refit_reference(
         "cv_results_sha256": dataset.file_fingerprint(reference_path),
         "folds": reference["folds"],
         "data_size": reference["data_size"],
+        "input_variant": reference["input_variant"],
         "aggregate": reference["aggregate"],
     }
 

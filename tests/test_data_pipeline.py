@@ -200,6 +200,7 @@ def test_full_refit_reference_requires_the_evaluated_configuration(tmp_path):
     assert validated["folds"] == 5
     assert validated["data_size"] == 3
     assert validated["cv_results_sha256"] == file_fingerprint(reference_path)
+    assert validated["input_variant"] == "title_context"
 
     reference["train_config"]["epochs"] = 3.0
     reference_path.write_text(json.dumps(reference), encoding="utf-8")
@@ -231,7 +232,11 @@ def test_full_refit_manifest_records_provenance_without_test_metrics(tmp_path):
         device="cuda",
         warmup_steps=4,
         class_weights=model.compute_class_weights(frame["label_id"]),
-        evaluation_reference={"cv_results_sha256": "abc", "folds": 5},
+        evaluation_reference={
+            "cv_results_sha256": "abc",
+            "folds": 5,
+            "input_variant": "title_context",
+        },
     )
 
     assert manifest["run_type"] == "full_data_refit"
@@ -243,6 +248,7 @@ def test_full_refit_manifest_records_provenance_without_test_metrics(tmp_path):
     }
     assert manifest["selection"]["outer_holdout_used"] is False
     assert manifest["provenance"]["source_file_sha256"] == file_fingerprint(source)
+    assert manifest["selection"]["input_variant"] == "title_context"
     assert "test_metrics" not in manifest
 
 def test_stratified_folds_are_disjoint_and_cover_every_row():

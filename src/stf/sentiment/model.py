@@ -210,6 +210,18 @@ def resolve_inference_config(
     return strategy, MAX_LEN
 
 
+def resolve_input_variant(model_dir: Path) -> str:
+    """Read the model-input variant selected for a deployable checkpoint."""
+    manifest = _load_manifest(model_dir)
+    variant = manifest.get("selection", {}).get("input_variant") if manifest else None
+    if variant not in dataset.INPUT_VARIANTS:
+        raise ValueError(
+            "Checkpoint manifest lacks a valid selected input_variant; "
+            "rerun sentiment-refit before scoring news."
+        )
+    return variant
+
+
 def reproducibility_metadata() -> dict:
     """Data-independent environment metadata for manifests.
 
@@ -480,6 +492,9 @@ def build_full_refit_manifest(
     reviewed rows are used for the deployable checkpoint.
     """
     label_ids, counts = _full_refit_labels(frame)
+    input_variant = evaluation_reference.get("input_variant")
+    if input_variant not in dataset.INPUT_VARIANTS:
+        raise ValueError("evaluation_reference lacks a valid input_variant.")
 
     return {
         "run_type": "full_data_refit",
@@ -495,6 +510,7 @@ def build_full_refit_manifest(
             "strategy": "fixed_configuration_from_cross_validation",
             "outer_holdout_used": False,
             "validation_used": False,
+            "input_variant": input_variant,
             "evaluation_reference": evaluation_reference,
         },
         "reproducibility": reproducibility_metadata(),

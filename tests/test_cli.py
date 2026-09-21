@@ -65,6 +65,9 @@ def test_score_news_scores_articles_without_a_real_model(monkeypatch, tmp_path):
     model_dir = tmp_path / "fake-model"
     model_dir.mkdir()
     (model_dir / "config.json").write_text("{}", encoding="utf-8")
+    (model_dir / "manifest.json").write_text(
+        json.dumps({"selection": {"input_variant": "title"}}), encoding="utf-8"
+    )
     output = tmp_path / "scored.parquet"
     rc = main(
         [
@@ -149,6 +152,19 @@ def test_score_news_scores_articles_without_a_real_model(monkeypatch, tmp_path):
         changed_output.with_suffix(".manifest.json"), typ="series"
     )
     assert changed_manifest["input"]["fingerprint"] != manifest["input"]["fingerprint"]
+
+    with pytest.raises(ValueError, match="does not match checkpoint input variant"):
+        main(
+            [
+                "score-news",
+                "--model-dir",
+                str(model_dir),
+                "--input-variant",
+                "title_context",
+                "--output",
+                str(tmp_path / "mismatched.parquet"),
+            ]
+        )
 
 
     monkeypatch.setattr(
@@ -246,7 +262,16 @@ def test_forecast_binds_verified_score_manifest(monkeypatch, tmp_path, capsys):
     assert score_manifest["checkpoint_directory_sha256"] == "checkpoint-v1"
     assert score_manifest["inference"]["truncation_strategy"] == "head_tail"
 
-    news.loc[0, "prob_positive"] = 0.6
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    news.loc[0, "prob_negative"] = 1.2
+    news.to_parquet(news_path, index=False)
+    manifest["output"]["sha256"] = file_fingerprint(news_path)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    assert main(["forecast", "--news-sentiment", str(news_path)]) == 2
+    assert "invalid probability vectors" in capsys.readouterr().err
+
+    news.loc[0, "prob_negative"] = 0.1
+    news.loc[0, "url"] = "https://vietstock.vn/b.htm"
     news.to_parquet(news_path, index=False)
     assert main(["forecast", "--news-sentiment", str(news_path)]) == 2
     assert "parquet hash does not match manifest" in capsys.readouterr().err

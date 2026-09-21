@@ -337,6 +337,29 @@ def _validated_scored_news_manifest(news_path: Path, news: pd.DataFrame) -> dict
     ):
         raise ValueError(f"score-news manifest {manifest_path} is missing required provenance.")
 
+    identity_columns = {"ticker", "url", "published_at"}
+    probability_columns = {"prob_negative", "prob_neutral", "prob_positive"}
+    missing_columns = (identity_columns | probability_columns) - set(news.columns)
+    if missing_columns:
+        raise ValueError(
+            f"score-news parquet lacks required columns: {sorted(missing_columns)}."
+        )
+    if news.empty:
+        raise ValueError("score-news parquet has no rows.")
+    try:
+        probabilities = news.loc[:, sorted(probability_columns)].apply(
+            pd.to_numeric, errors="raise"
+        ).to_numpy(dtype="float64")
+    except (TypeError, ValueError) as error:
+        raise ValueError("score-news parquet has non-numeric probabilities.") from error
+    if (
+        not np.isfinite(probabilities).all()
+        or (probabilities < 0).any()
+        or (probabilities > 1).any()
+        or not np.isclose(probabilities.sum(axis=1), 1.0, atol=1e-6).all()
+    ):
+        raise ValueError("score-news parquet has invalid probability vectors.")
+
     actual_hash = file_fingerprint(news_path)
     if output.get("sha256") != actual_hash:
         raise ValueError(
@@ -382,7 +405,16 @@ def cmd_score_news(args: argparse.Namespace) -> int:
         predict_proba,
         reproducibility_metadata,
         resolve_inference_config,
+        resolve_input_variant,
     )
+
+    model_dir = Path(args.model_dir)
+    checkpoint_variant = resolve_input_variant(model_dir)
+    if args.input_variant != checkpoint_variant:
+        raise ValueError(
+            f"score-news input variant {args.input_variant!r} does not match "
+            f"checkpoint input variant {checkpoint_variant!r}."
+        )
 
     articles = load_ticker_articles()
     if args.limit is not None:
@@ -393,7 +425,6 @@ def cmd_score_news(args: argparse.Namespace) -> int:
     scored = build_input_text(
         articles, args.input_variant, context_chars=args.context_chars
     )
-    model_dir = Path(args.model_dir)
     effective_strategy, effective_max_len = resolve_inference_config(
         model_dir, truncation_strategy=args.truncation_strategy
     )

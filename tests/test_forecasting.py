@@ -863,3 +863,9 @@ def test_information_gain_decomposition_is_exact_and_guards_config_drift(tmp_pat
     )
     with pytest.raises(ValueError, match="required pairing columns"):
         compare_information_gain(real_dir, control_dir)
+
+    control_predictions.drop(columns="y_pred").to_csv(
+        control_dir / "forecast_predictions.csv", index=False
+    )
+    with pytest.raises(ValueError, match="required pairing columns"):
+        compare_information_gain(real_dir, control_dir)

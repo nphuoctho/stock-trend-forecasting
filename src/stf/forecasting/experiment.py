@@ -814,7 +814,9 @@ def compare_information_gain(
     }
     if real_test_dates != control_test_dates:
         raise ValueError("Runs have different test windows; the difference is not attributable.")
-    real_arm, control_arm = _paired_arm_predictions(real_dir, control_dir, arm=arm)
+    real_arm, control_arm = _paired_arm_predictions(
+        real_dir, control_dir, arm=arm, required_columns=("y_pred",)
+    )
     _require_identical_price_arm(
         real, control, real_dir, control_dir, price_arm=price_arm
     )
