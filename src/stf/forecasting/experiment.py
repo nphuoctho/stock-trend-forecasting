@@ -660,12 +660,13 @@ def _paired_arm_predictions(
     control_dir: Path,
     *,
     arm: str,
+    required_columns: tuple[str, ...] = (),
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Load one arm from paired runs and require identical test observations."""
     key_columns = ["window", "seed", "ticker", "target_date", "y_true"]
     real_preds = pd.read_csv(Path(real_dir) / "forecast_predictions.csv")
     control_preds = pd.read_csv(Path(control_dir) / "forecast_predictions.csv")
-    required = set(key_columns + ["arm"])
+    required = set(key_columns + ["arm", *required_columns])
     for name, predictions in (("real", real_preds), ("control", control_preds)):
         missing = required - set(predictions.columns)
         if missing:
@@ -720,7 +721,10 @@ def _require_identical_price_arm(
 ) -> None:
     """Require price-only predictions and metrics to be identical across paired runs."""
     real_price, control_price = _paired_arm_predictions(
-        real_dir, control_dir, arm=price_arm
+        real_dir,
+        control_dir,
+        arm=price_arm,
+        required_columns=("y_pred", "has_news"),
     )
     key_columns = ["window", "seed", "ticker", "target_date", "y_true"]
     real_price = real_price.sort_values(key_columns).reset_index(drop=True)
@@ -765,9 +769,9 @@ def compare_information_gain(
     preserves every article's timing and volume while replacing only its
     probabilities with the constant neutral prior. The price-only arm lacks the
     news-presence and volume features retained by this control, so its difference
-    from the neutral two-branch arm is an architecture-and-news-presence effect.
-    The runs must share their configuration and identical price-arm predictions,
-    otherwise the difference is not attributable and this raises.
+    from the neutral two-branch arm is an architecture-and-news-presence-volume
+    effect. The runs must share their configuration and identical price-arm
+    predictions, otherwise the difference is not attributable and this raises.
     """
     real = json.loads((Path(real_dir) / "forecast_results.json").read_text(encoding="utf-8"))
     control = json.loads(
@@ -834,7 +838,7 @@ def compare_information_gain(
             "price_only": price,
             "two_branch_neutral_prior": neutral,
             "two_branch_real_sentiment": actual,
-            "architecture_and_news_presence_effect": neutral - price,
+            "architecture_and_news_presence_volume_effect": neutral - price,
             "information_gain": actual - neutral,
             "naive_delta": actual - price,
             "information_gain_per_window": per_window,

@@ -302,25 +302,87 @@ def _directory_fingerprint(path: Path) -> str | None:
     return digest.hexdigest()
 
 
-def _scored_input_fingerprint(scored: pd.DataFrame) -> str:
-    """Hash the scored article content independently of crawler row order."""
-    columns = ["ticker", "url", "published_at", "text"]
-    digest = hashlib.sha256()
-    digest.update(b"stf-score-news-input-v1\0")
-    canonical = scored.loc[:, columns].sort_values(columns, kind="stable")
-    for row in canonical.itertuples(index=False, name=None):
-        for value in row:
-            encoded = ("" if pd.isna(value) else str(value)).encode("utf-8")
-            digest.update(len(encoded).to_bytes(8, "big"))
-            digest.update(encoded)
-    return digest.hexdigest()
+def _checkpoint_manifest_path(model_dir: Path) -> Path | None:
+    """Find the manifest used by inference, matching the model loader's lookup."""
+    for candidate in (model_dir / "manifest.json", model_dir.parent / "manifest.json"):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _validated_scored_news_manifest(news_path: Path, news: pd.DataFrame) -> dict:
+    """Bind a forecast input to the contemporaneous score-news sidecar."""
+    from stf.sentiment.dataset import file_fingerprint
+
+    manifest_path = news_path.with_suffix(".manifest.json")
+    if not manifest_path.is_file():
+        raise ValueError(
+            f"missing score-news manifest {manifest_path}; rerun score-news before forecast."
+        )
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"invalid score-news manifest {manifest_path}.") from error
+    if manifest.get("schema_version") != 2:
+        raise ValueError(
+            f"unsupported score-news manifest schema at {manifest_path}; rerun score-news."
+        )
+
+    output = manifest.get("output")
+    checkpoint = manifest.get("checkpoint")
+    inference = manifest.get("inference")
+    score_input = manifest.get("input")
+    if not all(
+        isinstance(value, dict) for value in (output, checkpoint, inference, score_input)
+    ):
+        raise ValueError(f"score-news manifest {manifest_path} is missing required provenance.")
+
+    actual_hash = file_fingerprint(news_path)
+    if output.get("sha256") != actual_hash:
+        raise ValueError(
+            f"score-news parquet hash does not match manifest {manifest_path}."
+        )
+    if output.get("rows") != int(len(news)):
+        raise ValueError(
+            f"score-news parquet row count does not match manifest {manifest_path}."
+        )
+    if not checkpoint.get("directory_sha256"):
+        raise ValueError(f"score-news manifest {manifest_path} lacks checkpoint provenance.")
+    if (
+        not score_input.get("fingerprint")
+        or inference.get("truncation_strategy") not in ("head", "tail", "head_tail")
+        or not isinstance(inference.get("max_len"), int)
+        or inference["max_len"] < 1
+        or not isinstance(inference.get("batch_size"), int)
+        or inference["batch_size"] < 1
+        or not isinstance(inference.get("runtime"), dict)
+    ):
+        raise ValueError(f"score-news manifest {manifest_path} lacks inference provenance.")
+
+    return {
+        "manifest_path": str(manifest_path),
+        "manifest_sha256": file_fingerprint(manifest_path),
+        "output_sha256": actual_hash,
+        "checkpoint_directory_sha256": checkpoint["directory_sha256"],
+        "checkpoint_manifest_sha256": checkpoint.get("manifest_sha256"),
+        "inference": inference,
+        "input": score_input,
+    }
 
 
 def cmd_score_news(args: argparse.Namespace) -> int:
     """Score crawler rows and persist audited probability provenance."""
     from stf.data.news import load_ticker_articles
-    from stf.sentiment.dataset import build_input_text, file_fingerprint
-    from stf.sentiment.model import predict_proba
+    from stf.sentiment.dataset import (
+        build_input_text,
+        file_fingerprint,
+        frame_fingerprint,
+    )
+    from stf.sentiment.model import (
+        predict_proba,
+        reproducibility_metadata,
+        resolve_inference_config,
+    )
 
     articles = load_ticker_articles()
     if args.limit is not None:
@@ -332,11 +394,15 @@ def cmd_score_news(args: argparse.Namespace) -> int:
         articles, args.input_variant, context_chars=args.context_chars
     )
     model_dir = Path(args.model_dir)
+    effective_strategy, effective_max_len = resolve_inference_config(
+        model_dir, truncation_strategy=args.truncation_strategy
+    )
     probs = predict_proba(
         scored["text"].tolist(),
         model_dir,
         batch_size=args.batch_size,
-        truncation_strategy=args.truncation_strategy,
+        truncation_strategy=effective_strategy,
+        max_len=effective_max_len,
     )
     probability_columns = ["prob_negative", "prob_neutral", "prob_positive"]
     probs = np.asarray(probs, dtype="float64")
@@ -367,9 +433,9 @@ def cmd_score_news(args: argparse.Namespace) -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     out.to_parquet(output_path, index=False)
     manifest_path = output_path.with_suffix(".manifest.json")
-    refit_manifest_path = model_dir.parent / "manifest.json"
+    refit_manifest_path = _checkpoint_manifest_path(model_dir)
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "output": {
             "path": str(output_path),
             "sha256": file_fingerprint(output_path),
@@ -391,18 +457,24 @@ def cmd_score_news(args: argparse.Namespace) -> int:
             "directory": str(model_dir),
             "directory_sha256": _directory_fingerprint(model_dir),
             "manifest_path": str(refit_manifest_path)
-            if refit_manifest_path.is_file()
+            if refit_manifest_path is not None
             else None,
             "manifest_sha256": file_fingerprint(refit_manifest_path)
-            if refit_manifest_path.is_file()
+            if refit_manifest_path is not None
             else None,
         },
+        "inference": {
+            "truncation_strategy": effective_strategy,
+            "max_len": effective_max_len,
+            "batch_size": args.batch_size,
+            "runtime": reproducibility_metadata(),
+        },
         "input": {
-            "fingerprint": _scored_input_fingerprint(scored),
+            "fingerprint": frame_fingerprint(
+                scored, columns=("ticker", "url", "published_at", "text")
+            ),
             "variant": args.input_variant,
             "context_chars": args.context_chars,
-            "truncation_strategy": args.truncation_strategy,
-            "batch_size": args.batch_size,
             "limit": args.limit,
         },
     }
@@ -572,6 +644,11 @@ def cmd_forecast(args: argparse.Namespace) -> int:
             print(f"forecast: missing {news_path}", file=sys.stderr)
             return 2
         news = pd.read_parquet(news_path)
+        try:
+            score_manifest = _validated_scored_news_manifest(news_path, news)
+        except ValueError as error:
+            print(f"forecast: {error}", file=sys.stderr)
+            return 2
         source_hash = frame_hash(news)
         mode = "real"
         if args.neutral_news_sentiment is not None:
@@ -597,6 +674,7 @@ def cmd_forecast(args: argparse.Namespace) -> int:
             "source_hash": source_hash,
             "feature_hash": frame_hash(news),
             "rows": int(len(news)),
+            "score_manifest": score_manifest,
         }
 
     panel = assemble(prices, news)
@@ -865,8 +943,8 @@ def cmd_forecast_compare(args: argparse.Namespace) -> int:
         print(f"      two-branch neutral prior   {effect['two_branch_neutral_prior']:.4f}")
         print(f"      two-branch real sentiment  {effect['two_branch_real_sentiment']:.4f}")
         print(
-            "      architecture + news presence "
-            f"{effect['architecture_and_news_presence_effect']:+.4f}"
+            "      architecture + news presence/volume "
+            f"{effect['architecture_and_news_presence_volume_effect']:+.4f}"
         )
         print(
             f"      information gain           {effect['information_gain']:+.4f}  "
@@ -1071,12 +1149,15 @@ def main(argv: list[str] | None = None) -> int:
     news_input.add_argument(
         "--news-sentiment",
         default=None,
-        help="parquet from score-news with observed sentiment probabilities",
+        help="verified score-news parquet with observed sentiment probabilities",
     )
     news_input.add_argument(
         "--neutral-news-sentiment",
         default=None,
-        help="parquet from score-news; preserve article timing and volume, force neutral probabilities",
+        help=(
+            "verified score-news parquet; preserve article timing and volume, "
+            "force neutral probabilities"
+        ),
     )
     p_forecast.add_argument("--output", default="outputs/forecast", help="artifact directory")
     p_forecast.add_argument("--seq-len", type=int, default=5)

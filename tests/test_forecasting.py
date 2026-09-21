@@ -782,13 +782,25 @@ def test_information_gain_decomposition_is_exact_and_guards_config_drift(tmp_pat
     report = compare_information_gain(real_dir, control_dir)
     effect = report["effects"]["macro_f1"]
     assert (
-        effect["architecture_and_news_presence_effect"] + effect["information_gain"]
+        effect["architecture_and_news_presence_volume_effect"]
+        + effect["information_gain"]
         == pytest.approx(effect["naive_delta"])
     )
     assert len(effect["information_gain_per_window"]) == 2
 
-    # Window records are keyed by their identifier, not their JSON list position.
+    # Config equality remains mandatory even when all prediction rows match.
     control_results_path = control_dir / "forecast_results.json"
+    original_control_results = json.loads(
+        control_results_path.read_text(encoding="utf-8")
+    )
+    config_drift = json.loads(control_results_path.read_text(encoding="utf-8"))
+    config_drift["config"]["epochs"] += 1
+    control_results_path.write_text(json.dumps(config_drift), encoding="utf-8")
+    with pytest.raises(ValueError, match="different configs"):
+        compare_information_gain(real_dir, control_dir)
+    control_results_path.write_text(json.dumps(original_control_results), encoding="utf-8")
+
+    # Window records are keyed by their identifier, not their JSON list position.
     control_results = json.loads(control_results_path.read_text(encoding="utf-8"))
     control_results["windows"].reverse()
     control_results_path.write_text(json.dumps(control_results), encoding="utf-8")
@@ -843,4 +855,11 @@ def test_information_gain_decomposition_is_exact_and_guards_config_drift(tmp_pat
     )
     control_predictions.to_csv(control_dir / "forecast_predictions.csv", index=False)
     with pytest.raises(ValueError, match="different price-arm predictions"):
+        compare_information_gain(real_dir, control_dir)
+
+    # Stale artifacts must report a documented pairing error, not leak a KeyError.
+    control_predictions.drop(columns="has_news").to_csv(
+        control_dir / "forecast_predictions.csv", index=False
+    )
+    with pytest.raises(ValueError, match="required pairing columns"):
         compare_information_gain(real_dir, control_dir)

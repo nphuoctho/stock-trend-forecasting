@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -49,10 +51,14 @@ def test_score_news_scores_articles_without_a_real_model(monkeypatch, tmp_path):
 
     captured = {}
 
-    def fake_predict_proba(texts, model_dir, *, batch_size=32, truncation_strategy=None):
+    def fake_predict_proba(
+        texts, model_dir, *, batch_size=32, truncation_strategy=None, max_len=None
+    ):
         captured["texts"] = list(texts)
         captured["model_dir"] = model_dir
-        return np.array([[0.7, 0.2, 0.1], [0.1, 0.2, 0.7]])
+        captured["truncation_strategy"] = truncation_strategy
+        captured["max_len"] = max_len
+        return np.array([[0.7, 0.2, 0.1], [0.1, 0.2, 0.7]])[: len(texts)]
 
     monkeypatch.setattr(model_module, "predict_proba", fake_predict_proba)
 
@@ -78,9 +84,33 @@ def test_score_news_scores_articles_without_a_real_model(monkeypatch, tmp_path):
     assert manifest["output"]["rows"] == 2
     assert manifest["probabilities"]["totals"]["prob_neutral"] == pytest.approx(0.4)
     assert manifest["checkpoint"]["directory_sha256"]
+    assert manifest["schema_version"] == 2
+    assert manifest["inference"]["truncation_strategy"] == "head"
+    assert manifest["inference"]["max_len"] == 256
     assert manifest["input"]["variant"] == "title"
     assert manifest["input"]["fingerprint"]
     assert manifest["input"]["limit"] is None
+
+    limited_output = tmp_path / "limited.parquet"
+    assert (
+        main(
+            [
+                "score-news",
+                "--model-dir",
+                str(model_dir),
+                "--limit",
+                "1",
+                "--output",
+                str(limited_output),
+            ]
+        )
+        == 0
+    )
+    limited_manifest = pd.read_json(
+        limited_output.with_suffix(".manifest.json"), typ="series"
+    )
+    assert len(pd.read_parquet(limited_output)) == 1
+    assert limited_manifest["input"]["limit"] == 1
 
     articles = articles.iloc[::-1].reset_index(drop=True)
     reordered_output = tmp_path / "reordered.parquet"
@@ -138,3 +168,85 @@ def test_score_news_scores_articles_without_a_real_model(monkeypatch, tmp_path):
             ]
         )
     assert not invalid_output.exists()
+
+
+def test_forecast_binds_verified_score_manifest(monkeypatch, tmp_path, capsys):
+    from stf import cli as cli_module
+    from stf import forecasting as forecasting_module
+    from stf.forecasting import experiment as experiment_module
+    from stf.sentiment.dataset import file_fingerprint
+
+    news_path = tmp_path / "scored.parquet"
+    news = pd.DataFrame(
+        {
+            "ticker": ["FPT"],
+            "url": ["https://vietstock.vn/a.htm"],
+            "published_at": ["2021-01-01T10:00:00+07:00"],
+            "prob_negative": [0.1],
+            "prob_neutral": [0.2],
+            "prob_positive": [0.7],
+        }
+    )
+    news.to_parquet(news_path, index=False)
+    manifest_path = news_path.with_suffix(".manifest.json")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "output": {"sha256": file_fingerprint(news_path), "rows": 1},
+                "checkpoint": {"directory_sha256": "checkpoint-v1"},
+                "inference": {
+                    "truncation_strategy": "head_tail",
+                    "max_len": 256,
+                    "batch_size": 32,
+                    "runtime": {},
+                },
+                "input": {"fingerprint": "inputs-v1"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    prices = pd.DataFrame(
+        {
+            "ticker": ["FPT"],
+            "time": [pd.Timestamp("2021-01-01")],
+            "close": [100.0],
+        }
+    )
+    panel = pd.DataFrame({"has_news": [1]})
+    captured = {}
+    monkeypatch.setattr(cli_module, "_load_prices", lambda: prices)
+    monkeypatch.setattr(forecasting_module, "assemble", lambda *_args: panel)
+
+    def fake_run_experiment(panel, *, cfg, output_dir, provenance):
+        captured["provenance"] = provenance
+        return {
+            "panel_rows": len(panel),
+            "windows": [],
+            "chance_level": 1 / 3,
+            "summary": {},
+            "ablation": {},
+        }
+
+    monkeypatch.setattr(experiment_module, "run_experiment", fake_run_experiment)
+    assert (
+        main(
+            [
+                "forecast",
+                "--news-sentiment",
+                str(news_path),
+                "--output",
+                str(tmp_path / "forecast"),
+            ]
+        )
+        == 0
+    )
+    score_manifest = captured["provenance"]["news_sentiment"]["score_manifest"]
+    assert score_manifest["manifest_sha256"] == file_fingerprint(manifest_path)
+    assert score_manifest["checkpoint_directory_sha256"] == "checkpoint-v1"
+    assert score_manifest["inference"]["truncation_strategy"] == "head_tail"
+
+    news.loc[0, "prob_positive"] = 0.6
+    news.to_parquet(news_path, index=False)
+    assert main(["forecast", "--news-sentiment", str(news_path)]) == 2
+    assert "parquet hash does not match manifest" in capsys.readouterr().err
