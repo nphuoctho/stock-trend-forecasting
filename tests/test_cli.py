@@ -79,6 +79,47 @@ def test_score_news_scores_articles_without_a_real_model(monkeypatch, tmp_path):
     assert manifest["probabilities"]["totals"]["prob_neutral"] == pytest.approx(0.4)
     assert manifest["checkpoint"]["directory_sha256"]
     assert manifest["input"]["variant"] == "title"
+    assert manifest["input"]["fingerprint"]
+    assert manifest["input"]["limit"] is None
+
+    articles = articles.iloc[::-1].reset_index(drop=True)
+    reordered_output = tmp_path / "reordered.parquet"
+    assert (
+        main(
+            [
+                "score-news",
+                "--model-dir",
+                str(model_dir),
+                "--output",
+                str(reordered_output),
+            ]
+        )
+        == 0
+    )
+    reordered_manifest = pd.read_json(
+        reordered_output.with_suffix(".manifest.json"), typ="series"
+    )
+    assert reordered_manifest["input"]["fingerprint"] == manifest["input"]["fingerprint"]
+
+    articles.loc[0, "title"] = "Tin A đã sửa"
+    changed_output = tmp_path / "changed.parquet"
+    assert (
+        main(
+            [
+                "score-news",
+                "--model-dir",
+                str(model_dir),
+                "--output",
+                str(changed_output),
+            ]
+        )
+        == 0
+    )
+    changed_manifest = pd.read_json(
+        changed_output.with_suffix(".manifest.json"), typ="series"
+    )
+    assert changed_manifest["input"]["fingerprint"] != manifest["input"]["fingerprint"]
+
 
     monkeypatch.setattr(
         model_module,

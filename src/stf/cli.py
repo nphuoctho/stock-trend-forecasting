@@ -302,6 +302,20 @@ def _directory_fingerprint(path: Path) -> str | None:
     return digest.hexdigest()
 
 
+def _scored_input_fingerprint(scored: pd.DataFrame) -> str:
+    """Hash the scored article content independently of crawler row order."""
+    columns = ["ticker", "url", "published_at", "text"]
+    digest = hashlib.sha256()
+    digest.update(b"stf-score-news-input-v1\0")
+    canonical = scored.loc[:, columns].sort_values(columns, kind="stable")
+    for row in canonical.itertuples(index=False, name=None):
+        for value in row:
+            encoded = ("" if pd.isna(value) else str(value)).encode("utf-8")
+            digest.update(len(encoded).to_bytes(8, "big"))
+            digest.update(encoded)
+    return digest.hexdigest()
+
+
 def cmd_score_news(args: argparse.Namespace) -> int:
     """Score crawler rows and persist audited probability provenance."""
     from stf.data.news import load_ticker_articles
@@ -384,10 +398,12 @@ def cmd_score_news(args: argparse.Namespace) -> int:
             else None,
         },
         "input": {
+            "fingerprint": _scored_input_fingerprint(scored),
             "variant": args.input_variant,
             "context_chars": args.context_chars,
             "truncation_strategy": args.truncation_strategy,
             "batch_size": args.batch_size,
+            "limit": args.limit,
         },
     }
     manifest_path.write_text(
