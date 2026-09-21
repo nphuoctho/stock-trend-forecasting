@@ -162,9 +162,9 @@ uv run python -m stf.cli sentiment-refit \
 ```
 
 Lệnh bắt buộc mã băm dữ liệu, cấu hình và kích thước mẫu phải khớp artifact CV. Nó
-huấn luyện trên toàn bộ nhãn đã duyệt với số epoch cố định, không rút validation hoặc
-outer holdout nên manifest không chứa chỉ số kiểm thử. Sau khi tải checkpoint về, chạy
-`score-news`, hai lệnh `forecast` và `forecast-compare` theo `README.md`.
+huấn luyện trên toàn bộ nhãn đã duyệt với số epoch cố định, không tạo hoặc ghi chỉ số kiểm
+thử mới từ lượt refit; manifest chỉ tham chiếu kết quả CV đã khóa. Sau khi tải checkpoint
+về, chạy `score-news`, hai lệnh `forecast` và `forecast-compare` theo `README.md`.
 
 ## Cải thiện tùy chọn
 - Nếu mở rộng nhãn, giữ một tầng lấy mẫu ngẫu nhiên độc lập cho đánh giá và đưa

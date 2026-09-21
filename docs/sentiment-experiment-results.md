@@ -46,6 +46,10 @@ luyện triển khai hậu xác thực chéo, không sinh chỉ số kiểm th�
 dùng đúng cùng parquet đã chấm; đối chứng chỉ thay xác suất mỗi bài thành
 `(NEGATIVE=0, NEUTRAL=1, POSITIVE=0)`, nên giữ nguyên thời điểm, số lượng tin và cờ có tin.
 
+Các artifact forecast hiện có có trước lược đồ sidecar phiên bản 2. Vì vậy chúng không
+được diễn giải là đã kiểm tra mã băm parquet/điểm kiểm bởi sidecar; không tạo backfill
+tổng hợp. Một lượt tái chạy từ checkpoint và parquet xác định mới có thể mang bảo đảm đó.
+
 | Chỉ số LSTM | Chỉ giá | Hai nhánh trung tính | Hai nhánh cảm xúc thật | Đóng góp thông tin |
 | --- | ---: | ---: | ---: | ---: |
 | F1 vĩ mô | 0.3797 | 0.3841 | 0.3907 | +0.0066 |

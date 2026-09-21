@@ -167,6 +167,10 @@ uv run python -m stf.cli sentiment-refit \
 `body_preview` ở 400 ký tự, còn `articles.parquet` giữ nội dung đầy đủ; bỏ cờ này sẽ
 suy luận trên đầu vào dài hơn miền huấn luyện.
 
+`score-news` đọc dạng đầu vào đã khóa trong manifest của điểm kiểm; cờ
+`--input-variant` phải khớp chính xác để không chấm tiêu đề bằng điểm kiểm đã huấn luyện
+trên tiêu đề--ngữ cảnh.
+
 ```bash
 uv run python -m stf.cli score-news \
   --model-dir models/sentiment/merged-refit/best \
