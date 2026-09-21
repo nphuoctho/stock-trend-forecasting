@@ -1,0 +1,76 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #0b1020;
+  --foreground: #e6ebf5;
+  --card: #141b2d;
+  --card-foreground: #e6ebf5;
+  --popover: #141b2d;
+  --popover-foreground: #e6ebf5;
+  --primary: #2dd4bf;
+  --primary-foreground: #06251f;
+  --secondary: #1c2742;
+  --secondary-foreground: #c6d0e5;
+  --muted: #1c2742;
+  --muted-foreground: #8b98b8;
+  --accent: #2dd4bf;
+  --accent-foreground: #06251f;
+  --destructive: #f87171;
+  --destructive-foreground: #2a0a0a;
+  --border: #26314a;
+  --input: #26314a;
+  --ring: #2dd4bf;
+  --radius: 0.625rem;
+  --chart-1: #2dd4bf;
+  --chart-2: #818cf8;
+  --chart-3: #f472b6;
+  --chart-4: #64748b;
+  --chart-5: #d97706;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family:
+    'Inter',
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

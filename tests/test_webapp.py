@@ -76,3 +76,50 @@ def test_run_scoped_endpoints_and_filters(client):
 def test_unknown_run_and_missing_information_gain_return_404(client):
     assert client.get("/api/runs/missing/summary").status_code == 404
     assert client.get("/api/runs/run_a/information-gain").status_code == 404
+
+
+def test_legacy_artifact_keys_are_normalized(client, tmp_path, monkeypatch):
+    """Pre-rename runs expose canonical keys through the API."""
+    run_dir = tmp_path / "outputs" / "legacy"
+    run_dir.mkdir(parents=True)
+    (run_dir / "forecast_results.json").write_text(
+        json.dumps(
+            {
+                "provenance": {
+                    "news_sentiment": {
+                        "path": "data/processed/news_sentiment.parquet",
+                        "hash": "abc123",
+                        "rows": 5,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "information_gain.json").write_text(
+        json.dumps(
+            {
+                "arm": "lstm_price_sentiment",
+                "price_arm": "lstm_price",
+                "effects": {
+                    "macro_f1": {
+                        "architecture_effect": 0.01,
+                        "information_gain": 0.02,
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    runs = {run["name"]: run for run in client.get("/api/runs").json()["runs"]}
+    assert runs["legacy"]["mode"] == "real"
+
+    news = client.get("/api/runs/legacy/summary").json()["provenance"]["news_sentiment"]
+    assert news["source_path"] == "data/processed/news_sentiment.parquet"
+    assert news["source_hash"] == "abc123"
+    assert "path" not in news and "hash" not in news
+
+    effect = client.get("/api/runs/legacy/information-gain").json()["effects"]["macro_f1"]
+    assert effect["architecture_and_news_presence_volume_effect"] == 0.01
+    assert "architecture_effect" not in effect

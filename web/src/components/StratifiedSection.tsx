@@ -11,6 +11,23 @@ import {
 } from 'recharts'
 import { StratifiedByNews, StratifiedRow, StratumStat } from '../api'
 import { armLabel, fmt, fmtInt, fmtSigned, metricLabel } from '../format'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { cn } from '@/lib/utils'
 
 type StratMetric = 'macro_f1' | 'balanced_accuracy' | 'accuracy'
 const STRATIFIED_METRICS: StratMetric[] = ['macro_f1', 'balanced_accuracy', 'accuracy']
@@ -87,29 +104,32 @@ export default function StratifiedSection({
   if (!stratifiedByNews && rows.length === 0) return null
 
   return (
-    <section className="panel">
-      <div className="panel-head">
-        <h2>Phân tầng theo tin tức</h2>
-        <label className="inline-filter">
-          Chỉ số{' '}
-          <select
-            value={metric}
-            onChange={(e) => setMetric(e.target.value as StratMetric)}
-          >
-            {STRATIFIED_METRICS.map((m) => (
-              <option key={m} value={m}>
-                {metricLabel(m)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <p className="panel-note">
-        Hiệu năng trên các quan sát có tin tức trong ngày so với ngày không tin.
-      </p>
-
-      {chartData.length > 0 && (
-        <div className="chart-block">
+    <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+        <div className="space-y-1">
+          <CardTitle>Phân tầng theo tin tức</CardTitle>
+          <CardDescription>
+            Hiệu năng trên các quan sát có tin tức trong ngày so với ngày không tin.
+          </CardDescription>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Chỉ số</span>
+          <Select value={metric} onValueChange={(v) => setMetric(v as StratMetric)}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STRATIFIED_METRICS.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {metricLabel(m)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {chartData.length > 0 && (
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#26314a" />
@@ -129,7 +149,11 @@ export default function StratifiedSection({
                 tickFormatter={(v: number) => v.toFixed(3)}
               />
               <Tooltip
-                contentStyle={{ background: '#141b2d', border: '1px solid #26314a' }}
+                contentStyle={{
+                  background: '#141b2d',
+                  border: '1px solid #26314a',
+                  borderRadius: '8px',
+                }}
                 labelStyle={{ color: '#e6ebf5' }}
                 formatter={(v) => (typeof v === 'number' ? v.toFixed(4) : v)}
               />
@@ -138,49 +162,49 @@ export default function StratifiedSection({
               <Bar dataKey="Không tin tức" fill="#64748b" />
             </BarChart>
           </ResponsiveContainer>
-        </div>
-      )}
+        )}
 
-      {windowRows.length > 0 && (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Nhánh</th>
-                <th>Cửa sổ</th>
-                <th>n có tin</th>
-                <th>n không tin</th>
-                <th>{metricLabel(metric)} — có tin</th>
-                <th>{metricLabel(metric)} — không tin</th>
-                <th>Δ</th>
-              </tr>
-            </thead>
-            <tbody>
+        {windowRows.length > 0 && (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nhánh</TableHead>
+                <TableHead>Cửa sổ</TableHead>
+                <TableHead>n có tin</TableHead>
+                <TableHead>n không tin</TableHead>
+                <TableHead>{metricLabel(metric)} — có tin</TableHead>
+                <TableHead>{metricLabel(metric)} — không tin</TableHead>
+                <TableHead>Δ</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {windowRows.map((r) => {
                 const delta =
                   r.hasMean !== null && r.noMean !== null ? r.hasMean - r.noMean : null
                 return (
-                  <tr key={`${r.arm}-${r.window}`}>
-                    <td>{armLabel(r.arm)}</td>
-                    <td>{r.window}</td>
-                    <td>{fmtInt(r.hasN)}</td>
-                    <td>{fmtInt(r.noN)}</td>
-                    <td>{fmt(r.hasMean)}</td>
-                    <td>{fmt(r.noMean)}</td>
-                    <td
-                      className={
-                        delta !== null ? (delta > 0 ? 'pos' : delta < 0 ? 'neg' : '') : ''
-                      }
+                  <TableRow key={`${r.arm}-${r.window}`}>
+                    <TableCell>{armLabel(r.arm)}</TableCell>
+                    <TableCell className="tabular-nums">{r.window}</TableCell>
+                    <TableCell className="tabular-nums">{fmtInt(r.hasN)}</TableCell>
+                    <TableCell className="tabular-nums">{fmtInt(r.noN)}</TableCell>
+                    <TableCell className="tabular-nums">{fmt(r.hasMean)}</TableCell>
+                    <TableCell className="tabular-nums">{fmt(r.noMean)}</TableCell>
+                    <TableCell
+                      className={cn(
+                        'tabular-nums',
+                        delta !== null &&
+                          (delta > 0 ? 'text-primary' : delta < 0 ? 'text-destructive' : ''),
+                      )}
                     >
                       {fmtSigned(delta)}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )
               })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   )
 }

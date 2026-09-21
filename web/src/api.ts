@@ -48,8 +48,6 @@ export interface NewsSentimentProv {
   source_path?: string
   source_hash?: string
   feature_hash?: string
-  path?: string
-  hash?: string
   rows?: number
 }
 
@@ -120,7 +118,6 @@ export interface IgEffect {
   price_only: number | null
   two_branch_neutral_prior: number | null
   two_branch_real_sentiment: number | null
-  architecture_effect?: number | null
   architecture_and_news_presence_volume_effect?: number | null
   information_gain: number | null
   naive_delta: number | null
