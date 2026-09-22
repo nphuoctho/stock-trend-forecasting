@@ -68,8 +68,9 @@ là $-0{,}0024$ F1 vĩ mô, khoảng tin cậy theo ngày $[-0{,}0134; +0{,}0079
 lượng điểm là $+0{,}0061$ nhưng cả khoảng theo ngày $[-0{,}0041; +0{,}0181]$ lẫn khoảng
 theo cửa sổ $[-0{,}0008; +0{,}0143]$ đều chứa 0, nên không được dùng làm bằng chứng.
 
-So với lượt hồi cứu ($+0{,}0040$ ở LSTM), ước lượng điểm giảm khoảng $0{,}006$ và đổi dấu.
-Độ dịch chuyển này nằm trong bề rộng khoảng tin cậy của cả hai lượt và có ít nhất hai cách
+So với lượt hồi cứu, chỉ ước lượng theo cửa sổ đổi dấu ($+0{,}0040 \to -0{,}0024$); ước
+lượng theo ngày, vốn là căn cứ chính, đã âm ở cả hai lượt ($-0{,}0013 \to -0{,}0029$).
+Độ dịch chuyển nằm trong bề rộng khoảng tin cậy của cả hai lượt và có ít nhất hai cách
 giải thích mà đồ án không tách được: rò rỉ thời điểm qua bộ sinh ở lượt hồi cứu, và việc
 điểm kiểm đóng băng chỉ học từ 1.049 thay vì 1.306 nhãn nên yếu hơn. Phép tách cần một lượt
 huấn luyện trên 1.049 nhãn lấy ngẫu nhiên không theo thời gian; hạng mục này chưa thực hiện.

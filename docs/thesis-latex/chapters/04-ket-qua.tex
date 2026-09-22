@@ -491,8 +491,8 @@ Khoảng theo ngày được ưu tiên vì chỉ có năm khối cửa sổ.
     Chỉ số & Hiệu số & Khoảng tin cậy 95\% & Hiệu số & Khoảng tin cậy 95\% \\
     \midrule
     F1 vĩ mô & $+0{,}0040$ & $[+0{,}0016; +0{,}0078]$ & $-0{,}0013$ & $[-0{,}0105; +0{,}0082]$ \\
-    Độ chính xác cân bằng & $+0{,}0027$ & $[-0{,}0043; +0{,}0097]$ & $-0{,}0015$ & $[-0{,}0115; +0{,}0062]$ \\
-    Độ chính xác & $-0{,}0039$ & $[-0{,}0181; +0{,}0070]$ & $-0{,}0037$ & $[-0{,}0126; +0{,}0052]$ \\
+    Độ chính xác cân bằng & $+0{,}0027$ & $[-0{,}0043; +0{,}0097]$ & $-0{,}0029$ & $[-0{,}0115; +0{,}0062]$ \\
+    Độ chính xác & $-0{,}0039$ & $[-0{,}0181; +0{,}0070]$ & $-0{,}0039$ & $[-0{,}0126; +0{,}0052]$ \\
     \bottomrule
   \end{tabular}
 \noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment\_tft/information\_gain.json}.}
@@ -548,15 +548,19 @@ $[-0{,}0041; +0{,}0181]$; khoảng theo cửa sổ $[-0{,}0008; +0{,}0143]$ cũn
 nên con số dương này không được nâng thành bằng chứng, chỉ được ghi nhận để so sánh
 giữa hai kiến trúc.
 
-So với lượt hồi cứu ($+0{,}0040$ ở LSTM), ước lượng điểm giảm khoảng $0{,}006$ và
-đổi dấu. Có hai cách giải thích và đồ án không tách được chúng. Thứ nhất, một phần
-hiệu số dương của lượt hồi cứu đến từ việc bộ sinh xác suất đã nhìn thấy nhãn thuộc
-giai đoạn kiểm thử. Thứ hai, điểm kiểm đóng băng chỉ học từ 1.049 nhãn thay vì 1.306,
-nên bản thân bộ phân loại cảm xúc yếu hơn và sinh ra xác suất nhiễu hơn. Độ dịch
-chuyển này nằm trong bề rộng khoảng tin cậy của cả hai lượt, vì vậy không đủ căn cứ
-để quy toàn bộ cho rò rỉ thời điểm. Một phép tách cần lượt thứ ba: điểm kiểm huấn
-luyện trên 1.049 nhãn lấy ngẫu nhiên không theo thời gian, để cô lập ảnh hưởng của
-kích thước tập huấn luyện --- hạng mục này chưa thực hiện.
+So với lượt hồi cứu, chỉ ước lượng \emph{theo cửa sổ} đổi dấu: từ $+0{,}0040$ xuống
+$-0{,}0024$. Ước lượng \emph{theo ngày}, vốn là căn cứ chính, đã âm ở cả hai lượt
+($-0{,}0013$ ở lượt hồi cứu, $-0{,}0029$ ở lượt đóng băng), nên điểm kiểm phù hợp thời
+điểm không tạo ra một sự đảo chiều kết luận mà làm ước lượng âm sẵn có rõ hơn một chút.
+
+Độ dịch chuyển khoảng $0{,}006$ ở ước lượng theo cửa sổ có ít nhất hai cách giải thích và
+đồ án không tách được chúng. Thứ nhất, một phần hiệu số dương của lượt hồi cứu đến từ
+việc bộ sinh xác suất đã nhìn thấy nhãn thuộc giai đoạn kiểm thử. Thứ hai, điểm kiểm đóng
+băng chỉ học từ 1.049 nhãn thay vì 1.306, nên bản thân bộ phân loại cảm xúc yếu hơn và
+sinh ra xác suất nhiễu hơn. Độ dịch chuyển này nằm trong bề rộng khoảng tin cậy của cả hai
+lượt, vì vậy không đủ căn cứ để quy cho rò rỉ thời điểm. Một phép tách cần lượt thứ ba:
+điểm kiểm huấn luyện trên 1.049 nhãn lấy ngẫu nhiên không theo thời gian, để cô lập ảnh
+hưởng của kích thước tập huấn luyện --- hạng mục này chưa thực hiện.
 
 Điều kết luận được là: khi loại bỏ rò rỉ thời điểm, \textbf{không còn ước lượng điểm
 dương nào ở nhánh chính, và không khoảng tin cậy nào loại trừ 0}. Trên bộ dữ liệu và
@@ -606,15 +610,19 @@ bằng chứng chất lượng phân loại tốt hơn của cấu hình có tr�
 phải bằng chứng rằng tín hiệu cảm xúc đã cải thiện dự báo giá.
 
 \textbf{Câu hỏi thứ hai} --- xác suất cảm xúc có cải thiện dự báo hay không, và mức bao
-nhiêu. Khi so với đối chứng trung tính ghép cặp, ước lượng theo cửa sổ của đóng góp thông
-tin phân cực là $+0{,}0066$ F1 vĩ mô. Tuy nhiên, ước lượng theo ngày là $+0{,}0014$ với
-khoảng tin cậy $[-0{,}0087; +0{,}0116]$ chứa 0. Kết luận: \textbf{chưa có bằng chứng đủ
-mạnh rằng đặc trưng cảm xúc cải thiện dự báo xu hướng phiên kế tiếp} trong giao thức hồi
-cứu này. Dữ liệu hiện tại không loại trừ cả cải thiện nhỏ lẫn suy giảm nhỏ.
+nhiêu. Ở lượt hồi cứu, so với đối chứng trung tính ghép cặp, ước lượng theo cửa sổ của
+đóng góp thông tin phân cực là $+0{,}0040$ F1 vĩ mô, nhưng ước lượng theo ngày --- căn cứ
+chính --- là $-0{,}0013$ với khoảng tin cậy $[-0{,}0105; +0{,}0082]$ chứa 0. Ở lượt ngoài
+mẫu với điểm kiểm đóng băng (Mục~\ref{sec:kq-point-in-time}), cả hai cách gộp đều âm:
+$-0{,}0024$ theo cửa sổ và $-0{,}0029$ theo ngày, khoảng tin cậy vẫn chứa 0. Kết luận:
+\textbf{chưa có bằng chứng rằng đặc trưng cảm xúc cải thiện dự báo xu hướng phiên kế
+tiếp}, ở cả giao thức hồi cứu lẫn giao thức ngoài mẫu. Dữ liệu hiện tại không loại trừ
+cả cải thiện nhỏ lẫn suy giảm nhỏ.
 
-Hiệu số trực tiếp $+0{,}0110$ trộn lẫn kiến trúc, sự hiện diện/khối lượng tin và xác suất
-cảm xúc. Đối chứng trung tính ghép cặp giữ nguyên sự hiện diện và khối lượng tin, nên chỉ
-hiệu số $+0{,}0066$ giữa hai nhánh là phép đo của xác suất cảm xúc.
+Hiệu số trực tiếp $+0{,}0025$ trộn lẫn kiến trúc, sự hiện diện/khối lượng tin và xác suất
+cảm xúc; riêng thành phần kiến trúc và độ phủ tin là $-0{,}0015$. Đối chứng trung tính
+ghép cặp giữ nguyên sự hiện diện và khối lượng tin, nên chỉ hiệu số $+0{,}0040$ giữa hai
+nhánh là phép đo của xác suất cảm xúc.
 
 \textbf{Câu hỏi thứ ba} --- điều kiện nào cảm xúc phát huy tác dụng. Chưa có ước lượng ghép
 cặp phân tầng riêng theo điều kiện thị trường, ngày sự kiện hoặc mật độ tin. Vì vậy, đề tài
@@ -640,8 +648,8 @@ Các điểm kiểm tra sau được thực hiện và ghi nhận kết quả th
         này.
   \item \textbf{Số tham số}: mô hình một nhánh có 5.091 tham số, mô hình hai nhánh có
         11.203 tham số, tức gấp 2,20 lần (thêm 6.112 tham số). Đối chứng phân phối tiên
-        nghiệm trung tính tách đóng góp thông tin phân cực; chênh lệch $+0{,}0044$ F1 vĩ
-        mô còn bao gồm cả kiến trúc và đặc trưng sự hiện diện, khối lượng tin.
+        nghiệm trung tính tách đóng góp thông tin phân cực; chênh lệch $-0{,}0015$ F1 vĩ
+        mô là phần do kiến trúc và đặc trưng sự hiện diện, khối lượng tin đóng góp.
   \item \textbf{Tính tái lập}: hai lần chạy độc lập cho kết quả trùng khớp đến từng chữ số ở
         các mô hình chỉ giá. Trong quá trình thực nghiệm đã phát hiện và sửa một lỗi tái lập:
         trọng số mạng được khởi tạo trước khi gieo hạt giống, khiến kết quả của một cửa sổ phụ
