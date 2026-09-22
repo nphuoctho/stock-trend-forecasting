@@ -23,8 +23,7 @@ băng trước ngày kiểm thử đầu tiên cung cấp đánh giá ngoài m�
 Mục tiêu thứ nhất là tạo bộ dữ liệu có thể truy nguyên. Mục tiêu này \textbf{đã hoàn
 thành}: 14.256 liên kết tin--mã Vietstock với 100\% có mốc thời gian và nội dung, và
 14.990 dòng giá của 10 mã HOSE trong giai đoạn 2020--2025 không có giá trị thiếu. Trong
-12.624 liên kết thuộc cửa sổ nghiên cứu, 12.613 được neo vào một phiên giao dịch và 11 bị
-loại vì không neo được. Toàn bộ dữ liệu được ghi kèm mã băm trong bản kê của lần chạy.
+cửa sổ nghiên cứu có 12.613 liên kết tin--mã, tất cả đều neo được vào một phiên giao dịch. Toàn bộ dữ liệu được ghi kèm mã băm trong bản kê của lần chạy.
 
 Mục tiêu thứ hai là đánh giá PhoBERT ở tầng cảm xúc. Xác thực chéo theo tầng trên 1.306
 nhãn đã rà soát đã hoàn thành: cấu hình có trọng số nghịch đảo tần suất đạt F1 vĩ mô
@@ -33,13 +32,13 @@ tham chiếu 85--90\% của đề cương. Năm tập kiểm thử ngoài có t�
 bao phủ trung bình 0,6803, nên lớp này đã được đo nhưng bất định vẫn lớn hơn hai lớp
 còn lại. Kết quả có trọng số là phép so sánh trên tập mở rộng, không phải mô hình cuối.
 Sau khi khóa cấu hình, checkpoint triển khai đã được tinh chỉnh lại trên toàn bộ 1.306
-nhãn với năm epoch cố định, chấm lại 12.624 liên kết tin--mã và dùng làm đầu vào của dự báo.
+nhãn với năm epoch cố định, chấm lại 14.256 liên kết tin--mã và dùng làm đầu vào của dự báo.
 Lượt tinh chỉnh lại không tạo chỉ số kiểm thử mới.
 
 Mục tiêu thứ ba và thứ tư là kết hợp hai nguồn dữ liệu và huấn luyện mô hình dự báo. Mục
 tiêu này \textbf{đã hoàn thành với cả LSTM và TFT}. Mô hình LSTM chỉ giá đạt F1 vĩ mô
-0,3839, độ chính xác cân bằng 0,3918 và AUC-ROC một-chống-còn-lại 0,5728; các điểm này cao
-hơn mốc ngẫu nhiên 0,3346 và mốc lớp phổ biến 0,1573. TFT đạt 0,3595 khi chỉ dùng giá,
+0,3756, độ chính xác cân bằng 0,3915 và AUC-ROC một-chống-còn-lại 0,5714; các điểm này cao
+hơn mốc ngẫu nhiên 0,3289 và mốc lớp phổ biến 0,1453. TFT đạt 0,3619 khi chỉ dùng giá,
 thấp hơn LSTM, nên kiến trúc phức tạp hơn không tạo lợi thế trên quy mô dữ liệu này. Báo
 cáo không có kiểm định ghép cặp với hai mốc đối chứng, nên so sánh này chỉ mô tả mức điểm
 quan sát được \cite{Halder2022_221107392v1,Gu2024_240716150v1}.
@@ -51,34 +50,29 @@ nhánh, cùng bài tin, thời điểm và số lượng tin, nhưng thay xác s
 tiên nghiệm trung tính. Kết quả:
 
 \begin{itemize}[nosep]
-  \item hiệu số trực tiếp: $+0{,}0025$ F1 vĩ mô;
-  \item trong đó hiệu ứng kiến trúc, sự hiện diện và khối lượng tin: $-0{,}0015$;
-  \item đóng góp thông tin phân cực: $+0{,}0040$ theo cửa sổ; ước lượng theo ngày là
-        $-0{,}0013$, khoảng tin cậy 95\% $[-0{,}0105; +0{,}0082]$.
+  \item hiệu số trực tiếp: $+0{,}0113$ F1 vĩ mô;
+  \item trong đó hiệu ứng kiến trúc, sự hiện diện và khối lượng tin: $+0{,}0034$;
+  \item đóng góp thông tin phân cực: $+0{,}0080$ theo cửa sổ; ước lượng theo ngày là
+        $-0{,}0020$, khoảng tin cậy 95\% $[-0{,}0120; +0{,}0081]$.
 \end{itemize}
 
-Khoảng tin cậy theo ngày chứa 0 ở cả ba chỉ số, và bộ sinh cảm xúc của lượt này đã học từ
-nhãn trong giai đoạn kiểm thử, nên các số liệu trên chỉ là chênh lệch hồi cứu.
+Khoảng tin cậy theo ngày chứa 0 ở F1 vĩ mô và độ chính xác cân bằng; riêng độ chính xác
+có khoảng nằm dưới 0 trong khi khoảng theo cửa sổ của chính chỉ số đó vẫn chứa 0, nên hai
+cách lấy mẫu lặp không tạo thành một kết luận thống nhất. Quan trọng hơn, bộ sinh cảm xúc
+của lượt này đã học từ nhãn trong giai đoạn kiểm thử, nên mọi số liệu trên chỉ là chênh
+lệch hồi cứu.
 
-Để có đánh giá ngoài mẫu hợp lệ, một điểm kiểm thứ hai được tinh chỉnh chỉ trên 1.049 nhãn
-công bố trước ngày quan sát kiểm thử đầu tiên (22/10/2024), rồi chấm lại toàn bộ 12.140 bài
-tin (14.256 liên kết tin--mã) và chạy lại thang dự báo cùng đối chứng ghép cặp. Với điểm
-kiểm đóng băng, đóng góp thông tin phân cực ở LSTM hai nhánh --- nhánh chính của đồ án ---
-là $-0{,}0024$ F1 vĩ mô, khoảng tin cậy theo ngày $[-0{,}0134; +0{,}0079]$. Ở TFT, ước
-lượng điểm là $+0{,}0061$ nhưng cả khoảng theo ngày $[-0{,}0041; +0{,}0181]$ lẫn khoảng
-theo cửa sổ $[-0{,}0008; +0{,}0143]$ đều chứa 0, nên không được dùng làm bằng chứng.
+Giao thức cho đánh giá ngoài mẫu đã được cài đặt và khóa: một điểm kiểm tinh chỉnh chỉ
+trên 1.049 nhãn công bố trước ngày quan sát kiểm thử đầu tiên (21/10/2024), cùng một điểm
+kiểm đối chứng rút đúng số nhãn mỗi lớp đó nhưng từ mọi mốc thời gian, để tách ảnh hưởng
+của việc loại nhãn tương lai khỏi ảnh hưởng của việc huấn luyện trên ít dữ liệu hơn. Lệnh
+\texttt{forecast} xác minh mã băm bản kê điểm kiểm và ghi \texttt{point\_in\_time} kèm lý
+do vào tệp kết quả, nên chỉ artifact được xác minh mới có thể dùng làm bằng chứng.
 
-So với lượt hồi cứu, chỉ ước lượng theo cửa sổ đổi dấu ($+0{,}0040 \to -0{,}0024$); ước
-lượng theo ngày, vốn là căn cứ chính, đã âm ở cả hai lượt ($-0{,}0013 \to -0{,}0029$).
-Độ dịch chuyển nằm trong bề rộng khoảng tin cậy của cả hai lượt và có ít nhất hai cách
-giải thích mà đồ án không tách được: rò rỉ thời điểm qua bộ sinh ở lượt hồi cứu, và việc
-điểm kiểm đóng băng chỉ học từ 1.049 thay vì 1.306 nhãn nên yếu hơn. Phép tách cần một lượt
-huấn luyện trên 1.049 nhãn lấy ngẫu nhiên không theo thời gian; hạng mục này chưa thực hiện.
-
-Kết luận ngoài mẫu của đồ án vì vậy là: trên bộ dữ liệu và thiết lập hiện tại, cảm xúc tin
-tài chính tiếng Việt \textbf{không mang lại cải thiện có thể tái lập} cho bài toán phân loại
-xu hướng phiên kế tiếp. Đây là kết quả âm tính được đo đúng quy trình, không phải thất bại
-của quy trình đo.
+Hai điểm kiểm này cần GPU và được huấn luyện ngoài máy phát triển; kết quả chưa được đo
+nên đồ án không đưa ra con số ngoài mẫu nào. Kết luận hiện có là kết luận hồi cứu: trên
+bộ dữ liệu và thiết lập này, \textbf{chưa có bằng chứng rằng cảm xúc tin tài chính tiếng
+Việt cải thiện dự báo xu hướng phiên kế tiếp}.
 
 Mục tiêu thứ sáu là hệ thống demo hoàn chỉnh. Mục tiêu này \textbf{đã hoàn thành một phần}:
 đường dự báo hằng ngày (thu giá, thu tin, chấm cảm xúc, dự báo, đối soát kết quả thực tế)
@@ -153,24 +147,27 @@ tiếng Việt vào dự báo xu hướng giá cổ phiếu. PhoBERT được l�
 LSTM hai nhánh được lựa chọn làm cấu hình cơ sở để so sánh mô hình chỉ dùng giá với mô
 hình có cảm xúc, và TFT được chạy như tầng mở rộng sau khi cấu hình cơ sở được xác minh.
 
-Đồ án \textbf{đã đưa ra kết quả định lượng ở cả hai chế độ}. Mô hình dự báo dùng đặc trưng
-giá có điểm cao hơn hai mốc đối chứng bắt buộc; do chưa có kiểm định ghép cặp với các mốc
-này, kết quả chỉ mô tả mức điểm quan sát được. Với đối chứng giữ nguyên kiến trúc, thời
-điểm và số lượng tin, lượt hồi cứu cho đóng góp thông tin theo cửa sổ $+0{,}0040$ F1 vĩ mô
-(theo ngày $-0{,}0013$, khoảng tin cậy $[-0{,}0105; +0{,}0082]$).
+Đồ án \textbf{đã đưa ra kết quả định lượng cho lượt hồi cứu}. Mô hình dự báo dùng đặc
+trưng giá có điểm cao hơn hai mốc đối chứng bắt buộc; do chưa có kiểm định ghép cặp với
+các mốc này, kết quả chỉ mô tả mức điểm quan sát được. Với đối chứng giữ nguyên kiến
+trúc, thời điểm và số lượng tin, đóng góp thông tin phân cực là $+0{,}0080$ F1 vĩ mô
+theo cửa sổ và $-0{,}0020$ theo ngày, khoảng tin cậy theo ngày $[-0{,}0120; +0{,}0081]$
+chứa 0.
 
-Lượt ngoài mẫu với điểm kiểm đóng băng trước ngày kiểm thử đầu tiên cho $-0{,}0024$ F1 vĩ
-mô ở LSTM hai nhánh, nhánh chính của đồ án (khoảng tin cậy theo ngày
-$[-0{,}0134; +0{,}0079]$). Ở TFT ước lượng điểm là $+0{,}0061$ nhưng cả hai khoảng tin cậy
-đều chứa 0. Không ước lượng nào loại trừ 0, và ở nhánh chính không còn ước lượng điểm
-dương. Độ dịch chuyển so với lượt hồi cứu nằm trong bề rộng khoảng tin cậy và chưa tách
-được giữa rò rỉ thời điểm và việc điểm kiểm đóng băng học từ ít nhãn hơn.
+Tầng TFT được chạy trên đúng giao thức đó và đạt $0{,}3619$ F1 vĩ mô khi chỉ dùng giá,
+thấp hơn $0{,}3756$ của LSTM. Thêm dung lượng và cơ chế chọn biến không đổi được kết
+luận trên quy mô dữ liệu này.
 
-Kết luận của đồ án vì vậy là: trên 10 mã HOSE giai đoạn 2020--2025 với nguồn tin Vietstock
-và chân trời một phiên, cảm xúc tin tài chính tiếng Việt \textbf{không mang lại cải thiện
-có thể tái lập} cho bài toán phân loại xu hướng. Giá trị của đồ án nằm ở chỗ kết luận âm
-tính này được rút ra từ một quy trình đo có đối chứng ghép cặp giữ nguyên kiến trúc và độ
-phủ tin, có điểm kiểm phù hợp thời điểm, và có đủ bản kê để tái lập --- thay vì một ước
+Lượt ngoài mẫu chưa được đo. Giao thức của nó --- điểm kiểm đóng băng trước ngày kiểm
+thử đầu tiên, cùng một điểm kiểm đối chứng khớp kích thước và phân bố lớp --- đã được
+cài đặt, kiểm chứng bằng mã băm và pin bằng kiểm thử tự động, nhưng cần GPU ngoài máy
+phát triển. Đồ án vì vậy không trình bày con số ngoài mẫu nào.
+
+Kết luận trong phạm vi đã đo là: trên 10 mã HOSE giai đoạn 2020--2025 với nguồn tin
+Vietstock và chân trời một phiên, \textbf{chưa có bằng chứng rằng cảm xúc tin tài chính
+tiếng Việt cải thiện dự báo xu hướng phiên kế tiếp}. Giá trị của đồ án nằm ở chỗ phát
+biểu này được rút ra từ một quy trình đo có đối chứng ghép cặp giữ nguyên kiến trúc và
+độ phủ tin, và ghi rõ ranh giới giữa điều đã đo với điều chưa đo --- thay vì một ước
 lượng điểm dương báo cáo mà không kiểm tra thời điểm của bộ sinh.
 
 Mọi diễn giải phải giữ đúng phạm vi 10 mã HOSE, giai đoạn 2020--2025, nguồn tin Vietstock và

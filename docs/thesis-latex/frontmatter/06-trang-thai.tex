@@ -31,13 +31,18 @@ liên kết tin--mã (1.632 liên kết năm 2026). Xác thực chéo PhoBERT th
 Thang dự báo đã chạy đủ 5 cửa sổ cuốn chiếu, 3 hạt giống và đối chứng ghép cặp giữ nguyên
 bài tin, thời điểm và số lượng tin, với cả tầng LSTM hai nhánh và tầng TFT.
 
-\noindent Đồ án có hai lượt đánh giá. Lượt hồi cứu dùng điểm kiểm tinh chỉnh trên toàn
-bộ 1.306 nhãn. Lượt ngoài mẫu dùng điểm kiểm đóng băng chỉ từ 1.049 nhãn công bố trước
-ngày quan sát kiểm thử đầu tiên (22/10/2024); artifact ghi \texttt{point\_in\_time: true}.
-Kết quả ngoài mẫu: đóng góp thông tin phân cực $-0{,}0024$ F1 vĩ mô ở LSTM hai nhánh
-(nhánh chính) và $+0{,}0061$ ở TFT; mọi khoảng tin cậy đều chứa 0 --- chưa có cải thiện
-có thể tái lập. Phép tách giữa rò rỉ thời điểm và kích thước tập huấn luyện nhỏ hơn
-chưa thực hiện.
+\noindent Lượt hồi cứu đã có kết quả đầy đủ: LSTM chỉ giá đạt F1 vĩ mô 0,3756, LSTM hai
+nhánh 0,3869, TFT chỉ giá 0,3619 và TFT hai nhánh 0,3597. Đóng góp thông tin phân cực là
+$+0{,}0080$ theo cửa sổ và $-0{,}0020$ theo ngày, khoảng tin cậy theo ngày
+$[-0{,}0120; +0{,}0081]$ chứa 0. Vì điểm kiểm cảm xúc học từ cả nhãn sau các ngày kiểm
+thử, đây là chênh lệch hồi cứu, không phải bằng chứng ngoài mẫu.
+
+\noindent Lượt ngoài mẫu \textbf{chưa được đo}. Giao thức đã cài đặt và khóa: điểm kiểm
+đóng băng chỉ từ 1.049 nhãn công bố trước ngày quan sát kiểm thử đầu tiên (21/10/2024),
+cùng một điểm kiểm đối chứng khớp đúng số nhãn mỗi lớp nhưng lấy từ mọi mốc thời gian, để
+tách ảnh hưởng của việc loại nhãn tương lai khỏi ảnh hưởng của tập huấn luyện nhỏ hơn.
+Lệnh dự báo xác minh mã băm bản kê điểm kiểm và ghi \texttt{point\_in\_time} kèm lý do.
+Hai điểm kiểm cần GPU nên được huấn luyện ngoài máy phát triển.
 
 \noindent Hạng mục còn lại của đề cương chưa thực hiện và được chuyển sang Chương 6 là
 biến thể PhoBERT kết hợp CNN hoặc BiLSTM, phân tầng ghép cặp theo điều kiện thị
