@@ -1191,6 +1191,30 @@ def test_collect_listings_rewalks_a_year_left_partial_by_an_earlier_end(
     assert walked == [(2025, "2025-06-01")]
 
 
+def test_collect_listings_honours_an_end_earlier_than_the_cache(monkeypatch, tmp_path):
+    """A cache walked further than the request must still respect --end.
+
+    The watermark makes a year reusable, but reuse filtered by year alone would
+    hand back December rows for a June request, so --end would silently do nothing
+    whenever the cache happened to be ahead of it.
+    """
+    _listings_sandbox(monkeypatch, tmp_path)
+
+    def fake_walk(code, year, *, to_date):
+        return [
+            (f"https://vietstock.vn/{year}/{month:02d}/a-{month}.htm", f"15/{month:02d}/{year}")
+            for month in range(1, 13)
+        ], True
+
+    monkeypatch.setattr(news, "list_ticker_year", fake_walk)
+
+    full = news.collect_listings(end="2023-12-31")
+    assert len(full) == 12
+
+    reused = news.collect_listings(end="2023-06-30")
+    assert sorted(reused["list_date"]) == [f"15/{m:02d}/2023" for m in range(1, 7)]
+
+
 def test_fetch_articles_budget_counts_only_network_fetches(monkeypatch, tmp_path):
     """--batch limits network work, and a timestamp-less page stops being retried.
 

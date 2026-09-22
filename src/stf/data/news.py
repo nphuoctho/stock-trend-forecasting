@@ -370,6 +370,19 @@ def collect_listings(refresh: bool = False, end: str | None = None) -> pd.DataFr
     def _wanted_through(year: int) -> str:
         return end if year == end_year else f"{year}-12-31"
 
+    def _within_window(frame: pd.DataFrame) -> pd.DataFrame:
+        """Keep only rows whose listing date lies inside [DATE_START, end].
+
+        Filtering by ``year`` alone is not enough: a cache walked through December
+        still carries rows past a mid-year ``--end``, so the flag would be ignored
+        on the reuse path. ``list_date`` is Vietstock's ``dd/mm/yyyy``.
+        """
+        if frame.empty:
+            return frame.reset_index(drop=True)
+        listed = pd.to_datetime(frame["list_date"], format="%d/%m/%Y", errors="coerce")
+        keep = listed.between(pd.Timestamp(config.DATE_START), pd.Timestamp(end))
+        return frame[keep.fillna(False)].reset_index(drop=True)
+
     cached: pd.DataFrame | None = None
     years = list(range(start_year, end_year + 1))
     if config.LISTINGS_PQ.exists() and not refresh:
@@ -384,9 +397,7 @@ def collect_listings(refresh: bool = False, end: str | None = None) -> pd.DataFr
         if cached.empty:
             cached = None
         elif not years:
-            df = cached[cached["year"].between(start_year, end_year)].reset_index(
-                drop=True
-            )
+            df = _within_window(cached)
             _log(
                 f"[listings] reused: {len(df)} rows, {df['url'].nunique()} urls, "
                 f"every year covered through its requested end"
@@ -455,8 +466,8 @@ def collect_listings(refresh: bool = False, end: str | None = None) -> pd.DataFr
     else:
         df = pd.DataFrame(recs)
     # Drop rows outside the configured window so the artifact keeps meaning
-    # "listings in the study window" even after a run with a later --end.
-    df = df[df["year"].between(start_year, end_year)].reset_index(drop=True)
+    # "listings in [DATE_START, end]" even after a run with a later --end.
+    df = _within_window(df)
     # The watermark is written only here, after every ticker finished every year in
     # this run, and only for years whose every walk ended on an empty page. A crash
     # or a transient fetch failure therefore leaves the old watermark, so the
