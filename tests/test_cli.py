@@ -305,3 +305,142 @@ def test_forecast_binds_verified_score_manifest(monkeypatch, tmp_path, capsys):
     manifest_path.write_text("[]", encoding="utf-8")
     assert main(["forecast", "--news-sentiment", str(news_path)]) == 2
     assert "invalid score-news manifest" in capsys.readouterr().err
+
+
+def _point_in_time_verdict(monkeypatch, tmp_path, *, label_cutoff, tamper=False):
+    """Run `forecast` against a checkpoint with `label_cutoff` and return its verdict."""
+    from stf import cli as cli_module
+    from stf import forecasting as forecasting_module
+    from stf.forecasting import experiment as experiment_module
+    from stf.sentiment.dataset import file_fingerprint
+
+    checkpoint_manifest = tmp_path / "checkpoint-manifest.json"
+    checkpoint_manifest.write_text(
+        json.dumps({"provenance": {"label_cutoff": label_cutoff}}), encoding="utf-8"
+    )
+    news_path = tmp_path / "scored.parquet"
+    pd.DataFrame(
+        {
+            "ticker": ["FPT"],
+            "url": ["https://vietstock.vn/a.htm"],
+            "published_at": ["2021-01-01T10:00:00+07:00"],
+            "prob_negative": [0.1],
+            "prob_neutral": [0.2],
+            "prob_positive": [0.7],
+        }
+    ).to_parquet(news_path, index=False)
+    recorded_hash = file_fingerprint(checkpoint_manifest)
+    if tamper:
+        checkpoint_manifest.write_text(
+            json.dumps({"provenance": {"label_cutoff": "1999-01-01"}}), encoding="utf-8"
+        )
+    news_path.with_suffix(".manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "output": {"sha256": file_fingerprint(news_path), "rows": 1},
+                "checkpoint": {
+                    "directory_sha256": "checkpoint-v1",
+                    "manifest_path": str(checkpoint_manifest),
+                    "manifest_sha256": recorded_hash,
+                },
+                "inference": {
+                    "truncation_strategy": "head_tail",
+                    "max_len": 256,
+                    "batch_size": 32,
+                    "runtime": {},
+                },
+                "input": {"fingerprint": "inputs-v1"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    panel = pd.DataFrame(
+        {
+            "has_news": [1, 1],
+            "observation_date": pd.to_datetime(["2024-10-20", "2024-10-21"]),
+            "target_date": pd.to_datetime(["2024-10-21", "2024-10-22"]),
+        }
+    )
+    captured = {}
+    monkeypatch.setattr(
+        cli_module,
+        "_load_prices",
+        lambda: pd.DataFrame(
+            {"ticker": ["FPT"], "time": [pd.Timestamp("2024-10-21")], "close": [100.0]}
+        ),
+    )
+    monkeypatch.setattr(forecasting_module, "assemble", lambda *_args: panel)
+    from stf.forecasting import split as split_module
+
+    monkeypatch.setattr(
+        split_module,
+        "walk_forward_windows",
+        lambda *_a, **_k: [type("W", (), {"test": [1]})()],
+    )
+
+    def fake_run_experiment(panel, *, cfg, output_dir, provenance):
+        captured["provenance"] = provenance
+        return {
+            "panel_rows": len(panel),
+            "windows": [],
+            "chance_level": 1 / 3,
+            "summary": {},
+            "ablation": {},
+        }
+
+    monkeypatch.setattr(experiment_module, "run_experiment", fake_run_experiment)
+    assert (
+        main(
+            [
+                "forecast",
+                "--news-sentiment",
+                str(news_path),
+                "--output",
+                str(tmp_path / "forecast"),
+            ]
+        )
+        == 0
+    )
+    return captured["provenance"]["news_sentiment"]
+
+
+@pytest.mark.parametrize(
+    "label_cutoff, point_in_time",
+    [
+        ("2024-10-20", True),  # a day before the first test observation
+        ("2024-10-21", True),  # exactly on it: the filter is strictly-before, so valid
+        ("2024-10-22", False),  # a day after: the checkpoint saw a test-period label
+    ],
+)
+def test_point_in_time_verdict_at_the_cutoff_boundary(
+    monkeypatch, tmp_path, label_cutoff, point_in_time
+):
+    """Equality is the tight admissible case, and one day past it is not.
+
+    `sentiment-refit --before-date` keeps labels strictly before the cutoff, so a
+    cutoff equal to the first test observation proves no test-period label was seen.
+    An off-by-one here either voids a valid out-of-sample claim or, worse, endorses
+    a leaked one.
+    """
+    verdict = _point_in_time_verdict(monkeypatch, tmp_path, label_cutoff=label_cutoff)
+
+    assert verdict["first_test_observation_date"] == "2024-10-21"
+    assert verdict["point_in_time"] is point_in_time
+    assert verdict["point_in_time_reason"] == (
+        "verified" if point_in_time else "cutoff_after_test_start"
+    )
+
+
+def test_point_in_time_refuses_a_checkpoint_manifest_edited_after_scoring(
+    monkeypatch, tmp_path
+):
+    """A cutoff is only trusted when the manifest still hashes to what scoring saw."""
+    verdict = _point_in_time_verdict(
+        monkeypatch, tmp_path, label_cutoff="2024-10-21", tamper=True
+    )
+
+    assert verdict["point_in_time"] is False
+    assert verdict["point_in_time_reason"] == "hash_mismatch"
+    assert verdict["label_cutoff"] is None

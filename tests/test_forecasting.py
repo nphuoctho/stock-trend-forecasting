@@ -903,3 +903,40 @@ def test_tft_preserves_feature_identity():
         model.eval()
         with torch.no_grad():
             assert not torch.allclose(model(window), model(masked))
+
+
+def test_tft_arm_survives_the_refit_load_round_trip(tmp_path):
+    """A reloaded TFT arm reproduces the probabilities it produced before saving.
+
+    refit_arm derives the input width from the concatenated feature matrix while
+    load_arm recomputes it from the manifest's feature lists. If those two ever
+    disagree the checkpoint loads into a mis-shaped net, which surfaces as silently
+    different live predictions rather than as an error.
+    """
+    from stf.forecasting.experiment import ForecastConfig
+    from stf.forecasting.serve import load_arm, predict_latest, refit_arm
+
+    prices = pd.concat([_prices("FPT", n=90), _prices("VNM", n=90)], ignore_index=True)
+    news = pd.DataFrame(
+        {
+            "ticker": ["FPT", "VNM"] * 20,
+            "published_at": [
+                f"2021-0{1 + i // 20}-{1 + i % 20:02d}T09:00:00+07:00" for i in range(40)
+            ],
+            "prob_negative": np.linspace(0.05, 0.5, 40),
+            "prob_neutral": np.linspace(0.5, 0.3, 40),
+            "prob_positive": np.linspace(0.45, 0.2, 40),
+        }
+    )
+    panel = assemble(prices, news)
+    cfg = ForecastConfig(epochs=1, patience=1, seeds=(42,), hidden=8)
+
+    refit_arm(panel, "tft_price_sentiment", cfg=cfg, output_dir=tmp_path / "arm")
+    arm = load_arm(tmp_path / "arm")
+    first = predict_latest(panel, arm)
+    second = predict_latest(panel, load_arm(tmp_path / "arm"))
+
+    probabilities = ["prob_down", "prob_flat", "prob_up"]
+    assert arm.family == "tft"
+    pd.testing.assert_frame_equal(first[probabilities], second[probabilities])
+    assert np.allclose(first[probabilities].sum(axis=1), 1.0)
