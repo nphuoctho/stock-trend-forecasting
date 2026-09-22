@@ -489,6 +489,7 @@ def build_full_refit_manifest(
     class_weights: np.ndarray | None,
     evaluation_reference: dict,
     label_cutoff: str | None = None,
+    subset: dict | None = None,
 ) -> dict:
     """Describe a fixed-configuration fit on every reviewed label.
 
@@ -525,6 +526,7 @@ def build_full_refit_manifest(
             ),
             "training_fingerprint": dataset.frame_fingerprint(frame),
             "label_cutoff": label_cutoff,
+            "subset": subset,
         },
     }
 
@@ -537,6 +539,7 @@ def refit_full_data(
     source_path: str | Path | None = None,
     evaluation_reference: dict,
     label_cutoff: str | None = None,
+    subset: dict | None = None,
 ) -> dict:
     """Fit the cross-validated configuration on every reviewed row.
 
@@ -627,6 +630,7 @@ def refit_full_data(
         class_weights=class_weights,
         evaluation_reference=evaluation_reference,
         label_cutoff=label_cutoff,
+        subset=subset,
     )
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"

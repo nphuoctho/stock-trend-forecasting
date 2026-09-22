@@ -241,6 +241,7 @@ def cmd_sentiment_refit(args: argparse.Namespace) -> int:
         )
         return 2
     df = dataset.load_labeled(args.data)
+    subset_provenance = None
     if args.before_date:
         if "published_at" not in df.columns:
             print(
@@ -311,22 +312,35 @@ def cmd_sentiment_refit(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 2
-        df = (
-            df.groupby("label", group_keys=False)
-            .apply(
-                lambda g: g.sample(
-                    n=int(wanted[g.name]), random_state=args.sample_seed
-                )
+        drawn = [
+            df.loc[df["label"] == name].sample(
+                n=int(count), random_state=args.sample_seed
             )
-            .sort_index()
-            .reset_index(drop=True)
-        )
+            for name, count in sorted(wanted.items())
+        ]
+        df = pd.concat(drawn).sort_index().reset_index(drop=True)
+        # Which rows were drawn is itself a random factor, so record the identity of
+        # the draw. Without it a second seed cannot be told apart from this one, and
+        # the control cannot be reproduced or compared across seeds.
+        selected = sorted(str(value) for value in df["sample_id"])
+        subset_provenance = {
+            "strategy": "class_matched_random",
+            "reference_manifest": str(args.sample_like),
+            "reference_class_distribution": wanted,
+            "sample_seed": args.sample_seed,
+            "selected_rows": len(selected),
+            "selected_sample_id_sha256": hashlib.sha256(
+                "\n".join(selected).encode("utf-8")
+            ).hexdigest(),
+            "point_in_time": False,
+        }
         print(
             f"Refit restricted to {len(df)} labels matching the class counts of "
             f"{args.sample_like} ({wanted}, seed {args.sample_seed}). This is a "
             "training-size control only; it draws from every date and is NOT "
             "point-in-time."
         )
+        print("Subset id:", subset_provenance["selected_sample_id_sha256"][:16])
     frame = dataset.prepare_model_input(df, args.input_variant)
     cfg = model.TrainConfig(
         epochs=args.epochs,
@@ -354,6 +368,7 @@ def cmd_sentiment_refit(args: argparse.Namespace) -> int:
         source_path=args.data,
         evaluation_reference=evaluation_reference,
         label_cutoff=cutoff.date().isoformat() if args.before_date else None,
+        subset=subset_provenance,
     )
     print("Checkpoint:", Path(args.output) / "best")
     print("Manifest:", Path(args.output) / "manifest.json")
