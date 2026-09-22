@@ -27,16 +27,17 @@ chưa được đo lường.
 \noindent Tóm tắt trạng thái: dữ liệu gồm giá của 10 mã VN30 (14.990 dòng mã--phiên) và
 14.256 bài tin có mốc thời gian và nội dung (gồm 1.632 bài năm 2026). Xác thực chéo
 PhoBERT theo tầng 5 lượt trên 1.306 nhãn đã rà soát đã hoàn thành, đạt F1 vĩ mô 0,7298
-và độ chính xác cân bằng 0,7689. Sau khi khóa cấu hình, điểm kiểm triển khai đã được
-tinh chỉnh lại trên toàn bộ 1.306 nhãn, chấm lại 14.256 liên kết tin--mã và đưa vào
-thang dự báo hồi cứu. Thang này đã chạy đủ 5 cửa sổ cuốn chiếu, 3 hạt giống và đối
-chứng ghép cặp giữ nguyên bài tin, thời điểm và số lượng tin, kèm tầng TFT tối giản
-chạy trên cùng giao thức. Vì điểm kiểm chứa nhãn sau các ngày kiểm thử, kết quả nhánh
-có cảm xúc chưa là đánh giá ngoài mẫu hợp lệ.
+và độ chính xác cân bằng 0,7689. Thang dự báo đã chạy đủ 5 cửa sổ cuốn chiếu, 3 hạt
+giống và đối chứng ghép cặp giữ nguyên bài tin, thời điểm và số lượng tin, với cả tầng
+LSTM hai nhánh và tầng TFT.
 
-\noindent Ưu tiên tiếp theo là tinh chỉnh lại theo từng cửa sổ chỉ bằng nhãn quá khứ,
-hoặc dùng điểm kiểm đóng băng trước ngày kiểm thử đầu tiên, rồi chạy lại thang dự báo
-và đối chứng. Hạng mục còn lại của đề cương chưa thực hiện và được chuyển sang Chương 6
-là biến thể PhoBERT kết hợp CNN hoặc BiLSTM. Hệ thống demo trực quan hóa đã có bản
-dashboard đọc artifact và đường dự báo hằng ngày qua dòng lệnh; phần trình bày trực
-quan đầy đủ vẫn là hướng phát triển.
+\noindent Đồ án có hai lượt đánh giá. Lượt hồi cứu dùng điểm kiểm tinh chỉnh trên toàn
+bộ 1.306 nhãn. Lượt ngoài mẫu dùng điểm kiểm đóng băng chỉ từ 1.049 nhãn công bố trước
+ngày quan sát kiểm thử đầu tiên (22/10/2024); artifact ghi \texttt{point\_in\_time: true}.
+Kết quả ngoài mẫu: đóng góp thông tin phân cực $-0{,}0024$ F1 vĩ mô ở LSTM và $+0{,}0061$
+ở TFT, khoảng tin cậy đều chứa 0 --- chưa có cải thiện có thể tái lập.
+
+\noindent Hạng mục còn lại của đề cương chưa thực hiện và được chuyển sang Chương 6 là
+biến thể PhoBERT kết hợp CNN hoặc BiLSTM, và phân tầng ghép cặp theo điều kiện thị
+trường. Hệ thống demo đã có đường dự báo hằng ngày qua dòng lệnh và bản dashboard đọc
+artifact phục vụ 5 cấu hình mô hình; giao diện trực quan đầy đủ vẫn là hướng phát triển.
