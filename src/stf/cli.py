@@ -874,19 +874,17 @@ def cmd_forecast(args: argparse.Namespace) -> int:
         }
 
     panel = assemble(prices, news)
-    # Price history is fetched with a lookback before the study window so rolling
-    # features are defined on the first session. The evaluated panel must still
-    # start at the declared window, otherwise extra history shifts every
+    # Both bounds filter target_date, because the label is the outcome and the
+    # declared study window is a window over outcomes. Price history deliberately
+    # reaches back before the window so rolling features are defined on the first
+    # evaluated session; bounding the low side on observation_date instead would
+    # discard the first in-window outcome of every ticker and silently shift every
     # walk-forward split.
     panel_start = args.panel_start or config.DATE_START
-    panel = panel[
-        pd.to_datetime(panel["observation_date"]) >= pd.Timestamp(panel_start)
-    ].reset_index(drop=True)
+    target = pd.to_datetime(panel["target_date"])
+    panel = panel[target >= pd.Timestamp(panel_start)].reset_index(drop=True)
     provenance["panel_start"] = panel_start
     if args.panel_end:
-        # Filter on target_date, not observation_date: the label is the outcome and
-        # it must fall inside the declared study window. Filtering observations
-        # alone would let a 2025-12-31 observation carry a 2026 outcome.
         panel = panel[
             pd.to_datetime(panel["target_date"]) <= pd.Timestamp(args.panel_end)
         ].reset_index(drop=True)

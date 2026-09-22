@@ -1124,3 +1124,115 @@ def test_outer_split_uses_all_rows_for_ordinary_cross_validation():
 
     assert len(split.val) == 6  # ceil(10% * 57 outer-train rows)
     assert set(split.val["stratum"]) == {"train_negative"}
+
+
+def _listings_sandbox(monkeypatch, tmp_path):
+    """Point the news module's artifact paths at a temp dir with one ticker."""
+    from stf import config
+
+    monkeypatch.setattr(config, "NEWS_DIR", tmp_path)
+    monkeypatch.setattr(config, "LISTINGS_PQ", tmp_path / "listings.parquet")
+    monkeypatch.setattr(config, "ARTICLES_PQ", tmp_path / "articles.parquet")
+    monkeypatch.setattr(config, "NEWS_HTML_DIR", tmp_path / "html")
+    monkeypatch.setattr(config, "TICKERS", ["FPT"])
+    monkeypatch.setattr(config, "DATE_START", "2023-01-01")
+    (tmp_path / "html").mkdir(parents=True, exist_ok=True)
+
+
+def test_collect_listings_rewalks_a_year_left_partial_by_an_earlier_end(
+    monkeypatch, tmp_path
+):
+    """A year walked only up to a mid-year --end must not be treated as complete.
+
+    Inferring coverage from row presence cannot tell a fully walked year from one
+    that stopped at an earlier run's end date. Once the calendar rolls over, the
+    partial year stops being the end year and would be frozen with its tail
+    permanently missing.
+    """
+    _listings_sandbox(monkeypatch, tmp_path)
+    walked = []
+
+    def fake_walk(code, year, *, to_date):
+        walked.append((year, to_date))
+        return [(f"https://vietstock.vn/{year}/01/a-{year}.htm", f"05/01/{year}")], True
+
+    monkeypatch.setattr(news, "list_ticker_year", fake_walk)
+
+    news.collect_listings(end="2024-06-30")
+    walked.clear()
+
+    # Same request: every year is covered through what was asked, so nothing refetches.
+    news.collect_listings(end="2024-06-30")
+    assert walked == []
+
+    # Asking for more of 2024 must re-walk 2024, not reuse the mid-year cache.
+    news.collect_listings(end="2024-12-31")
+    assert walked == [(2024, "2024-12-31")]
+    walked.clear()
+
+    # A new end year re-walks only that year; 2024 is now covered to its full extent.
+    news.collect_listings(end="2025-03-01")
+    assert walked == [(2025, "2025-03-01")]
+
+    # A transient failure mid-walk must withhold the watermark, so the year is
+    # re-walked rather than frozen with whatever partial rows it produced.
+    monkeypatch.setattr(
+        news,
+        "list_ticker_year",
+        lambda code, year, *, to_date: (
+            [(f"https://vietstock.vn/{year}/01/b-{year}.htm", f"06/01/{year}")],
+            False,
+        ),
+    )
+    news.collect_listings(end="2025-06-01")
+    monkeypatch.setattr(news, "list_ticker_year", fake_walk)
+    walked.clear()
+    news.collect_listings(end="2025-06-01")
+    assert walked == [(2025, "2025-06-01")]
+
+
+def test_fetch_articles_budget_counts_only_network_fetches(monkeypatch, tmp_path):
+    """--batch limits network work, and a timestamp-less page stops being retried.
+
+    Charging a cached re-parse against the budget lets a few permanently
+    unparseable articles consume the whole batch on every run, so the crawl stalls
+    before reaching any genuinely new article.
+    """
+    _listings_sandbox(monkeypatch, tmp_path)
+    from stf import config
+
+    stuck = "https://vietstock.vn/2024/01/stuck-111.htm"
+    fresh = "https://vietstock.vn/2024/01/fresh-222.htm"
+    (config.NEWS_HTML_DIR / "111.html").write_text(
+        "<html><title>no timestamp</title><body>text</body></html>", encoding="utf-8"
+    )
+    fetched = []
+
+    def fake_get(url):
+        fetched.append(url)
+        return type(
+            "R",
+            (),
+            {
+                "text": '<html><title>t</title>'
+                '<meta itemprop="datePublished" content="2024-01-05T10:00:00+07:00">'
+                "<body>body text</body></html>"
+            },
+        )()
+
+    monkeypatch.setattr(news, "get", fake_get)
+    monkeypatch.setattr(news, "SLEEP", 0)
+
+    first = news.fetch_articles([stuck, fresh], max_new=1)
+    # The cached unparseable page did not spend the budget, so the new URL was still
+    # fetched in the same run.
+    assert fetched == [fresh]
+    assert first.set_index("url").loc[stuck, "parse_failed"]
+
+    fetched.clear()
+    news.fetch_articles([stuck, fresh], max_new=1)
+    assert fetched == []  # nothing left to do; the stuck page is not retried
+
+    fetched.clear()
+    news.fetch_articles([stuck, fresh], max_new=1, retry_failed=True)
+    assert fetched == []  # cached HTML is re-parsed without network work

@@ -19,6 +19,7 @@ Run:
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import time
@@ -231,6 +232,13 @@ def _atomic_to_parquet(df: pd.DataFrame, path: Path) -> None:
     os.replace(tmp, path)
 
 
+def _atomic_write_json(path: Path, payload: dict) -> None:
+    """Write ``payload`` to ``path`` via temp file + ``os.replace``."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    os.replace(tmp, path)
+
+
 def _is_allowed_url(url: str) -> bool:
     """Return whether ``url`` is https and targets an exact allowed Vietstock host."""
     try:
@@ -280,10 +288,19 @@ def get(
 # News listings
 
 
-def list_ticker_year(code: str, year: int, *, to_date: str) -> list[tuple[str, str]]:
-    """Walk every news page for one ticker in one year. Returns [(url, dd/mm/yyyy date)]."""
+def list_ticker_year(
+    code: str, year: int, *, to_date: str
+) -> tuple[list[tuple[str, str]], bool]:
+    """Walk every news page for one ticker in one year.
+
+    Returns ``(rows, complete)``. ``complete`` is True only when pagination ended
+    on a page that genuinely had nothing new. A fetch failure or hitting
+    ``MAX_PAGES`` yields whatever was collected with ``complete=False``, so a
+    caller cannot mistake a truncated walk for a finished one.
+    """
     rows: list[tuple[str, str]] = []
     seen: set[str] = set()
+    complete = False
     for page in range(1, MAX_PAGES + 1):
         r = get(
             BASE,
@@ -299,6 +316,7 @@ def list_ticker_year(code: str, year: int, *, to_date: str) -> list[tuple[str, s
             },
         )
         if r is None:
+            _log(f"[listings] {code} {year}: fetch failed on page {page}; walk incomplete")
             break
         new = [
             (href, date)
@@ -306,52 +324,102 @@ def list_ticker_year(code: str, year: int, *, to_date: str) -> list[tuple[str, s
             if href not in seen
         ]
         if not new:  # empty page / only articles already seen => year exhausted
+            complete = True
             break
         for h, d in new:
             seen.add(h)
             rows.append((h, d))
         time.sleep(SLEEP)
-    return rows
+    else:
+        _log(f"[listings] {code} {year}: hit MAX_PAGES={MAX_PAGES}; walk incomplete")
+    return rows, complete
+
+
+def _coverage_path() -> Path:
+    return config.NEWS_DIR / "listings_coverage.json"
+
+
+def _read_coverage() -> dict[str, str]:
+    """Year -> the date that year was walked through, from the last complete run."""
+    path = _coverage_path()
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def collect_listings(refresh: bool = False, end: str | None = None) -> pd.DataFrame:
     """Gather news listings for every ticker x year in the config window. The news->ticker mapping source.
 
-    Without ``refresh`` a cached listing is reused for fully covered years; the
-    final year is always re-walked so a daily run picks up fresh articles, and
-    any missing years are fetched and merged in.
+    Without ``refresh`` a year is reused only when a recorded watermark proves it
+    was walked through its full extent. Row presence alone cannot prove that: a
+    year that was the end year at cache time stopped at that run's ``to_date``,
+    and would otherwise be frozen mid-year once the calendar rolls over.
     """
     end = end or config.DATE_END
     start_year = int(config.DATE_START[:4])
     end_year = int(end[:4])
+    if end_year < start_year:
+        raise ValueError(
+            f"end {end!r} precedes the study window start {config.DATE_START!r}."
+        )
+
+    def _wanted_through(year: int) -> str:
+        return end if year == end_year else f"{year}-12-31"
 
     cached: pd.DataFrame | None = None
+    years = list(range(start_year, end_year + 1))
     if config.LISTINGS_PQ.exists() and not refresh:
         cached = pd.read_parquet(config.LISTINGS_PQ)
-        cached_years = (
-            {int(y) for y in cached["year"].unique()} if len(cached) else set()
-        )
-        missing = [y for y in range(start_year, end_year + 1) if y not in cached_years]
-        years = sorted(set(missing) | {end_year})
-        if cached_years and not missing and end_year not in cached_years:
-            years = [end_year]
-        if not cached_years or years == list(range(start_year, end_year + 1)):
+        coverage = _read_coverage()
+        covered = {
+            year
+            for year in range(start_year, end_year + 1)
+            if coverage.get(str(year), "") >= _wanted_through(year)
+        }
+        years = [year for year in range(start_year, end_year + 1) if year not in covered]
+        if cached.empty:
             cached = None
+        elif not years:
+            df = cached[cached["year"].between(start_year, end_year)].reset_index(
+                drop=True
+            )
+            _log(
+                f"[listings] reused: {len(df)} rows, {df['url'].nunique()} urls, "
+                f"every year covered through its requested end"
+            )
+            return df
         else:
             _log(
                 f"[listings] reusing {len(cached)} cached rows; "
                 f"re-walking years {years}"
             )
-    if cached is None:
-        years = list(range(start_year, end_year + 1))
 
     recs: list[dict] = []
+    # A year earns its watermark only if every ticker's walk terminated on an empty
+    # page. One transient fetch failure anywhere in the year withholds it, so the
+    # next run re-walks instead of freezing a gap.
+    year_complete = {year: True for year in years}
+    # Drop the watermark for every year about to be rewritten, before the first
+    # partial write. The parquet is replaced after each ticker, so a crash between
+    # here and the end would otherwise leave partial rows that a stale watermark
+    # still vouches for.
+    if years:
+        config.NEWS_DIR.mkdir(parents=True, exist_ok=True)
+        stale = _read_coverage()
+        for year in years:
+            stale.pop(str(year), None)
+        _atomic_write_json(_coverage_path(), stale)
     for code in config.TICKERS:
         tot = 0
         for year in years:
             # Final year stops at the requested end; other years go to Dec 31.
             to_date = end if year == end_year else f"{year}-12-31"
-            rows = list_ticker_year(code, year, to_date=to_date)
+            rows, complete = list_ticker_year(code, year, to_date=to_date)
+            year_complete[year] = year_complete[year] and complete
             for href, d in rows:
                 if href.startswith("//"):
                     url = f"https:{href}"
@@ -386,6 +454,20 @@ def collect_listings(refresh: bool = False, end: str | None = None) -> pd.DataFr
         )
     else:
         df = pd.DataFrame(recs)
+    # Drop rows outside the configured window so the artifact keeps meaning
+    # "listings in the study window" even after a run with a later --end.
+    df = df[df["year"].between(start_year, end_year)].reset_index(drop=True)
+    # The watermark is written only here, after every ticker finished every year in
+    # this run, and only for years whose every walk ended on an empty page. A crash
+    # or a transient fetch failure therefore leaves the old watermark, so the
+    # affected year is re-walked next time instead of being mistaken for complete.
+    coverage = _read_coverage()
+    for year in years:
+        if year_complete.get(year):
+            coverage[str(year)] = _wanted_through(year)
+        else:
+            _log(f"[listings] {year}: walk incomplete, watermark withheld")
+    _atomic_write_json(_coverage_path(), coverage)
     _log(f"[listings] done: {len(df)} rows, {df['url'].nunique()} unique urls")
     return df
 
@@ -504,7 +586,11 @@ def _has_body(val) -> bool:
 
 
 def fetch_articles(
-    urls: list[str], *, limit_urls: int | None = None, max_new: int | None = None
+    urls: list[str],
+    *,
+    limit_urls: int | None = None,
+    max_new: int | None = None,
+    retry_failed: bool = False,
 ) -> pd.DataFrame:
     """Fetch article pages, reusing cached HTML and stored records."""
     config.NEWS_HTML_DIR.mkdir(parents=True, exist_ok=True)
@@ -515,7 +601,14 @@ def fetch_articles(
         for record in prev.to_dict("records"):
             normalized = {
                 key: record.get(key)
-                for key in ("url", "article_id", "published_at", "title", "body")
+                for key in (
+                    "url",
+                    "article_id",
+                    "published_at",
+                    "title",
+                    "body",
+                    "parse_failed",
+                )
             }
             normalized["published_at"] = _normalize_stored_timestamp(
                 normalized.get("published_at")
@@ -532,46 +625,64 @@ def fetch_articles(
 
     def _needs_body(url: str) -> bool:
         rec = store.get(url)
-        return rec is None or not _has_body(rec.get("body")) or not rec.get("published_at")
+        if rec is None or not _has_body(rec.get("body")):
+            return True
+        if rec.get("published_at"):
+            return False
+        # Timestamp missing. `parse_failed` records that a parser already tried this
+        # cached page and produced nothing, so a permanently timestamp-less article
+        # stops re-entering the queue every run. `retry_failed` (set by --refresh) is
+        # the escape hatch after a parser change.
+        return retry_failed or not rec.get("parse_failed")
 
     def _flush() -> None:
         _atomic_to_parquet(pd.DataFrame(list(store.values())), config.ARTICLES_PQ)
 
-    n_new = 0
+    n_parsed = 0  # records written this run, for flush cadence and progress
+    n_fetched = 0  # network fetches, the only thing --batch limits
     for i, url in enumerate(urls, 1):
         if not _needs_body(url):
             continue
-        if max_new is not None and n_new >= max_new:
-            _log(
-                f"[articles] hit batch of {max_new}, stopping (rest left for next run)"
-            )
-            break
         aid_m = ART_ID.search(url)
         aid = aid_m.group(1) if aid_m else sha256(url.encode()).hexdigest()[:16]
         cache = config.NEWS_HTML_DIR / f"{aid}.html"
         if cache.exists():
             html = cache.read_text(encoding="utf-8", errors="ignore")
         else:
+            # The budget limits network work. Re-parsing cached HTML is free, so
+            # charging it here would let a handful of stuck records consume the
+            # whole batch every run and starve genuinely new articles.
+            if max_new is not None and n_fetched >= max_new:
+                _log(
+                    f"[articles] hit batch of {max_new}, stopping (rest left for next run)"
+                )
+                break
             r = get(url)
             if r is None:
                 continue
             html = r.text
             cache.write_text(html, encoding="utf-8")
+            n_fetched += 1
             time.sleep(SLEEP)
         parsed = parse_article(html)
+        published_at = _to_iso(parsed["published_at_str"])
         store[url] = {
             "url": url,
             "article_id": aid,
-            "published_at": _to_iso(parsed["published_at_str"]),
+            "published_at": published_at,
             "title": parsed["title"],
             "body": parsed["body"],
+            # Set when this parser found no timestamp. Cleared automatically on any
+            # re-parse that succeeds; `news --refresh` forces that re-parse.
+            "parse_failed": published_at is None,
         }
-        n_new += 1
-        if n_new % 100 == 0:
+        n_parsed += 1
+        if n_parsed % 100 == 0:
             _flush()
             with_body = sum(1 for r in store.values() if _has_body(r.get("body")))
             _log(
-                f"[articles] {i}/{len(urls)} | batch {n_new} | body {with_body}/{len(store)}"
+                f"[articles] {i}/{len(urls)} | parsed {n_parsed} | "
+                f"fetched {n_fetched} | body {with_body}/{len(store)}"
             )
 
     _flush()
@@ -589,7 +700,9 @@ def crawl(
     listings = collect_listings(refresh=refresh, end=end)
     urls = listings["url"].drop_duplicates().tolist()
     _log(f"[news] {len(urls)} unique urls to fetch content for")
-    return fetch_articles(urls, limit_urls=limit_urls, max_new=max_new)
+    return fetch_articles(
+        urls, limit_urls=limit_urls, max_new=max_new, retry_failed=refresh
+    )
 
 
 def summary(articles: pd.DataFrame) -> None:

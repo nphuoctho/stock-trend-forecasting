@@ -20,10 +20,10 @@ echo "[daily] $(date -Is) fetching prices"
 uv run python -m stf.cli prices --end "$TODAY"
 
 echo "[daily] $(date -Is) crawling news"
-# --refresh until listings carry a per-year coverage watermark: without one,
-# a partially walked year is indistinguishable from a complete one and would
-# be frozen the moment the calendar rolls over.
-uv run python -m stf.cli news --refresh --end "$TODAY"
+# No --refresh: listings record a per-year coverage watermark, so a year is
+# reused only when it was walked through its full extent. --end advances daily,
+# which re-walks the current year and leaves the archive alone.
+uv run python -m stf.cli news --end "$TODAY"
 
 echo "[daily] $(date -Is) scoring new articles"
 uv run python -m stf.cli score-news \
