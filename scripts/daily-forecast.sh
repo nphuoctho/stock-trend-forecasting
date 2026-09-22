@@ -14,11 +14,13 @@ SENTIMENT_MODEL="${SENTIMENT_MODEL:-models/sentiment/merged-refit/best}"
 SCORED_NEWS="${SCORED_NEWS:-data/processed/news_sentiment_merged.parquet}"
 ARMS="${ARMS:-lstm_price_sentiment lstm_price logreg_price_sentiment}"
 
+TODAY="$(date +%F)"
+
 echo "[daily] $(date -Is) fetching prices"
-uv run python -m stf.cli prices
+uv run python -m stf.cli prices --end "$TODAY"
 
 echo "[daily] $(date -Is) crawling news"
-uv run python -m stf.cli news
+uv run python -m stf.cli news --refresh --end "$TODAY"
 
 echo "[daily] $(date -Is) scoring new articles"
 uv run python -m stf.cli score-news \

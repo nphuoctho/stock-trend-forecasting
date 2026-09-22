@@ -97,6 +97,7 @@ class _ArticleParser(HTMLParser):
         self.og_description: str | None = None
         self.title_parts: list[str] = []
         self.published_parts: list[str] = []
+        self.meta_published: str | None = None
         self._body_depth = 0
         self._capture: str | None = None
         self._capture_depth = 0
@@ -112,6 +113,8 @@ class _ArticleParser(HTMLParser):
                 self.og_title = attr_map.get("content")
             elif prop == "og:description":
                 self.og_description = attr_map.get("content")
+            elif attr_map.get("itemprop", "").lower() == "datepublished":
+                self.meta_published = attr_map.get("content")
 
         if self._skip_depth:
             if tag not in _VOID_TAGS:
@@ -143,7 +146,7 @@ class _ArticleParser(HTMLParser):
         if tag == "title":
             self._capture = "title"
             self._capture_depth = 1
-        elif tag == "span" and attr_map.get("itemprop", "").lower() == "datepublished":
+        elif tag in ("span", "div") and attr_map.get("itemprop", "").lower() == "datepublished":
             self._capture = "published"
             self._capture_depth = 1
 
@@ -311,24 +314,43 @@ def list_ticker_year(code: str, year: int, *, to_date: str) -> list[tuple[str, s
     return rows
 
 
-def collect_listings(refresh: bool = False) -> pd.DataFrame:
-    """Gather news listings for every ticker x year in the config window. The news->ticker mapping source."""
-    if config.LISTINGS_PQ.exists() and not refresh:
-        df = pd.read_parquet(config.LISTINGS_PQ)
-        _log(
-            f"[listings] reused: {len(df)} rows, {df['url'].nunique()} urls, "
-            f"{df['ticker'].nunique()} tickers"
-        )
-        return df
+def collect_listings(refresh: bool = False, end: str | None = None) -> pd.DataFrame:
+    """Gather news listings for every ticker x year in the config window. The news->ticker mapping source.
 
+    Without ``refresh`` a cached listing is reused for fully covered years; the
+    final year is always re-walked so a daily run picks up fresh articles, and
+    any missing years are fetched and merged in.
+    """
+    end = end or config.DATE_END
     start_year = int(config.DATE_START[:4])
-    end_year = int(config.DATE_END[:4])
+    end_year = int(end[:4])
+
+    cached: pd.DataFrame | None = None
+    if config.LISTINGS_PQ.exists() and not refresh:
+        cached = pd.read_parquet(config.LISTINGS_PQ)
+        cached_years = (
+            {int(y) for y in cached["year"].unique()} if len(cached) else set()
+        )
+        missing = [y for y in range(start_year, end_year + 1) if y not in cached_years]
+        years = sorted(set(missing) | {end_year})
+        if cached_years and not missing and end_year not in cached_years:
+            years = [end_year]
+        if not cached_years or years == list(range(start_year, end_year + 1)):
+            cached = None
+        else:
+            _log(
+                f"[listings] reusing {len(cached)} cached rows; "
+                f"re-walking years {years}"
+            )
+    if cached is None:
+        years = list(range(start_year, end_year + 1))
+
     recs: list[dict] = []
     for code in config.TICKERS:
         tot = 0
-        for year in range(start_year, end_year + 1):
-            # Final year stops at DATE_END (e.g. 2025-12-31); other years go to Dec 31.
-            to_date = config.DATE_END if year == end_year else f"{year}-12-31"
+        for year in years:
+            # Final year stops at the requested end; other years go to Dec 31.
+            to_date = end if year == end_year else f"{year}-12-31"
             rows = list_ticker_year(code, year, to_date=to_date)
             for href, d in rows:
                 if href.startswith("//"):
@@ -350,8 +372,20 @@ def collect_listings(refresh: bool = False) -> pd.DataFrame:
                 f"[listings] {code} {year}: {len(rows)} articles (ticker running total {tot})"
             )
         config.NEWS_DIR.mkdir(parents=True, exist_ok=True)
-        _atomic_to_parquet(pd.DataFrame(recs), config.LISTINGS_PQ)  # save incrementally after each ticker
-    df = pd.DataFrame(recs)
+        if cached is not None and len(cached):
+            kept = cached[~cached["year"].isin(years)]
+            merged = pd.concat([kept, pd.DataFrame(recs)], ignore_index=True)
+        else:
+            merged = pd.DataFrame(recs)
+        _atomic_to_parquet(merged, config.LISTINGS_PQ)  # save incrementally after each ticker
+
+    if cached is not None and len(cached):
+        df = pd.concat(
+            [cached[~cached["year"].isin(years)], pd.DataFrame(recs)],
+            ignore_index=True,
+        )
+    else:
+        df = pd.DataFrame(recs)
     _log(f"[listings] done: {len(df)} rows, {df['url'].nunique()} unique urls")
     return df
 
@@ -411,7 +445,7 @@ def parse_article(html: str) -> dict[str, str | None]:
     """Extract the timestamp, title and body stored for one article."""
     parser = _parse_article_html(html)
     title = clean_html(parser.og_title) or clean_html(" ".join(parser.title_parts))
-    timestamp = _clean_text(" ".join(parser.published_parts))
+    timestamp = _clean_text(" ".join(parser.published_parts)) or parser.meta_published
     return {
         "published_at_str": timestamp,
         "title": title,
@@ -423,12 +457,25 @@ def parse_article(html: str) -> dict[str, str | None]:
 def _to_iso(ts: str | None) -> str | None:
     if not ts:
         return None
-    try:
-        local = datetime.strptime(ts, "%d/%m/%Y %H:%M")
-    except ValueError:
-        return None
-    return local.replace(tzinfo=ZoneInfo(config.TIMEZONE)).isoformat()
-
+    # ISO 8601 (from meta tag or already-normalized strings)
+    if "T" in ts or (len(ts) >= 10 and ts[4] == "-" and ts[7] == "-"):
+        iso = pd.to_datetime(ts, errors="coerce")
+        if not pd.isna(iso):
+            if iso.tzinfo is None:
+                iso = iso.tz_localize(config.TIMEZONE)
+            else:
+                iso = iso.tz_convert(config.TIMEZONE)
+            return iso.isoformat()
+    # Vietstock formats: DD/MM/YYYY HH:MM or DD-MM-YYYY HH:MM[:SS][+TZ]
+    for fmt in ("%d/%m/%Y %H:%M", "%d-%m-%Y %H:%M:%S%z", "%d-%m-%Y %H:%M"):
+        try:
+            local = datetime.strptime(ts, fmt)
+        except ValueError:
+            continue
+        if local.tzinfo is None:
+            local = local.replace(tzinfo=ZoneInfo(config.TIMEZONE))
+        return local.isoformat()
+    return None
 
 def _normalize_stored_timestamp(value: str | None) -> str | None:
     """Upgrade old naive timestamps to the study timezone."""
@@ -485,7 +532,7 @@ def fetch_articles(
 
     def _needs_body(url: str) -> bool:
         rec = store.get(url)
-        return rec is None or not _has_body(rec.get("body"))
+        return rec is None or not _has_body(rec.get("body")) or not rec.get("published_at")
 
     def _flush() -> None:
         _atomic_to_parquet(pd.DataFrame(list(store.values())), config.ARTICLES_PQ)
@@ -532,10 +579,14 @@ def fetch_articles(
 
 
 def crawl(
-    *, refresh: bool = False, limit_urls: int | None = None, max_new: int | None = None
+    *,
+    refresh: bool = False,
+    limit_urls: int | None = None,
+    max_new: int | None = None,
+    end: str | None = None,
 ) -> pd.DataFrame:
     """Run the news pipeline end to end: listing -> articles (ts + title + body)."""
-    listings = collect_listings(refresh=refresh)
+    listings = collect_listings(refresh=refresh, end=end)
     urls = listings["url"].drop_duplicates().tolist()
     _log(f"[news] {len(urls)} unique urls to fetch content for")
     return fetch_articles(urls, limit_urls=limit_urls, max_new=max_new)

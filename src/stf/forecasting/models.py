@@ -95,6 +95,90 @@ class PriceSentimentLSTM(nn.Module):
         return self.head(fused)
 
 
+class _GLU(nn.Module):
+    """Gated Linear Unit: halves the last dimension with a sigmoid gate."""
+
+    def __init__(self, dim: int) -> None:
+        super().__init__()
+        self.proj = nn.Linear(dim, dim * 2)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        value, gate = self.proj(x).chunk(2, dim=-1)
+        return value * torch.sigmoid(gate)
+
+
+class _GRN(nn.Module):
+    """Gated Residual Network (Lim et al. 2021): ELU -> linear -> GLU -> add&norm."""
+
+    def __init__(self, in_dim: int, out_dim: int, dropout: float = 0.0) -> None:
+        super().__init__()
+        self.fc1 = nn.Linear(in_dim, out_dim)
+        self.fc2 = nn.Linear(out_dim, out_dim)
+        self.gate = _GLU(out_dim)
+        self.skip = nn.Linear(in_dim, out_dim) if in_dim != out_dim else nn.Identity()
+        self.norm = nn.LayerNorm(out_dim)
+        self.drop = nn.Dropout(dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        hidden = torch.nn.functional.elu(self.fc1(x))
+        gated = self.gate(self.drop(self.fc2(hidden)))
+        return self.norm(self.skip(x) + gated)
+
+
+class TemporalFusionClassifier(nn.Module):
+    """Minimal TFT-style classifier over a ``(batch, seq_len, n_features)`` window.
+
+    Follows the TFT encoder path of Lim et al. (2021) reduced to what a univariate
+    panel without static covariates needs: per-feature linear embeddings, a variable
+    selection network that re-weights features per timestep, a single-layer LSTM
+    encoder, multi-head self-attention with a gated residual, and a GRN head over
+    the last position. ``n_features`` is the concatenated price (+ sentiment)
+    feature count, so the same class serves both the price-only and the fused arm.
+    """
+
+    def __init__(
+        self,
+        n_features: int,
+        *,
+        hidden: int = 32,
+        num_heads: int = 4,
+        num_classes: int = NUM_TREND_CLASSES,
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+        if hidden % num_heads != 0:
+            raise ValueError(f"hidden={hidden} must be divisible by num_heads={num_heads}.")
+        self.n_features = n_features
+        self.feature_embed = nn.Linear(1, hidden)
+        self.variable_selection = _GRN(n_features, n_features, dropout)
+        self.encoder = nn.LSTM(hidden, hidden, num_layers=1, batch_first=True)
+        self.attention = nn.MultiheadAttention(
+            hidden, num_heads, dropout=dropout, batch_first=True
+        )
+        self.attn_gate = _GLU(hidden)
+        self.attn_norm = nn.LayerNorm(hidden)
+        self.head = nn.Sequential(
+            _GRN(hidden, hidden, dropout),
+            nn.Linear(hidden, num_classes),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Map a feature window to class logits ``(batch, num_classes)``."""
+        if x.dim() != 3:
+            raise ValueError(f"expected (batch, seq_len, features); got shape {tuple(x.shape)}.")
+        if x.size(-1) != self.n_features:
+            raise ValueError(f"expected {self.n_features} features; got {x.size(-1)}.")
+        # Per-feature embeddings: (B, T, F) -> (B, T, F, H).
+        embedded = self.feature_embed(x.unsqueeze(-1))
+        # Variable selection weights from the raw timestep vector.
+        weights = torch.softmax(self.variable_selection(x), dim=-1)
+        selected = (embedded * weights.unsqueeze(-1)).sum(dim=2)
+        encoded, _ = self.encoder(selected)
+        attended, _ = self.attention(encoded, encoded, encoded)
+        fused = self.attn_norm(encoded + self.attn_gate(attended))
+        return self.head(fused[:, -1, :])
+
+
 class MajorityBaseline:
     """Predict the most frequent training class for every sample (deterministic)."""
 

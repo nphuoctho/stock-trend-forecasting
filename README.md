@@ -46,10 +46,14 @@ models/                  model checkpoints (gitignored)
 # Fetch prices for the 10 VN30 tickers (2020-01 -> 2025-12-31)
 uv run python -m stf.cli prices              # full run
 uv run python -m stf.cli prices --limit 1    # quick 1-symbol test
+uv run python -m stf.cli prices --end 2026-09-22  # extend past the study window (live mode)
 
 # Crawl news (minute timestamp + title + body)
 uv run python -m stf.cli news                 # full run (long)
 # `--refresh` re-crawls listings and repairs cached listing dates after parser changes.
+# Without `--refresh`, cached years are reused and only the final year is re-walked,
+# so a daily run picks up fresh articles without re-crawling the archive.
+uv run python -m stf.cli news --end 2026-09-22  # include the current year
 uv run python -m stf.cli news --refresh       # full crawl/refresh
 uv run python -m stf.cli news --limit-urls 20 # quick 20-article test
 
@@ -194,19 +198,24 @@ một parquet từ `score-news`, rồi chạy thang đầy đủ trên các cử
 Để báo cáo kết quả ngoài mẫu, parquet cảm xúc phải được tạo bởi điểm kiểm phù hợp thời
 điểm của từng cửa sổ. Một điểm kiểm tinh chỉnh trên toàn bộ tệp nhãn chỉ phù hợp cho phân
 tích hồi cứu; nó không được dùng để kết luận hiệu quả dự báo trên các ngày có nhãn tương lai.
+`sentiment-refit --before-date` tạo checkpoint đóng băng trước ngày kiểm thử đầu tiên và
+`forecast` ghi `point_in_time` vào `forecast_results.json` (xem `notebooks/training-guide.md`).
 
 ```bash
 # Đối chứng trung tính ghép cặp: giữ nguyên bài tin, thời điểm và khối lượng tin,
 # chỉ thay ba xác suất thành prior trung tính. Hai lần chạy vì thế chỉ khác
 # thông tin phân cực cảm xúc.
+# `--panel-end` khóa cửa sổ đánh giá khi dữ liệu giá đã kéo dài qua cửa sổ nghiên cứu.
 uv run python -m stf.cli forecast \
   --neutral-news-sentiment data/processed/news_sentiment_merged.parquet \
+  --panel-end 2025-12-31 \
   --windows 5 --test-size 60 --val-size 60 --epochs 40 --patience 6 \
   --seeds 42 43 44 --output outputs/forecast_merged_control
 
 # Thang đầy đủ với cảm xúc; hai nhánh dùng cùng cửa sổ, hạt giống và hàng kiểm thử.
 uv run python -m stf.cli forecast \
   --news-sentiment data/processed/news_sentiment_merged.parquet \
+  --panel-end 2025-12-31 \
   --windows 5 --test-size 60 --val-size 60 --epochs 40 --patience 6 \
   --seeds 42 43 44 --output outputs/forecast_merged_sentiment
 
@@ -218,7 +227,11 @@ uv run python -m stf.cli forecast-compare \
 ```
 
 The ladder is `majority`, `random`, `logreg_price`, `logreg_price_sentiment`,
-`lstm_price`, `lstm_price_sentiment`. Per window the command refits the trend thresholds
+`lstm_price`, `lstm_price_sentiment`, `tft_price`, `tft_price_sentiment`. The TFT
+arms use `TemporalFusionClassifier`, a minimal TFT-style encoder (per-feature
+embeddings, variable selection, LSTM encoder, multi-head self-attention, gated
+residuals) trained for 3-class classification on the same windows. Per window the
+command refits the trend thresholds
 and both feature scalers on training rows only, selects each LSTM checkpoint on that
 window's validation macro-F1, and scores every arm once on the same test rows. Results
 are averaged over `--seeds`. The sentiment contribution is reported twice: as a paired

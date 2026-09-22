@@ -249,6 +249,7 @@ def validate_full_refit_reference(
     input_variant: str,
     cfg: model.TrainConfig,
     source_path: str | Path,
+    allow_subset: bool = False,
 ) -> dict:
     """Require a CV artifact that exactly selected a full-data refit configuration."""
     reference_path = Path(reference_path)
@@ -268,6 +269,7 @@ def validate_full_refit_reference(
         field
         for field, expected in actual.items()
         if reference.get(field) != expected
+        and not (allow_subset and field == "data_size")
     ]
     if mismatches:
         raise ValueError(

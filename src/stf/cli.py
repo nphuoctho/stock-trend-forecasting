@@ -24,7 +24,7 @@ from stf.forecasting.serve import ARM_FAMILIES
 def cmd_prices(args: argparse.Namespace) -> int:
     from stf.data import prices
 
-    result = prices.collect(limit=args.limit)
+    result = prices.collect(limit=args.limit, end=args.end)
     prices.summary(result)
     return 0 if result and all(value > 0 for value in result.values()) else 1
 
@@ -33,7 +33,10 @@ def cmd_news(args: argparse.Namespace) -> int:
     from stf.data import news
 
     articles = news.crawl(
-        refresh=args.refresh, limit_urls=args.limit_urls, max_new=args.batch
+        refresh=args.refresh,
+        limit_urls=args.limit_urls,
+        max_new=args.batch,
+        end=args.end,
     )
     news.summary(articles)
     return 0 if len(articles) else 1
@@ -231,6 +234,33 @@ def cmd_sentiment_refit(args: argparse.Namespace) -> int:
     from stf.sentiment import dataset, experiments, model
 
     df = dataset.load_labeled(args.data)
+    if args.before_date:
+        if "published_at" not in df.columns:
+            print(
+                "sentiment-refit: --before-date requires a published_at column.",
+                file=sys.stderr,
+            )
+            return 2
+        cutoff = pd.Timestamp(args.before_date)
+        dates = pd.to_datetime(df["published_at"], errors="coerce")
+        undated = int(dates.isna().sum())
+        if undated:
+            print(
+                f"sentiment-refit: {undated} rows lack a parseable published_at; "
+                "cannot prove point-in-time.",
+                file=sys.stderr,
+            )
+            return 2
+        df = df.loc[dates < cutoff].reset_index(drop=True)
+        if df.empty:
+            print(
+                f"sentiment-refit: no labels strictly before {args.before_date}.",
+                file=sys.stderr,
+            )
+            return 2
+        print(
+            f"Refit restricted to {len(df)} labels published before {args.before_date}."
+        )
     frame = dataset.prepare_model_input(df, args.input_variant)
     cfg = model.TrainConfig(
         epochs=args.epochs,
@@ -245,6 +275,7 @@ def cmd_sentiment_refit(args: argparse.Namespace) -> int:
         input_variant=args.input_variant,
         cfg=cfg,
         source_path=args.data,
+        allow_subset=bool(args.before_date),
     )
     print(
         f"Refitting {len(frame)} reviewed rows with the locked "
@@ -256,6 +287,7 @@ def cmd_sentiment_refit(args: argparse.Namespace) -> int:
         out_dir=Path(args.output),
         source_path=args.data,
         evaluation_reference=evaluation_reference,
+        label_cutoff=args.before_date,
     )
     print("Checkpoint:", Path(args.output) / "best")
     print("Manifest:", Path(args.output) / "manifest.json")
@@ -391,6 +423,7 @@ def _validated_scored_news_manifest(news_path: Path, news: pd.DataFrame) -> dict
         "output_sha256": actual_hash,
         "checkpoint_directory_sha256": checkpoint["directory_sha256"],
         "checkpoint_manifest_sha256": checkpoint.get("manifest_sha256"),
+        "checkpoint_manifest_path": checkpoint.get("manifest_path"),
         "inference": inference,
         "input": score_input,
     }
@@ -596,6 +629,7 @@ def cmd_forecast_smoke(args: argparse.Namespace) -> int:
     from stf.forecasting.models import (
         PriceLSTM,
         PriceSentimentLSTM,
+        TemporalFusionClassifier,
         fit_lstm,
         make_two_branch_sequences,
     )
@@ -662,12 +696,20 @@ def cmd_forecast_smoke(args: argparse.Namespace) -> int:
         epochs=args.epochs,
         seed=args.seed,
     )
+    X_both = np.concatenate([X_price, X_sent], axis=2)
+    net3 = TemporalFusionClassifier(
+        X_both.shape[-1], hidden=8, num_heads=2, num_classes=len(TREND_LABELS)
+    )
+    history3 = fit_lstm(
+        net3, X_both[train_mask2], y2[train_mask2], epochs=args.epochs, seed=args.seed
+    )
     print(
         f"Forecast smoke: panel={len(labeled)} rows | "
         f"train={len(split.train)} val={len(split.val)} test={len(split.test)} | "
         f"sequences=train:{train_mask.sum()} val:{val_mask.sum()} test:{test_mask.sum()} | "
         f"price_lstm_final_loss={history['loss_history'][-1]:.6f} | "
-        f"price_sentiment_lstm_final_loss={history2['loss_history'][-1]:.6f}"
+        f"price_sentiment_lstm_final_loss={history2['loss_history'][-1]:.6f} | "
+        f"tft_final_loss={history3['loss_history'][-1]:.6f}"
     )
     return 0
 
@@ -696,6 +738,7 @@ def cmd_forecast(args: argparse.Namespace) -> int:
     """
     from stf.forecasting import assemble
     from stf.forecasting.experiment import ForecastConfig, frame_hash, run_experiment
+    from stf.forecasting.split import walk_forward_windows
 
     prices = _load_prices()
     provenance: dict = {
@@ -750,6 +793,11 @@ def cmd_forecast(args: argparse.Namespace) -> int:
         }
 
     panel = assemble(prices, news)
+    if args.panel_end:
+        panel = panel[
+            pd.to_datetime(panel["observation_date"]) <= pd.Timestamp(args.panel_end)
+        ].reset_index(drop=True)
+        provenance["panel_end"] = args.panel_end
     if "alignment_report" in panel.attrs:
         provenance["alignment_report"] = panel.attrs["alignment_report"]
     provenance["panel_hash"] = frame_hash(panel)
@@ -759,7 +807,6 @@ def cmd_forecast(args: argparse.Namespace) -> int:
         "rows_with_news": news_days,
         "fraction": round(news_days / len(panel), 6) if len(panel) else 0.0,
     }
-
     cfg = ForecastConfig(
         seq_len=args.seq_len,
         n_windows=args.windows,
@@ -772,6 +819,40 @@ def cmd_forecast(args: argparse.Namespace) -> int:
         patience=args.patience,
         seeds=tuple(args.seeds),
     )
+    if provenance["news_sentiment"] is not None:
+        # Point-in-time verdict: the scoring checkpoint must have been trained
+        # only on labels published before the first test observation date.
+        first_test_obs = None
+        try:
+            first_window = walk_forward_windows(
+                panel,
+                n_windows=cfg.n_windows,
+                test_size=cfg.test_size,
+                val_size=cfg.val_size,
+                expanding=cfg.expanding,
+            )[0]
+            first_test_obs = str(
+                pd.to_datetime(
+                    panel.iloc[first_window.test]["observation_date"]
+                ).min().date()
+            )
+        except ValueError:
+            first_test_obs = None
+        checkpoint = provenance["news_sentiment"]["score_manifest"]
+        manifest_path = checkpoint.get("checkpoint_manifest_path")
+        label_cutoff = None
+        if manifest_path and Path(manifest_path).is_file():
+            try:
+                label_cutoff = json.loads(
+                    Path(manifest_path).read_text(encoding="utf-8")
+                ).get("provenance", {}).get("label_cutoff")
+            except (OSError, json.JSONDecodeError):
+                label_cutoff = None
+        provenance["news_sentiment"]["label_cutoff"] = label_cutoff
+        provenance["news_sentiment"]["first_test_observation_date"] = first_test_obs
+        provenance["news_sentiment"]["point_in_time"] = bool(
+            label_cutoff and first_test_obs and label_cutoff <= first_test_obs
+        )
     record = run_experiment(
         panel, cfg=cfg, output_dir=Path(args.output), provenance=provenance
     )
@@ -1182,26 +1263,35 @@ def cmd_forecast_compare(args: argparse.Namespace) -> int:
             f"window-CI [{win['low']:+.4f}, {win['high']:+.4f}]  "
             f"date-CI [{date['low']:+.4f}, {date['high']:+.4f}]"
         )
-        print(f"      naive delta (conflated)    {effect['naive_delta']:+.4f}")
-    print(f"[forecast-compare] -> {output}")
+        print(
+            f"      naive delta (conflated)    {effect['naive_delta']:+.4f}"
+        )
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        prog="stf", description="Stock Trend Forecasting CLI"
-    )
+    parser = argparse.ArgumentParser(prog="stf", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_prices = sub.add_parser("prices", help="fetch adjusted OHLCV prices")
     p_prices.add_argument(
         "--limit", type=int, default=None, help="only take the first N tickers"
     )
+    p_prices.add_argument(
+        "--end",
+        default=config.DATE_END,
+        help="last session date YYYY-MM-DD (default: study window end)",
+    )
     p_prices.set_defaults(func=cmd_prices)
 
     p_news = sub.add_parser("news", help="crawl news (timestamp + title + body)")
     p_news.add_argument(
         "--limit-urls", type=int, default=None, help="only take the first N articles"
+    )
+    p_news.add_argument(
+        "--end",
+        default=config.DATE_END,
+        help="crawl listings up to YYYY-MM-DD (default: study window end)",
     )
     p_news.add_argument(
         "--batch",
@@ -1336,6 +1426,15 @@ def main(argv: list[str] | None = None) -> int:
         required=True,
     )
     p_refit.add_argument("--output", required=True)
+    p_refit.add_argument(
+        "--before-date",
+        default=None,
+        metavar="YYYY-MM-DD",
+        help=(
+            "train only on labels published strictly before this date "
+            "(point-in-time checkpoint); recorded in the manifest"
+        ),
+    )
     p_refit.set_defaults(func=cmd_sentiment_refit)
 
     p_ablation = sub.add_parser(
@@ -1391,6 +1490,12 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     p_forecast.add_argument("--output", default="outputs/forecast", help="artifact directory")
+    p_forecast.add_argument(
+        "--panel-end",
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="drop panel rows after this observation date (keeps the evaluation window fixed when price data extends past the study window)",
+    )
     p_forecast.add_argument("--seq-len", type=int, default=5)
     p_forecast.add_argument("--windows", type=int, default=5, help="walk-forward windows")
     p_forecast.add_argument("--test-size", type=int, default=60, help="test dates per window")

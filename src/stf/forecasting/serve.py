@@ -43,6 +43,8 @@ ARM_FAMILIES: dict[str, tuple[str, bool]] = {
     "logreg_price_sentiment": ("classical", True),
     "lstm_price": ("lstm", False),
     "lstm_price_sentiment": ("lstm", True),
+    "tft_price": ("tft", False),
+    "tft_price_sentiment": ("tft", True),
 }
 
 
@@ -120,6 +122,7 @@ def refit_arm(
         ClassicalBaseline,
         PriceLSTM,
         PriceSentimentLSTM,
+        TemporalFusionClassifier,
         fit_lstm,
         make_two_branch_sequences,
         set_seed,
@@ -163,13 +166,47 @@ def refit_arm(
             model = ClassicalBaseline(seed=seed).fit(key[train_mask], y[train_mask])
         else:
             set_seed(seed)
-            if use_sentiment:
-                net: torch.nn.Module = PriceSentimentLSTM(
+            if family == "tft":
+                n_in = X_both.shape[-1] if use_sentiment else X_price.shape[-1]
+                net: torch.nn.Module = TemporalFusionClassifier(
+                    n_in,
+                    hidden=cfg.hidden,
+                    num_classes=len(TREND_LABELS),
+                )
+                key = X_both if use_sentiment else X_price
+                history = fit_lstm(
+                    net,
+                    key[train_mask],
+                    y[train_mask],
+                    X_val=key[val_mask],
+                    y_val=y[val_mask],
+                    epochs=cfg.epochs,
+                    batch_size=cfg.batch_size,
+                    lr=cfg.lr,
+                    patience=cfg.patience,
+                    seed=seed,
+                )
+            elif use_sentiment:
+                net = PriceSentimentLSTM(
                     len(price_cols),
                     len(sent_cols),
                     hidden=cfg.hidden,
                     num_layers=cfg.num_layers,
                     num_classes=len(TREND_LABELS),
+                )
+                history = fit_lstm(
+                    net,
+                    X_price[train_mask],
+                    y[train_mask],
+                    X_sent=X_sent[train_mask],
+                    X_val=X_price[val_mask],
+                    y_val=y[val_mask],
+                    X_sent_val=X_sent[val_mask],
+                    epochs=cfg.epochs,
+                    batch_size=cfg.batch_size,
+                    lr=cfg.lr,
+                    patience=cfg.patience,
+                    seed=seed,
                 )
             else:
                 net = PriceLSTM(
@@ -178,20 +215,18 @@ def refit_arm(
                     num_layers=cfg.num_layers,
                     num_classes=len(TREND_LABELS),
                 )
-            history = fit_lstm(
-                net,
-                X_price[train_mask],
-                y[train_mask],
-                X_sent=X_sent[train_mask] if use_sentiment else None,
-                X_val=X_price[val_mask],
-                y_val=y[val_mask],
-                X_sent_val=X_sent[val_mask] if use_sentiment else None,
-                epochs=cfg.epochs,
-                batch_size=cfg.batch_size,
-                lr=cfg.lr,
-                patience=cfg.patience,
-                seed=seed,
-            )
+                history = fit_lstm(
+                    net,
+                    X_price[train_mask],
+                    y[train_mask],
+                    X_val=X_price[val_mask],
+                    y_val=y[val_mask],
+                    epochs=cfg.epochs,
+                    batch_size=cfg.batch_size,
+                    lr=cfg.lr,
+                    patience=cfg.patience,
+                    seed=seed,
+                )
             histories.append({"seed": seed, **history})
             model = net
         models.append(model)
@@ -199,14 +234,13 @@ def refit_arm(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     for seed, model in zip(cfg.seeds, models):
-        if family == "lstm":
+        if family in ("lstm", "tft"):
             torch.save(model.state_dict(), output_dir / f"seed_{seed}.pt")
         else:
             import joblib
 
             joblib.dump(model, output_dir / f"seed_{seed}.joblib")
     _save_scalers(output_dir / "scalers.npz", price_scaler, sent_scaler)
-
     manifest = {
         "arm": arm,
         "family": family,
@@ -241,7 +275,7 @@ def load_arm(model_dir: Path) -> LoadedArm:
     """Load a refit arm directory produced by :func:`refit_arm`."""
     import torch
 
-    from stf.forecasting.models import PriceLSTM, PriceSentimentLSTM
+    from stf.forecasting.models import PriceLSTM, PriceSentimentLSTM, TemporalFusionClassifier
 
     model_dir = Path(model_dir)
     manifest = json.loads((model_dir / "manifest.json").read_text(encoding="utf-8"))
@@ -250,8 +284,19 @@ def load_arm(model_dir: Path) -> LoadedArm:
 
     models: list[object] = []
     for seed in manifest["seeds"]:
-        if manifest["family"] == "lstm":
-            if manifest["use_sentiment"]:
+        if manifest["family"] in ("lstm", "tft"):
+            if manifest["family"] == "tft":
+                n_in = (
+                    len(manifest["price_features"]) + len(manifest["sentiment_features"])
+                    if manifest["use_sentiment"]
+                    else len(manifest["price_features"])
+                )
+                net: torch.nn.Module = TemporalFusionClassifier(
+                    n_in,
+                    hidden=cfg.hidden,
+                    num_classes=len(TREND_LABELS),
+                )
+            elif manifest["use_sentiment"]:
                 net: torch.nn.Module = PriceSentimentLSTM(
                     len(manifest["price_features"]),
                     len(manifest["sentiment_features"]),
@@ -353,6 +398,13 @@ def predict_latest(panel: pd.DataFrame, arm: LoadedArm) -> pd.DataFrame:
             probs = predict_lstm(
                 model, X_price, X_sent if arm.use_sentiment else None
             )
+        elif arm.family == "tft":
+            key = (
+                np.concatenate([X_price, X_sent], axis=2)
+                if arm.use_sentiment
+                else X_price
+            )
+            probs = predict_lstm(model, key)
         else:
             key = (
                 np.concatenate([X_price, X_sent], axis=2)

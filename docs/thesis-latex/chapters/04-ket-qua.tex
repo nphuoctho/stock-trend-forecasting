@@ -371,24 +371,33 @@ chạy (5 cửa sổ $\times$ 3 hạt giống), kèm độ lệch chuẩn của 
     \toprule
     Mô hình & F1 vĩ mô & Độ chính xác cân bằng & Độ chính xác & AUC-ROC OvR \\
     \midrule
-    Đối chứng lớp phổ biến & 0,1603 $\pm$ 0,0269 & 0,3333 & 0,3200 & --- \\
-    Đối chứng ngẫu nhiên & 0,3289 $\pm$ 0,0184 & 0,3343 & 0,3339 & --- \\
-    Hồi quy logistic, chỉ giá & 0,3550 $\pm$ 0,0279 & 0,3789 & 0,4220 & 0,5603 \\
-    Hồi quy logistic, giá và cảm xúc & 0,3681 $\pm$ 0,0252 & 0,3880 & 0,4280 & 0,5572 \\
-    LSTM, chỉ giá & 0,3797 $\pm$ 0,0287 & 0,3915 & \textbf{0,4300} & \textbf{0,5721} \\
-    \textbf{LSTM hai nhánh, giá và cảm xúc} & \textbf{0,3907} $\pm$ 0,0281 & \textbf{0,3981} & 0,4296 & 0,5660 \\
-    TFT & \multicolumn{4}{c}{\textit{Chưa thực hiện --- xem Chương~\ref{ch:huong-phat-trien}}} \\
+    Đối chứng lớp phổ biến & 0,1573 $\pm$ 0,0207 & 0,3333 & 0,3110 & --- \\
+    Đối chứng ngẫu nhiên & 0,3346 $\pm$ 0,0159 & 0,3408 & 0,3389 & --- \\
+    Hồi quy logistic, chỉ giá & 0,3518 $\pm$ 0,0303 & 0,3764 & 0,4150 & 0,5585 \\
+    Hồi quy logistic, giá và cảm xúc & 0,3653 $\pm$ 0,0226 & 0,3842 & 0,4180 & 0,5541 \\
+    LSTM, chỉ giá & 0,3839 $\pm$ 0,0140 & 0,3918 & \textbf{0,4247} & \textbf{0,5728} \\
+    \textbf{LSTM hai nhánh, giá và cảm xúc} & \textbf{0,3864} $\pm$ 0,0259 & \textbf{0,3934} & 0,4199 & 0,5693 \\
+    TFT, chỉ giá & 0,3595 $\pm$ 0,0290 & 0,3767 & 0,4110 & 0,5643 \\
+    TFT, giá và cảm xúc & 0,3628 $\pm$ 0,0206 & 0,3728 & 0,3940 & 0,5529 \\
     \bottomrule
   \end{tabular}
-\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment/forecast\_metrics.csv}.}
+\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment\_tft/forecast\_metrics.csv}.}
 \end{table}
 
-LSTM chỉ giá có F1 vĩ mô 0,3797, so với 0,3289 của mốc ngẫu nhiên và 0,1603 của
-mốc lớp phổ biến; AUC-ROC một-chống-còn-lại là 0,5721. Báo cáo không thực hiện
+LSTM chỉ giá có F1 vĩ mô 0,3839, so với 0,3346 của mốc ngẫu nhiên và 0,1573 của
+mốc lớp phổ biến; AUC-ROC một-chống-còn-lại là 0,5728. Báo cáo không thực hiện
 kiểm định ghép cặp với hai mốc đối chứng, nên đây chỉ là so sánh mô tả các điểm
 quan sát được. Điểm số hai nhánh được giữ để mô tả lần chạy hồi cứu, nhưng không
 là bằng chứng độc lập về giá trị của tin hay cảm xúc vì bộ sinh xác suất đã học từ
 nhãn tương lai tương đối với các cửa sổ kiểm thử.
+
+TFT đạt F1 vĩ mô 0,3595 khi chỉ dùng giá và 0,3628 khi có thêm cảm xúc, thấp hơn
+cả hai nhánh LSTM tương ứng (0,3839 và 0,3864). Trên bảng mã--ngày với khoảng
+15.820 dòng và cửa sổ đầu vào 5 phiên, kiến trúc có cổng và chú ý của TFT không
+tạo lợi thế so với LSTM hai nhánh; kết quả này phù hợp với nhận định rằng mô hình
+nhiều tham số cần dữ liệu lớn hơn để phát huy cơ chế chọn biến. TFT vì vậy được
+ghi nhận như một tầng đã chạy nhưng không vượt mức sàn, không phải hạng mục bỏ
+trống.
 
 \subsection{Báo cáo chỉ số theo lớp}
 
@@ -508,22 +517,21 @@ hạng mục chưa thực hiện.
 
 \subsection{Hạng mục chưa thực hiện}
 
-Hai hạng mục trong đề cương không được thực hiện trong phạm vi thời gian của đồ án và
+Một hạng mục trong đề cương không được thực hiện trong phạm vi thời gian của đồ án và
 không được điền bằng kết quả dự kiến:
 
 \begin{itemize}[nosep]
-  \item \textbf{TFT}: chưa cấu hình cho phân loại ba lớp và chưa chạy trên năm đoạn kiểm
-        thử cuốn chiếu. Chương~\ref{ch:phuong-phap} đã xác định TFT là phần mở rộng có điều
-        kiện, chỉ làm sau khi mức sàn đạt cổng chất lượng.
   \item \textbf{Biến thể PhoBERT kết hợp CNN hoặc BiLSTM}: chưa chạy, nên bảng cảm xúc chỉ
         có cấu hình tầng phân loại tuyến tính.
 \end{itemize}
 
-Cả hai được chuyển sang Chương~\ref{ch:huong-phat-trien}. Lý do là thứ tự ưu tiên: mức sàn
-gồm đối chứng cơ sở, mô hình chỉ giá, mô hình hai nhánh và phép tách đóng góp cảm xúc trả
-lời trực tiếp câu hỏi trung tâm của đề tài. Tuy nhiên, trước khi thay LSTM bằng kiến trúc
-phức tạp hơn, cần hoàn tất lượt đánh giá không rò rỉ thời điểm của bộ sinh cảm xúc; mô hình
-mới không khắc phục được giới hạn của đầu vào hiện tại.
+TFT đã được cấu hình cho phân loại ba lớp và chạy trên năm đoạn kiểm thử cuốn chiếu
+(Bảng~\ref{tab:ket-qua}); kết quả thấp hơn LSTM hai nhánh nên không thay đổi kết luận
+của đồ án. Hạng mục còn lại được chuyển sang Chương~\ref{ch:huong-phat-trien}. Lý do là
+thứ tự ưu tiên: mức sàn gồm đối chứng cơ sở, mô hình chỉ giá, mô hình hai nhánh và phép
+tách đóng góp cảm xúc trả lời trực tiếp câu hỏi trung tâm của đề tài. Tuy nhiên, trước
+khi thay LSTM bằng kiến trúc phức tạp hơn, cần hoàn tất lượt đánh giá không rò rỉ thời
+điểm của bộ sinh cảm xúc; mô hình mới không khắc phục được giới hạn của đầu vào hiện tại.
 
 \section{Bàn luận}
 \label{sec:kq-ban-luan}
