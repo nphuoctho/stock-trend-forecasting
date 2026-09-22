@@ -457,21 +457,23 @@ phủ tin với khác biệt về xác suất cảm xúc.
     \toprule
     Mức & F1 vĩ mô \\
     \midrule
-    LSTM chỉ giá & 0,3797 \\
-    LSTM hai nhánh, phân phối tiên nghiệm trung tính & 0,3841 \\
-    LSTM hai nhánh, cảm xúc thật & 0,3907 \\
+    LSTM chỉ giá & 0,3839 \\
+    LSTM hai nhánh, phân phối tiên nghiệm trung tính & 0,3824 \\
+    LSTM hai nhánh, cảm xúc thật & 0,3864 \\
     \midrule
-    Hiệu ứng kiến trúc, sự hiện diện và khối lượng tin & $+0{,}0044$ \\
-    \textbf{Đóng góp thông tin phân cực} & $\mathbf{+0{,}0066}$ \\
-    Hiệu số trực tiếp (trộn lẫn hai thành phần) & $+0{,}0110$ \\
+    Hiệu ứng kiến trúc, sự hiện diện và khối lượng tin & $-0{,}0015$ \\
+    \textbf{Đóng góp thông tin phân cực} & $\mathbf{+0{,}0040}$ \\
+    Hiệu số trực tiếp (trộn lẫn hai thành phần) & $+0{,}0025$ \\
     \bottomrule
   \end{tabular}
-\noindent\textit{Nguồn: \path{outputs/forecast_merged_sentiment/information_gain.json}.}
+\noindent\textit{Nguồn: \path{outputs/forecast_merged_sentiment_tft/information_gain.json}.}
 \end{table}
 
-Trên trung bình năm cửa sổ, cảm xúc thật cao hơn đối chứng trung tính $0{,}0066$ F1 vĩ
-mô; bốn trong năm cửa sổ có hiệu số dương. Tuy nhiên, dấu dương của ước lượng điểm chưa đủ
-để suy ra cải thiện có thể tái lập.
+Trên trung bình năm cửa sổ, cảm xúc thật cao hơn đối chứng trung tính $0{,}0040$ F1 vĩ
+mô; cả năm cửa sổ đều có hiệu số dương. Hiệu ứng kiến trúc và độ phủ tin lại mang dấu âm
+($-0{,}0015$), nên hiệu số trực tiếp $+0{,}0025$ nhỏ hơn đóng góp phân cực --- đúng lý do
+phải tách hai thành phần thay vì báo cáo một hiệu số gộp. Tuy nhiên, dấu dương của ước
+lượng điểm chưa đủ để suy ra cải thiện có thể tái lập.
 
 Bảng~\ref{tab:kq-ablation-ci} báo cáo khoảng tin cậy theo hai cách lấy mẫu lặp. Cách thứ
 nhất lấy mẫu lặp trên năm cửa sổ; cách thứ hai lấy mẫu lặp trên 300 \textit{ngày} kiểm thử,
@@ -488,12 +490,12 @@ Khoảng theo ngày được ưu tiên vì chỉ có năm khối cửa sổ.
     \cmidrule(lr){2-3} \cmidrule(lr){4-5}
     Chỉ số & Hiệu số & Khoảng tin cậy 95\% & Hiệu số & Khoảng tin cậy 95\% \\
     \midrule
-    F1 vĩ mô & $+0{,}0066$ & $[+0{,}0011; +0{,}0128]$ & $+0{,}0014$ & $[-0{,}0087; +0{,}0116]$ \\
-    Độ chính xác cân bằng & $+0{,}0027$ & $[-0{,}0004; +0{,}0053]$ & $-0{,}0008$ & $[-0{,}0102; +0{,}0089]$ \\
-    Độ chính xác & $-0{,}0024$ & $[-0{,}0143; +0{,}0048]$ & $-0{,}0024$ & $[-0{,}0118; +0{,}0068]$ \\
+    F1 vĩ mô & $+0{,}0040$ & $[+0{,}0016; +0{,}0078]$ & $-0{,}0013$ & $[-0{,}0105; +0{,}0082]$ \\
+    Độ chính xác cân bằng & $+0{,}0027$ & $[-0{,}0043; +0{,}0097]$ & $-0{,}0015$ & $[-0{,}0115; +0{,}0062]$ \\
+    Độ chính xác & $-0{,}0039$ & $[-0{,}0181; +0{,}0070]$ & $-0{,}0037$ & $[-0{,}0126; +0{,}0052]$ \\
     \bottomrule
   \end{tabular}
-\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment/information\_gain.json}.}
+\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment\_tft/information\_gain.json}.}
 \end{table}
 
 Hai cột hiệu số là hai đại lượng khác nhau và được báo cáo kèm khoảng tin cậy tương ứng của
@@ -513,8 +515,9 @@ Kết quả ở các mục trên dùng điểm kiểm cảm xúc tinh chỉnh tr
 trong đó có nhãn công bố sau ngày kiểm thử đầu tiên. Đó là phân tích hồi cứu, không
 phải bằng chứng ngoài mẫu. Để khắc phục, một điểm kiểm thứ hai được tinh chỉnh chỉ
 trên 1.049 nhãn công bố trước ngày quan sát kiểm thử đầu tiên (22/10/2024), giữ
-nguyên cấu hình đã khóa từ xác thực chéo. Toàn bộ 14.256 liên kết tin--mã được chấm
-lại bằng điểm kiểm này, rồi chạy lại thang dự báo và đối chứng trung tính ghép cặp
+nguyên cấu hình đã khóa từ xác thực chéo. Toàn bộ 12.140 bài tin (14.256 liên kết
+tin--mã) được chấm lại bằng điểm kiểm này, rồi chạy lại thang dự báo và đối chứng
+trung tính ghép cặp
 trên cùng năm cửa sổ và ba hạt giống. Artifact ghi \texttt{point\_in\_time: true},
 xác nhận mốc cắt nhãn không muộn hơn ngày kiểm thử đầu tiên.
 
@@ -538,17 +541,28 @@ xác nhận mốc cắt nhãn không muộn hơn ngày kiểm thử đầu tiên
 \noindent\textit{Nguồn: \path{outputs/forecast_pit_sentiment/information_gain.json} và \path{information_gain_tft.json}.}
 \end{table}
 
-Với điểm kiểm đóng băng, đóng góp thông tin của cảm xúc là $-0{,}0024$ F1 vĩ mô ở
-LSTM hai nhánh và $+0{,}0061$ ở TFT; khoảng tin cậy theo ngày của cả hai đều chứa 0.
-So với lượt hồi cứu ($+0{,}0066$ ở LSTM), ước lượng điểm giảm và đổi dấu. Điều này
-phù hợp với giả thuyết rằng một phần hiệu số dương của lượt hồi cứu đến từ việc bộ
-sinh xác suất đã nhìn thấy nhãn thuộc giai đoạn kiểm thử, chứ không phải từ thông
-tin phân cực có thể khai thác trước phiên.
+Với điểm kiểm đóng băng, đóng góp thông tin của cảm xúc ở LSTM hai nhánh --- nhánh
+chính của đồ án --- là $-0{,}0024$ F1 vĩ mô, khoảng tin cậy theo ngày
+$[-0{,}0134; +0{,}0079]$. Ở TFT, ước lượng điểm là $+0{,}0061$ với khoảng
+$[-0{,}0041; +0{,}0181]$; khoảng theo cửa sổ $[-0{,}0008; +0{,}0143]$ cũng chứa 0,
+nên con số dương này không được nâng thành bằng chứng, chỉ được ghi nhận để so sánh
+giữa hai kiến trúc.
 
-Kết luận ngoài mẫu của đồ án vì vậy là: \textbf{trên bộ dữ liệu và thiết lập hiện
-tại, cảm xúc tin tài chính tiếng Việt không mang lại cải thiện có thể tái lập cho
-bài toán phân loại xu hướng phiên kế tiếp}. Đây là một kết quả âm tính được đo đúng
-quy trình, không phải thất bại của quy trình đo.
+So với lượt hồi cứu ($+0{,}0040$ ở LSTM), ước lượng điểm giảm khoảng $0{,}006$ và
+đổi dấu. Có hai cách giải thích và đồ án không tách được chúng. Thứ nhất, một phần
+hiệu số dương của lượt hồi cứu đến từ việc bộ sinh xác suất đã nhìn thấy nhãn thuộc
+giai đoạn kiểm thử. Thứ hai, điểm kiểm đóng băng chỉ học từ 1.049 nhãn thay vì 1.306,
+nên bản thân bộ phân loại cảm xúc yếu hơn và sinh ra xác suất nhiễu hơn. Độ dịch
+chuyển này nằm trong bề rộng khoảng tin cậy của cả hai lượt, vì vậy không đủ căn cứ
+để quy toàn bộ cho rò rỉ thời điểm. Một phép tách cần lượt thứ ba: điểm kiểm huấn
+luyện trên 1.049 nhãn lấy ngẫu nhiên không theo thời gian, để cô lập ảnh hưởng của
+kích thước tập huấn luyện --- hạng mục này chưa thực hiện.
+
+Điều kết luận được là: khi loại bỏ rò rỉ thời điểm, \textbf{không còn ước lượng điểm
+dương nào ở nhánh chính, và không khoảng tin cậy nào loại trừ 0}. Trên bộ dữ liệu và
+thiết lập hiện tại, cảm xúc tin tài chính tiếng Việt không cho thấy cải thiện có thể
+tái lập cho bài toán phân loại xu hướng phiên kế tiếp. Đây là một kết quả âm tính
+được đo đúng quy trình, không phải thất bại của quy trình đo.
 
 
 \subsection{Giới hạn của kiểm tra theo điều kiện thị trường}

@@ -62,24 +62,28 @@ Sau khi khóa cấu hình, một điểm kiểm triển khai được tinh chỉ
 nhãn với năm epoch cố định và chấm lại 12.624 liên kết tin--mã. Có 12.613 liên kết được
 neo vào phiên giao dịch; 11 liên kết bị loại. Bảng dự báo gồm 14.990 dòng mã--phiên, trong
 đó 6.950 dòng có tin. Ở bài toán dự báo, mô hình LSTM chỉ dùng giá đạt F1 vĩ mô
-0,3797, độ chính xác cân bằng 0,3915 và AUC-ROC một-chống-còn-lại 0,5721; F1 vĩ
-mô này cao hơn mốc ngẫu nhiên 0,3289 và mốc lớp phổ biến 0,1603. Vì nhãn ba lớp
+0,3839, độ chính xác cân bằng 0,3918 và AUC-ROC một-chống-còn-lại 0,5728; F1 vĩ
+mô này cao hơn mốc ngẫu nhiên 0,3346 và mốc lớp phổ biến 0,1573. Tầng TFT tối giản
+đạt 0,3595, thấp hơn LSTM. Vì nhãn ba lớp
 được cắt theo phân vị một phần ba, các lớp gần cân bằng theo thiết kế và mức ngẫu
 nhiên của bài toán là 0,333.
 
 Đóng góp riêng của tín hiệu cảm xúc được đo bằng một đối chứng giữ nguyên kiến
 trúc hai nhánh, cùng bài tin, thời điểm và số lượng tin, nhưng thay xác suất cảm
-xúc thật bằng phân phối tiên nghiệm trung tính. Hiệu số trực tiếp là $+0{,}0110$
-F1 vĩ mô, trong đó hiệu ứng kiến trúc, sự hiện diện và khối lượng tin là $+0{,}0044$ và
-đóng góp thông tin theo cửa sổ là $+0{,}0066$. Khi lấy mẫu lặp
-theo khối ngày, đóng góp thông tin ước lượng là $+0{,}0014$ với khoảng tin cậy 95\%
-$[-0{,}0087; +0{,}0116]$. Khoảng này chứa 0.
+xúc thật bằng phân phối tiên nghiệm trung tính. Ở lượt hồi cứu, hiệu số trực tiếp là
+$+0{,}0025$ F1 vĩ mô, trong đó hiệu ứng kiến trúc, sự hiện diện và khối lượng tin là
+$-0{,}0015$ và đóng góp thông tin theo cửa sổ là $+0{,}0040$; ước lượng theo khối ngày
+là $-0{,}0013$ với khoảng tin cậy 95\% $[-0{,}0105; +0{,}0082]$.
 
-Điểm kiểm cảm xúc được học từ toàn bộ tập nhãn, gồm cả bài sau các ngày kiểm thử dự báo.
-Do đó các kết quả nhánh có cảm xúc chỉ là hồi cứu, không phải bằng chứng dự báo ngoài mẫu.
-Một lượt đánh giá hợp lệ phải tinh chỉnh lại trong từng cửa sổ chỉ bằng nhãn quá khứ hoặc
-dùng một điểm kiểm đóng băng được huấn luyện trước ngày kiểm thử đầu tiên. Kết quả không
-được diễn giải thành quan hệ nhân quả hay khuyến nghị đầu tư.
+Vì điểm kiểm của lượt hồi cứu học từ toàn bộ tập nhãn, gồm cả bài sau các ngày kiểm thử,
+đồ án chạy thêm một lượt ngoài mẫu với điểm kiểm đóng băng chỉ từ 1.049 nhãn công bố
+trước ngày quan sát kiểm thử đầu tiên. Ở lượt này, đóng góp thông tin phân cực là
+$-0{,}0024$ F1 vĩ mô ở LSTM hai nhánh với khoảng tin cậy theo ngày
+$[-0{,}0134; +0{,}0079]$, và $+0{,}0061$ ở TFT với khoảng $[-0{,}0041; +0{,}0181]$.
+Không khoảng tin cậy nào loại trừ 0. Kết luận ngoài mẫu là cảm xúc tin tài chính tiếng
+Việt chưa cho thấy cải thiện có thể tái lập trong phạm vi dữ liệu này. Độ dịch chuyển
+giữa hai lượt chưa tách được giữa rò rỉ thời điểm và kích thước tập huấn luyện nhỏ hơn.
+Kết quả không được diễn giải thành quan hệ nhân quả hay khuyến nghị đầu tư.
 
 \vspace{0.5cm}
 \noindent Từ khóa: dự báo xu hướng giá cổ phiếu, phân tích cảm xúc, PhoBERT,

@@ -51,22 +51,28 @@ nhánh, cùng bài tin, thời điểm và số lượng tin, nhưng thay xác s
 tiên nghiệm trung tính. Kết quả:
 
 \begin{itemize}[nosep]
-  \item hiệu số trực tiếp: $+0{,}0110$ F1 vĩ mô;
-  \item trong đó hiệu ứng kiến trúc, sự hiện diện và khối lượng tin: $+0{,}0044$;
-  \item đóng góp thông tin phân cực: $+0{,}0066$ theo cửa sổ; ước lượng theo ngày là
-        $+0{,}0014$, khoảng tin cậy 95\% $[-0{,}0087; +0{,}0116]$.
+  \item hiệu số trực tiếp: $+0{,}0025$ F1 vĩ mô;
+  \item trong đó hiệu ứng kiến trúc, sự hiện diện và khối lượng tin: $-0{,}0015$;
+  \item đóng góp thông tin phân cực: $+0{,}0040$ theo cửa sổ; ước lượng theo ngày là
+        $-0{,}0013$, khoảng tin cậy 95\% $[-0{,}0105; +0{,}0082]$.
 \end{itemize}
 
 Khoảng tin cậy theo ngày chứa 0 ở cả ba chỉ số, và bộ sinh cảm xúc của lượt này đã học từ
 nhãn trong giai đoạn kiểm thử, nên các số liệu trên chỉ là chênh lệch hồi cứu.
 
 Để có đánh giá ngoài mẫu hợp lệ, một điểm kiểm thứ hai được tinh chỉnh chỉ trên 1.049 nhãn
-công bố trước ngày quan sát kiểm thử đầu tiên (22/10/2024), rồi chấm lại toàn bộ 14.256
-liên kết tin--mã và chạy lại thang dự báo cùng đối chứng ghép cặp. Với điểm kiểm đóng băng,
-đóng góp thông tin phân cực là $-0{,}0024$ F1 vĩ mô ở LSTM hai nhánh (khoảng tin cậy theo
-ngày $[-0{,}0134; +0{,}0079]$) và $+0{,}0061$ ở TFT ($[-0{,}0041; +0{,}0181]$); cả hai
-khoảng đều chứa 0. So với lượt hồi cứu, ước lượng điểm giảm và đổi dấu ở LSTM, phù hợp với
-giả thuyết rằng một phần hiệu số dương trước đó đến từ rò rỉ thời điểm qua bộ sinh.
+công bố trước ngày quan sát kiểm thử đầu tiên (22/10/2024), rồi chấm lại toàn bộ 12.140 bài
+tin (14.256 liên kết tin--mã) và chạy lại thang dự báo cùng đối chứng ghép cặp. Với điểm
+kiểm đóng băng, đóng góp thông tin phân cực ở LSTM hai nhánh --- nhánh chính của đồ án ---
+là $-0{,}0024$ F1 vĩ mô, khoảng tin cậy theo ngày $[-0{,}0134; +0{,}0079]$. Ở TFT, ước
+lượng điểm là $+0{,}0061$ nhưng cả khoảng theo ngày $[-0{,}0041; +0{,}0181]$ lẫn khoảng
+theo cửa sổ $[-0{,}0008; +0{,}0143]$ đều chứa 0, nên không được dùng làm bằng chứng.
+
+So với lượt hồi cứu ($+0{,}0040$ ở LSTM), ước lượng điểm giảm khoảng $0{,}006$ và đổi dấu.
+Độ dịch chuyển này nằm trong bề rộng khoảng tin cậy của cả hai lượt và có ít nhất hai cách
+giải thích mà đồ án không tách được: rò rỉ thời điểm qua bộ sinh ở lượt hồi cứu, và việc
+điểm kiểm đóng băng chỉ học từ 1.049 thay vì 1.306 nhãn nên yếu hơn. Phép tách cần một lượt
+huấn luyện trên 1.049 nhãn lấy ngẫu nhiên không theo thời gian; hạng mục này chưa thực hiện.
 
 Kết luận ngoài mẫu của đồ án vì vậy là: trên bộ dữ liệu và thiết lập hiện tại, cảm xúc tin
 tài chính tiếng Việt \textbf{không mang lại cải thiện có thể tái lập} cho bài toán phân loại
@@ -149,20 +155,22 @@ hình có cảm xúc, và TFT được chạy như tầng mở rộng sau khi c�
 Đồ án \textbf{đã đưa ra kết quả định lượng ở cả hai chế độ}. Mô hình dự báo dùng đặc trưng
 giá có điểm cao hơn hai mốc đối chứng bắt buộc; do chưa có kiểm định ghép cặp với các mốc
 này, kết quả chỉ mô tả mức điểm quan sát được. Với đối chứng giữ nguyên kiến trúc, thời
-điểm và số lượng tin, lượt hồi cứu cho đóng góp thông tin theo cửa sổ $+0{,}0066$ F1 vĩ mô
-(theo ngày $+0{,}0014$, khoảng tin cậy $[-0{,}0087; +0{,}0116]$).
+điểm và số lượng tin, lượt hồi cứu cho đóng góp thông tin theo cửa sổ $+0{,}0040$ F1 vĩ mô
+(theo ngày $-0{,}0013$, khoảng tin cậy $[-0{,}0105; +0{,}0082]$).
 
 Lượt ngoài mẫu với điểm kiểm đóng băng trước ngày kiểm thử đầu tiên cho $-0{,}0024$ F1 vĩ
-mô ở LSTM hai nhánh (khoảng tin cậy theo ngày $[-0{,}0134; +0{,}0079]$) và $+0{,}0061$ ở
-TFT ($[-0{,}0041; +0{,}0181]$). Mọi khoảng tin cậy đều chứa 0, và ước lượng điểm của LSTM
-đổi dấu khi loại bỏ rò rỉ thời điểm.
+mô ở LSTM hai nhánh, nhánh chính của đồ án (khoảng tin cậy theo ngày
+$[-0{,}0134; +0{,}0079]$). Ở TFT ước lượng điểm là $+0{,}0061$ nhưng cả hai khoảng tin cậy
+đều chứa 0. Không ước lượng nào loại trừ 0, và ở nhánh chính không còn ước lượng điểm
+dương. Độ dịch chuyển so với lượt hồi cứu nằm trong bề rộng khoảng tin cậy và chưa tách
+được giữa rò rỉ thời điểm và việc điểm kiểm đóng băng học từ ít nhãn hơn.
 
 Kết luận của đồ án vì vậy là: trên 10 mã HOSE giai đoạn 2020--2025 với nguồn tin Vietstock
 và chân trời một phiên, cảm xúc tin tài chính tiếng Việt \textbf{không mang lại cải thiện
 có thể tái lập} cho bài toán phân loại xu hướng. Giá trị của đồ án nằm ở chỗ kết luận âm
 tính này được rút ra từ một quy trình đo có đối chứng ghép cặp giữ nguyên kiến trúc và độ
-phủ tin, có điểm kiểm phù hợp thời điểm, và có đủ bản kê để tái lập --- thay vì một con số
-dương thu được từ thiết lập bị rò rỉ.
+phủ tin, có điểm kiểm phù hợp thời điểm, và có đủ bản kê để tái lập --- thay vì một ước
+lượng điểm dương báo cáo mà không kiểm tra thời điểm của bộ sinh.
 
 Mọi diễn giải phải giữ đúng phạm vi 10 mã HOSE, giai đoạn 2020--2025, nguồn tin Vietstock và
 chân trời một phiên. Kết luận không được suy rộng thành lời hứa hiệu năng ngoài dữ liệu, và
