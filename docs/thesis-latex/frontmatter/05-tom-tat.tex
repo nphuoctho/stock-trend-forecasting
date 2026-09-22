@@ -51,16 +51,16 @@ xác thực và kiểm thử, cùng cách tiền xử lý, hạt giống ngẫu 
 tiêu chí dừng. Đối chứng giữ nguyên kiến trúc và độ phủ tin để tách phần chênh hồi cứu do
 xác suất cảm xúc khỏi ảnh hưởng của kiến trúc hoặc cách chia mẫu.
 
-Về dữ liệu, kho tin đã lưu 10.684 bản ghi có URL, thời điểm đăng và nội dung trong cửa sổ
-2020--2025, kết hợp với 12.613 liên kết tin tức và mã cổ phiếu thuộc 10 mã VN30, cùng 14.990 dòng dữ liệu giá
+Về dữ liệu, kho tin đã lưu 10.695 bản ghi có URL, thời điểm đăng và nội dung trong cửa sổ
+2020--2025, kết hợp với 12.624 liên kết tin tức và mã cổ phiếu thuộc 10 mã VN30, cùng 14.990 dòng dữ liệu giá
 OHLCV trong giai đoạn 2020--2025. Tập nhãn cảm xúc trong miền dữ liệu đã được rà soát
 gồm 1.306 mẫu, bên cạnh tập hạt giống CafeF gồm 999 mẫu. Xác thực chéo theo tầng 5 lượt
 trên tập 1.306 mẫu đạt F1 vĩ mô 0,7298, độ chính xác 0,8125 và độ chính xác cân bằng
 0,7689; năm tập kiểm thử ngoài cộng lại có 59 mẫu NEGATIVE với độ bao phủ 0,6803.
 
 Sau khi khóa cấu hình, một điểm kiểm triển khai được tinh chỉnh lại trên toàn bộ 1.306
-nhãn với năm epoch cố định và chấm lại 14.256 liên kết tin--mã, trong đó 12.613 liên kết
-thuộc cửa sổ 2020--2025 và đều neo được vào một phiên giao dịch. Bảng dự báo gồm 14.990
+nhãn với năm epoch cố định và chấm lại 14.256 liên kết tin--mã, trong đó 12.624 liên kết
+thuộc cửa sổ 2020--2025 và 12.613 neo được vào một phiên bên trong cửa sổ. Bảng dự báo gồm 14.990
 dòng mã--phiên, trong đó 6.948 dòng có tin. Ở bài toán dự báo, mô hình LSTM chỉ dùng giá
 đạt F1 vĩ mô 0,3756, độ chính xác cân bằng 0,3915 và AUC-ROC một-chống-còn-lại 0,5714;
 F1 vĩ mô này cao hơn mốc ngẫu nhiên 0,3289 và mốc lớp phổ biến 0,1453. Tầng TFT tối giản

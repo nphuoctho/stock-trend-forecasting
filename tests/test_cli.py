@@ -444,3 +444,116 @@ def test_point_in_time_refuses_a_checkpoint_manifest_edited_after_scoring(
     assert verdict["point_in_time"] is False
     assert verdict["point_in_time_reason"] == "hash_mismatch"
     assert verdict["label_cutoff"] is None
+
+
+def test_in_window_alignment_report_uses_a_half_open_final_day(monkeypatch, tmp_path):
+    """The window covers all of its last day and none of the next one.
+
+    An article published after the 15:00 cutoff on the final day still belongs to
+    the study window even though it anchors to the next session; one published at
+    midnight the following day does not. An inclusive upper bound admits that
+    midnight row, and a 23:59:59 bound drops timestamps carrying fractional
+    seconds in the last second.
+    """
+    from stf import cli as cli_module
+    from stf import forecasting as forecasting_module
+    from stf.forecasting import experiment as experiment_module
+    from stf.sentiment.dataset import file_fingerprint
+
+    published = [
+        "2019-12-31T23:59:59.500000+07:00",  # before the window
+        "2020-01-01T09:00:00+07:00",  # first instant of the window
+        "2020-12-31T16:30:00+07:00",  # after the cutoff on the last day: in window
+        "2020-12-31T23:59:59.500000+07:00",  # fractional second in the last second
+        "2021-01-01T00:00:00+07:00",  # first instant after the window
+    ]
+    news_path = tmp_path / "scored.parquet"
+    pd.DataFrame(
+        {
+            "ticker": ["FPT"] * len(published),
+            "url": [f"https://vietstock.vn/{i}.htm" for i in range(len(published))],
+            "published_at": published,
+            "prob_negative": [0.1] * len(published),
+            "prob_neutral": [0.2] * len(published),
+            "prob_positive": [0.7] * len(published),
+        }
+    ).to_parquet(news_path, index=False)
+    news_path.with_suffix(".manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "output": {"sha256": file_fingerprint(news_path), "rows": len(published)},
+                "checkpoint": {"directory_sha256": "checkpoint-v1"},
+                "inference": {
+                    "truncation_strategy": "head_tail",
+                    "max_len": 256,
+                    "batch_size": 32,
+                    "runtime": {},
+                },
+                "input": {"fingerprint": "inputs-v1"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    sessions = pd.bdate_range("2019-12-02", "2021-01-29")
+    prices = pd.DataFrame(
+        {
+            "ticker": "FPT",
+            "time": sessions,
+            "open": 100.0,
+            "high": 101.0,
+            "low": 99.0,
+            "close": 100.0 + np.arange(len(sessions), dtype=float),
+            "volume": 1_000_000,
+        }
+    )
+    captured = {}
+    monkeypatch.setattr(cli_module, "_load_prices", lambda: prices)
+    monkeypatch.setattr(
+        forecasting_module,
+        "assemble",
+        lambda *_a: pd.DataFrame(
+            {
+                "has_news": [1],
+                "observation_date": pd.to_datetime(["2020-06-01"]),
+                "target_date": pd.to_datetime(["2020-06-02"]),
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        experiment_module,
+        "run_experiment",
+        lambda panel, *, cfg, output_dir, provenance: captured.update(
+            provenance=provenance
+        )
+        or {
+            "panel_rows": len(panel),
+            "windows": [],
+            "chance_level": 1 / 3,
+            "summary": {},
+            "ablation": {},
+        },
+    )
+
+    assert (
+        main(
+            [
+                "forecast",
+                "--news-sentiment",
+                str(news_path),
+                "--panel-end",
+                "2020-12-31",
+                "--output",
+                str(tmp_path / "forecast"),
+            ]
+        )
+        == 0
+    )
+
+    report = captured["provenance"]["alignment_report_in_window"]
+    assert report["window"] == ["2020-01-01", "2020-12-31"]
+    assert report["links"] == 3  # the two boundary rows outside are excluded
+    # Both 2020-12-31 articles are published after the 15:00 cutoff, so they roll
+    # onto the first 2021 session: published in window, unusable by a 2020 panel.
+    assert report["anchored_after_window"] == 2

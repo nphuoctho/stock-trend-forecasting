@@ -25,7 +25,7 @@ Các con số trong Bảng~\ref{tab:kq-snapshot} là số liệu của bước c
 
 \begin{table}[H]
   \centering
-  \caption{Tổng hợp số liệu đầu vào đã kiểm kê.}
+  \caption{Tổng hợp số liệu đầu vào đã kiểm kê (kho tin là toàn bộ lần thu thập, gồm cả năm 2026; số dòng giá là của cửa sổ 2020--2025).}
   \label{tab:kq-snapshot}
   \begin{tabular}{p{8.8cm} c}
     \toprule
@@ -162,27 +162,27 @@ dữ liệu mã--phiên. Các con số được suy ra từ \texttt{stf.cli veri
     \toprule
     Chỉ tiêu & Số lượng hoặc tỷ lệ \\
     \midrule
-    Bài tin có URL duy nhất trong cửa sổ 2020--2025 & 10.684 \\
-    Liên kết tin--mã cổ phiếu trong cửa sổ & 12.613 \\
-    Bản ghi có mốc thời gian hợp lệ & 10.684 (100\%) \\
-    Bài có nội dung ngoài tiêu đề & 10.684 (100\%) \\
-    Liên kết được neo vào một phiên giao dịch & 12.613 \\
-    \quad trong đó neo vào chính phiên đó & 6.554 \\
-    \quad trong đó chuyển sang phiên kế tiếp & 6.059 \\
-    Liên kết không neo được và bị loại & 0 \\
+    Bài tin có URL duy nhất trong cửa sổ 2020--2025 & 10.695 \\
+    Liên kết tin--mã cổ phiếu trong cửa sổ & 12.624 \\
+    Bản ghi có mốc thời gian hợp lệ & 10.695 (100\%) \\
+    Bài có nội dung ngoài tiêu đề & 10.695 (100\%) \\
+    Liên kết neo vào chính phiên đăng & 6.554 \\
+    Liên kết chuyển sang phiên kế tiếp & 6.070 \\
+    \quad trong đó rơi sang phiên năm 2026, ngoài cửa sổ & 11 \\
+    Liên kết dùng được trong bảng dữ liệu & 12.613 \\
     Dòng mã--phiên của bảng dữ liệu & 14.990 \\
     Dòng mã--phiên có ít nhất một tin & 6.948 (46,35\%) \\
     Dòng mã--phiên không có tin & 8.042 (53,65\%) \\
     \bottomrule
   \end{tabular}
-\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment\_tft/forecast\_results.json}, trường \texttt{provenance}.}
+\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment\_tft/forecast\_results.json}, trường \texttt{provenance.alignment\_report\_in\_window} và \texttt{provenance.news\_coverage}.}
 \end{table}
 
 Có hai cách đếm độ phủ và hai cách cho hai con số khác nhau, nên cần nêu rõ định nghĩa.
 Nếu chỉ đối chiếu ngày đăng tin với ngày có phiên giao dịch, độ phủ là 37,8\%, vì tin
 cuối tuần, ngày lễ và tin sau 15:00 bị bỏ. Con số 46,35\% trong Bảng~\ref{tab:kq-news-stats}
 là độ phủ của quy trình thực tế: tin sau mốc cắt được chuyển sang phiên kế tiếp thay vì
-bị loại, nên 6.059 liên kết vẫn được dùng. Toàn bộ chương này dùng định nghĩa thứ hai.
+bị loại, nên 6.059 liên kết chuyển phiên vẫn được dùng. Toàn bộ chương này dùng định nghĩa thứ hai.
 
 Độ phủ tin lệch mạnh giữa các mã: MBB và TCB có trên 2.000 liên kết mỗi mã, còn GAS chỉ
 có 548. Vì vậy, số tin và biến \texttt{has\_news} được giữ làm đặc trưng riêng, và ngày
@@ -341,15 +341,16 @@ không báo cáo chỉ số kiểm thử mới. Manifest điểm kiểm xác nh�
 phân bố 194 NEGATIVE, 771 NEUTRAL và 341 POSITIVE, cùng môi trường GPU đã dùng.
 
 Các bảng dự báo lịch sử được tạo bằng bộ sinh 306 mẫu với \texttt{score-news} và
-\texttt{--context-chars 400}; 14.256 liên kết tin--mã đã nhận xác suất ba lớp, trong đó 12.613 thuộc cửa sổ 2020--2025 và được đưa vào bảng dự báo. Phân bố
+\texttt{--context-chars 400}; 14.256 liên kết tin--mã đã nhận xác suất ba lớp, trong đó 12.624 thuộc cửa sổ 2020--2025 và 12.613 được đưa vào bảng dự báo. Phân bố
 nhãn đa số lịch sử là 2.095 NEGATIVE, 6.776 NEUTRAL và 3.753 POSITIVE. Nhánh dự báo luôn
 dùng phân phối xác suất mềm, không dùng nhãn cứng; các số lịch sử này chỉ giải thích
 artifact cũ, không được gán cho điểm kiểm 1.306 mẫu.
 
 Điểm kiểm mới đã chấm lại đúng 14.256 liên kết với \texttt{title\_context},
-\texttt{head\_tail} và giới hạn 400 ký tự. Trong số đó 12.613 liên kết thuộc cửa sổ
-2020--2025 và neo được vào một phiên theo mốc 15 giờ; 1.643 liên kết còn lại thuộc năm
-2026, ngoài cửa sổ nghiên cứu, nên không tham gia bảng dự báo. Bảng dự báo có tin ở
+\texttt{head\_tail} và giới hạn 400 ký tự. Trong số đó 12.624 liên kết thuộc cửa sổ
+2020--2025; 12.613 neo được vào một phiên bên trong cửa sổ theo mốc 15 giờ, 11 liên kết
+đăng cuối ngày 31/12/2025 rơi sang phiên năm 2026 nên bị loại. 1.632 liên kết còn lại
+đăng trong năm 2026, ngoài cửa sổ nghiên cứu. Bảng dự báo có tin ở
 6.948 trên 14.990 dòng mã--phiên. Lần chạy mới và đối chứng ghép cặp dùng cùng các bài
 tin, thời điểm và số
 lượng tin; đối chứng chỉ thay ba xác suất mỗi bài bằng prior trung tính. Vì điểm kiểm được
@@ -624,15 +625,16 @@ Các điểm kiểm tra sau được thực hiện và ghi nhận kết quả th
         các mô hình chỉ giá. Trong quá trình thực nghiệm đã phát hiện và sửa một lỗi tái lập:
         trọng số mạng được khởi tạo trước khi gieo hạt giống, khiến kết quả của một cửa sổ phụ
         thuộc vào thứ tự chạy của các mô hình trước đó.
-  \item \textbf{Dữ liệu bị loại và mã ít tin}: trong cửa sổ 2020--2025 không có liên kết
-        nào không neo được vào phiên và không có bản ghi nào thiếu mốc thời gian hợp lệ.
+  \item \textbf{Dữ liệu bị loại và mã ít tin}: 11 liên kết đăng cuối ngày 31/12/2025 rơi
+        sang phiên năm 2026 nên bị loại; không có bản ghi nào thiếu mốc thời gian hợp lệ.
         Độ phủ tin lệch mạnh giữa các mã,
         từ 548 liên kết (GAS) đến 2.165 liên kết (MBB); kết quả theo từng mã chưa được phân
         tách nên chưa thể kết luận về ảnh hưởng của mật độ tin.
   \item \textbf{Giới hạn thời điểm của bộ sinh}: thang dự báo chính dùng điểm kiểm đã học
         từ toàn bộ 1.306 nhãn, gồm cả nhãn sau các ngày kiểm thử năm 2024--2025, nên là
-        kết quả hồi cứu. Mục~\ref{sec:kq-point-in-time} bổ sung lượt chạy với điểm kiểm
-        đóng băng trước ngày kiểm thử đầu tiên; đó mới là đánh giá ngoài mẫu hợp lệ.
+        kết quả hồi cứu. Mục~\ref{sec:kq-point-in-time} mô tả giao thức của lượt ngoài
+        mẫu với điểm kiểm đóng băng trước ngày kiểm thử đầu tiên; lượt đó chưa được đo,
+        nên đồ án chưa có đánh giá ngoài mẫu.
   \item \textbf{Phạm vi phân tầng}: đối chứng ghép cặp kiểm soát sự hiện diện và khối lượng
         tin trên toàn bộ mẫu. Phân tầng ghép cặp theo mã, độ biến động và ngày sự kiện
         \textbf{chưa} được thực hiện, nên câu hỏi thứ ba của đề cương chưa được trả lời.

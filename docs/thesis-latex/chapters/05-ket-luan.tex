@@ -15,15 +15,17 @@ cảm xúc, sinh xác suất của ba lớp, tổng hợp đặc trưng theo mã
 và DOWN, huấn luyện, đánh giá cuốn chiếu theo thời gian và phân tích loại bỏ đặc trưng.
 Tiền xử lý của nhánh giá chỉ học từ tập huấn luyện, mốc cắt thông tin là 15 giờ và năm
 đoạn kiểm thử cuốn chiếu không chồng lấn. Thang dự báo chính dùng điểm kiểm cảm xúc học từ
-nhãn gồm cả giai đoạn kiểm thử nên là lượt hồi cứu; một lượt bổ sung với điểm kiểm đóng
-băng trước ngày kiểm thử đầu tiên cung cấp đánh giá ngoài mẫu hợp lệ.
+nhãn gồm cả giai đoạn kiểm thử nên là lượt hồi cứu. Giao thức cho một lượt ngoài mẫu
+hợp lệ --- điểm kiểm đóng băng trước ngày kiểm thử đầu tiên --- đã được cài đặt và xác
+minh, nhưng chưa được đo.
 
 \section{Đối chiếu với mục tiêu và câu hỏi nghiên cứu}
 
 Mục tiêu thứ nhất là tạo bộ dữ liệu có thể truy nguyên. Mục tiêu này \textbf{đã hoàn
 thành}: 14.256 liên kết tin--mã Vietstock với 100\% có mốc thời gian và nội dung, và
 14.990 dòng giá của 10 mã HOSE trong giai đoạn 2020--2025 không có giá trị thiếu. Trong
-cửa sổ nghiên cứu có 12.613 liên kết tin--mã, tất cả đều neo được vào một phiên giao dịch. Toàn bộ dữ liệu được ghi kèm mã băm trong bản kê của lần chạy.
+cửa sổ nghiên cứu có 12.624 liên kết tin--mã, trong đó 12.613 neo được vào một phiên bên
+trong cửa sổ và 11 rơi sang phiên năm 2026 nên bị loại. Toàn bộ dữ liệu được ghi kèm mã băm trong bản kê của lần chạy.
 
 Mục tiêu thứ hai là đánh giá PhoBERT ở tầng cảm xúc. Xác thực chéo theo tầng trên 1.306
 nhãn đã rà soát đã hoàn thành: cấu hình có trọng số nghịch đảo tần suất đạt F1 vĩ mô

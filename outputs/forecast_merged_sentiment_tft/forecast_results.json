@@ -6710,6 +6710,23 @@
       "mapped": 14245,
       "dropped": 11
     },
+    "alignment_report_in_window": {
+      "window": [
+        "2020-01-01",
+        "2025-12-31"
+      ],
+      "articles": 10695,
+      "links": 12624,
+      "same_session": 6554,
+      "next_session": 6070,
+      "invalid": 0,
+      "no_calendar": 0,
+      "unmapped": 0,
+      "stale": 0,
+      "mapped": 12624,
+      "dropped": 0,
+      "anchored_after_window": 11
+    },
     "panel_hash": "3855c4cbdc25a61c9b801e2f39fc3cbb7f530171ff79e224f8352d700895322a",
     "news_coverage": {
       "panel_rows": 14990,

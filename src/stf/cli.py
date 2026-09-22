@@ -890,7 +890,40 @@ def cmd_forecast(args: argparse.Namespace) -> int:
         ].reset_index(drop=True)
         provenance["panel_end"] = args.panel_end
     if "alignment_report" in panel.attrs:
+        # This report covers every scored link handed to assemble, including any
+        # published outside the study window, so it cannot describe the evaluated
+        # panel on its own.
         provenance["alignment_report"] = panel.attrs["alignment_report"]
+    if news is not None and not news.empty:
+        from stf.forecasting.calendar import (
+            align_news_to_sessions,
+            alignment_report,
+            to_local,
+        )
+
+        window_end = args.panel_end or config.DATE_END
+        published = to_local(news["published_at"])
+        # Half-open on the final day: an article published on window_end after the
+        # 15:00 cutoff is still published inside the study window even though it
+        # anchors to the next session. A 23:59:59 upper bound would drop the last
+        # second when a timestamp carries fractional seconds.
+        lower = pd.Timestamp(panel_start, tz=config.TIMEZONE)
+        upper = pd.Timestamp(window_end, tz=config.TIMEZONE) + pd.Timedelta(days=1)
+        in_window = news[
+            ((published >= lower) & (published < upper)).to_numpy()
+        ].reset_index(drop=True)
+        aligned = align_news_to_sessions(in_window, prices)
+        observation = pd.to_datetime(aligned["observation_date"], errors="coerce")
+        anchored_outside = int((observation > pd.Timestamp(window_end)).sum())
+        provenance["alignment_report_in_window"] = {
+            "window": [panel_start, window_end],
+            "articles": int(in_window["url"].nunique()),
+            "links": int(len(in_window)),
+            **alignment_report(aligned),
+            # Published inside the window but rolled forward onto a session past
+            # its end, so the panel cannot carry them.
+            "anchored_after_window": anchored_outside,
+        }
     provenance["panel_hash"] = frame_hash(panel)
     news_days = int(panel["has_news"].sum())
     provenance["news_coverage"] = {
