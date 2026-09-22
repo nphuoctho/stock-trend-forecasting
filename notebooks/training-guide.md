@@ -171,7 +171,7 @@ về, chạy `score-news`, hai lệnh `forecast` và `forecast-compare` theo `RE
 Checkpoint `merged-refit` học trên toàn bộ 1.306 nhãn, trong đó có nhãn sau các
 ngày kiểm thử của thang dự báo — kết quả forecast với nó chỉ là phân tích hồi
 cứu. Để có đánh giá ngoài mẫu, tinh chỉnh một checkpoint đóng băng chỉ từ nhãn
-trước ngày quan sát kiểm thử đầu tiên (2024-10-22 với cấu hình 5 cửa sổ × 60
+trước ngày quan sát kiểm thử đầu tiên (2024-10-21 với cấu hình 5 cửa sổ × 60
 ngày kiểm thử trên panel kết thúc 2025-12-31):
 
 ```bash
@@ -182,7 +182,7 @@ uv run python -m stf.cli sentiment-refit \
   --truncation-strategy head_tail \
   --class-weighting inverse_frequency \
   --epochs 5 --batch-size 16 --seed 42 \
-  --before-date 2024-10-22 \
+  --before-date 2024-10-21 \
   --output models/sentiment/point-in-time
 ```
 
