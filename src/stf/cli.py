@@ -231,8 +231,15 @@ def cmd_sentiment_cv(args: argparse.Namespace) -> int:
 
 def cmd_sentiment_refit(args: argparse.Namespace) -> int:
     """Fit a cross-validated PhoBERT configuration on every reviewed label."""
+    from stf.forecasting.calendar import to_local
     from stf.sentiment import dataset, experiments, model
 
+    if args.before_date and args.sample_like:
+        print(
+            "sentiment-refit: --before-date and --sample-like are mutually exclusive.",
+            file=sys.stderr,
+        )
+        return 2
     df = dataset.load_labeled(args.data)
     if args.before_date:
         if "published_at" not in df.columns:
@@ -241,8 +248,22 @@ def cmd_sentiment_refit(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 2
-        cutoff = pd.Timestamp(args.before_date)
-        dates = pd.to_datetime(df["published_at"], errors="coerce")
+        try:
+            cutoff = pd.Timestamp(args.before_date, tz=config.TIMEZONE)
+        except ValueError:
+            print(
+                f"sentiment-refit: --before-date {args.before_date!r} is not a date.",
+                file=sys.stderr,
+            )
+            return 2
+        try:
+            dates = to_local(df["published_at"])
+        except (ValueError, TypeError):
+            print(
+                "sentiment-refit: published_at column is not parseable as timestamps.",
+                file=sys.stderr,
+            )
+            return 2
         undated = int(dates.isna().sum())
         if undated:
             print(
@@ -261,6 +282,51 @@ def cmd_sentiment_refit(args: argparse.Namespace) -> int:
         print(
             f"Refit restricted to {len(df)} labels published before {args.before_date}."
         )
+    elif args.sample_like:
+        # Training-size control for a point-in-time run. Matching only the row count
+        # would leave the class prior free to differ, and matching it proportionally
+        # would reproduce the FULL set's prior rather than the point-in-time subset's.
+        # Either way class balance would be confounded with time selection, so draw
+        # the reference checkpoint's exact per-class counts instead.
+        try:
+            reference = json.loads(Path(args.sample_like).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            print(
+                f"sentiment-refit: cannot read reference manifest {args.sample_like}.",
+                file=sys.stderr,
+            )
+            return 2
+        wanted = reference.get("class_distribution")
+        if not wanted:
+            print(
+                f"sentiment-refit: {args.sample_like} has no class_distribution.",
+                file=sys.stderr,
+            )
+            return 2
+        available = df["label"].value_counts().to_dict()
+        short = {k: v for k, v in wanted.items() if v > available.get(k, 0)}
+        if short:
+            print(
+                f"sentiment-refit: not enough labels to match {short}.",
+                file=sys.stderr,
+            )
+            return 2
+        df = (
+            df.groupby("label", group_keys=False)
+            .apply(
+                lambda g: g.sample(
+                    n=int(wanted[g.name]), random_state=args.sample_seed
+                )
+            )
+            .sort_index()
+            .reset_index(drop=True)
+        )
+        print(
+            f"Refit restricted to {len(df)} labels matching the class counts of "
+            f"{args.sample_like} ({wanted}, seed {args.sample_seed}). This is a "
+            "training-size control only; it draws from every date and is NOT "
+            "point-in-time."
+        )
     frame = dataset.prepare_model_input(df, args.input_variant)
     cfg = model.TrainConfig(
         epochs=args.epochs,
@@ -275,7 +341,7 @@ def cmd_sentiment_refit(args: argparse.Namespace) -> int:
         input_variant=args.input_variant,
         cfg=cfg,
         source_path=args.data,
-        allow_subset=bool(args.before_date),
+        allow_subset=bool(args.before_date or args.sample_like),
     )
     print(
         f"Refitting {len(frame)} reviewed rows with the locked "
@@ -287,7 +353,7 @@ def cmd_sentiment_refit(args: argparse.Namespace) -> int:
         out_dir=Path(args.output),
         source_path=args.data,
         evaluation_reference=evaluation_reference,
-        label_cutoff=args.before_date,
+        label_cutoff=cutoff.date().isoformat() if args.before_date else None,
     )
     print("Checkpoint:", Path(args.output) / "best")
     print("Manifest:", Path(args.output) / "manifest.json")
@@ -793,9 +859,21 @@ def cmd_forecast(args: argparse.Namespace) -> int:
         }
 
     panel = assemble(prices, news)
+    # Price history is fetched with a lookback before the study window so rolling
+    # features are defined on the first session. The evaluated panel must still
+    # start at the declared window, otherwise extra history shifts every
+    # walk-forward split.
+    panel_start = args.panel_start or config.DATE_START
+    panel = panel[
+        pd.to_datetime(panel["observation_date"]) >= pd.Timestamp(panel_start)
+    ].reset_index(drop=True)
+    provenance["panel_start"] = panel_start
     if args.panel_end:
+        # Filter on target_date, not observation_date: the label is the outcome and
+        # it must fall inside the declared study window. Filtering observations
+        # alone would let a 2025-12-31 observation carry a 2026 outcome.
         panel = panel[
-            pd.to_datetime(panel["observation_date"]) <= pd.Timestamp(args.panel_end)
+            pd.to_datetime(panel["target_date"]) <= pd.Timestamp(args.panel_end)
         ].reset_index(drop=True)
         provenance["panel_end"] = args.panel_end
     if "alignment_report" in panel.attrs:
@@ -841,18 +919,39 @@ def cmd_forecast(args: argparse.Namespace) -> int:
         checkpoint = provenance["news_sentiment"]["score_manifest"]
         manifest_path = checkpoint.get("checkpoint_manifest_path")
         label_cutoff = None
+        reason = "manifest_missing"
         if manifest_path and Path(manifest_path).is_file():
+            expected = checkpoint.get("checkpoint_manifest_sha256")
             try:
-                label_cutoff = json.loads(
-                    Path(manifest_path).read_text(encoding="utf-8")
-                ).get("provenance", {}).get("label_cutoff")
-            except (OSError, json.JSONDecodeError):
-                label_cutoff = None
+                raw = Path(manifest_path).read_bytes()
+            except OSError:
+                raw = None
+                reason = "manifest_unreadable"
+            if raw is None:
+                pass
+            elif not expected:
+                reason = "hash_missing"
+            elif hashlib.sha256(raw).hexdigest() != expected:
+                reason = "hash_mismatch"
+            else:
+                try:
+                    label_cutoff = (
+                        json.loads(raw).get("provenance", {}).get("label_cutoff")
+                    )
+                    reason = "no_label_cutoff" if label_cutoff is None else "verified"
+                except (json.JSONDecodeError, AttributeError):
+                    reason = "manifest_unreadable"
+        point_in_time = bool(
+            label_cutoff
+            and first_test_obs
+            and pd.Timestamp(label_cutoff).date() <= pd.Timestamp(first_test_obs).date()
+        )
+        if reason == "verified" and not point_in_time:
+            reason = "no_test_window" if not first_test_obs else "cutoff_after_test_start"
         provenance["news_sentiment"]["label_cutoff"] = label_cutoff
         provenance["news_sentiment"]["first_test_observation_date"] = first_test_obs
-        provenance["news_sentiment"]["point_in_time"] = bool(
-            label_cutoff and first_test_obs and label_cutoff <= first_test_obs
-        )
+        provenance["news_sentiment"]["point_in_time"] = point_in_time
+        provenance["news_sentiment"]["point_in_time_reason"] = reason
     record = run_experiment(
         panel, cfg=cfg, output_dir=Path(args.output), provenance=provenance
     )
@@ -1263,14 +1362,15 @@ def cmd_forecast_compare(args: argparse.Namespace) -> int:
             f"window-CI [{win['low']:+.4f}, {win['high']:+.4f}]  "
             f"date-CI [{date['low']:+.4f}, {date['high']:+.4f}]"
         )
-        print(
-            f"      naive delta (conflated)    {effect['naive_delta']:+.4f}"
-        )
+        print(f"      naive delta (conflated)    {effect['naive_delta']:+.4f}")
+    print(f"[forecast-compare] -> {output}")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="stf", description=__doc__)
+    parser = argparse.ArgumentParser(
+        prog="stf", description="Stock Trend Forecasting CLI"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_prices = sub.add_parser("prices", help="fetch adjusted OHLCV prices")
@@ -1435,6 +1535,22 @@ def main(argv: list[str] | None = None) -> int:
             "(point-in-time checkpoint); recorded in the manifest"
         ),
     )
+    p_refit.add_argument(
+        "--sample-like",
+        default=None,
+        metavar="MANIFEST",
+        help=(
+            "draw the exact per-class label counts recorded in another refit "
+            "manifest, ignoring publication date; size- and class-matched control "
+            "for a --before-date run (mutually exclusive with it)"
+        ),
+    )
+    p_refit.add_argument(
+        "--sample-seed",
+        type=int,
+        default=42,
+        help="seed for --sample-like (default: 42)",
+    )
     p_refit.set_defaults(func=cmd_sentiment_refit)
 
     p_ablation = sub.add_parser(
@@ -1495,6 +1611,15 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         metavar="YYYY-MM-DD",
         help="drop panel rows after this observation date (keeps the evaluation window fixed when price data extends past the study window)",
+    )
+    p_forecast.add_argument(
+        "--panel-start",
+        default=None,
+        metavar="YYYY-MM-DD",
+        help=(
+            "drop panel rows before this observation date "
+            f"(default: the study window start, {config.DATE_START})"
+        ),
     )
     p_forecast.add_argument("--seq-len", type=int, default=5)
     p_forecast.add_argument("--windows", type=int, default=5, help="walk-forward windows")

@@ -149,7 +149,13 @@ class TemporalFusionClassifier(nn.Module):
         if hidden % num_heads != 0:
             raise ValueError(f"hidden={hidden} must be divisible by num_heads={num_heads}.")
         self.n_features = n_features
-        self.feature_embed = nn.Linear(1, hidden)
+        # One embedding per variable. A single shared nn.Linear(1, hidden) would make
+        # every column share w and b, so the variable-selection sum would telescope to
+        # w * sum_j(alpha_j * x_j) + b -- a rank-2 signal regardless of hidden size,
+        # erasing feature identity before the encoder.
+        self.feature_weight = nn.Parameter(torch.empty(n_features, hidden))
+        self.feature_bias = nn.Parameter(torch.zeros(n_features, hidden))
+        nn.init.xavier_uniform_(self.feature_weight)
         self.variable_selection = _GRN(n_features, n_features, dropout)
         self.encoder = nn.LSTM(hidden, hidden, num_layers=1, batch_first=True)
         self.attention = nn.MultiheadAttention(
@@ -169,7 +175,7 @@ class TemporalFusionClassifier(nn.Module):
         if x.size(-1) != self.n_features:
             raise ValueError(f"expected {self.n_features} features; got {x.size(-1)}.")
         # Per-feature embeddings: (B, T, F) -> (B, T, F, H).
-        embedded = self.feature_embed(x.unsqueeze(-1))
+        embedded = x.unsqueeze(-1) * self.feature_weight + self.feature_bias
         # Variable selection weights from the raw timestep vector.
         weights = torch.softmax(self.variable_selection(x), dim=-1)
         selected = (embedded * weights.unsqueeze(-1)).sum(dim=2)

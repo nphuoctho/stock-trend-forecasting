@@ -34,6 +34,7 @@ from stf.forecasting.models import (
     PriceLSTM,
     PriceSentimentLSTM,
     RandomBaseline,
+    TemporalFusionClassifier,
     evaluate_predictions,
     fit_lstm,
     make_sequences,
@@ -869,3 +870,36 @@ def test_information_gain_decomposition_is_exact_and_guards_config_drift(tmp_pat
     )
     with pytest.raises(ValueError, match="required pairing columns"):
         compare_information_gain(real_dir, control_dir)
+
+
+def test_tft_preserves_feature_identity():
+    """Each variable gets its own embedding, so the encoder sees more than one signal.
+
+    A single shared ``nn.Linear(1, hidden)`` across all features makes the
+    variable-selection sum telescope to ``w * sum_j(alpha_j * x_j) + b``, because the
+    softmax weights sum to one. The encoder input then spans two dimensions -- one
+    signal plus bias -- no matter how large ``hidden`` is or how many features are
+    supplied, which silently destroys the price-vs-price+sentiment ablation. A
+    forward-shape assertion cannot see this; the rank can.
+    """
+    import torch
+
+    set_seed(0)
+    for n_features in (6, 11):
+        model = TemporalFusionClassifier(n_features, hidden=32)
+        window = torch.randn(64, 5, n_features)
+
+        embedded = window.unsqueeze(-1) * model.feature_weight + model.feature_bias
+        weights = torch.softmax(model.variable_selection(window), dim=-1)
+        encoder_input = (embedded * weights.unsqueeze(-1)).sum(dim=2)
+
+        rank = int(torch.linalg.matrix_rank(encoder_input.reshape(-1, 32)))
+        assert rank == n_features, f"expected rank {n_features} for the encoder input, got {rank}"
+
+        # Zeroing one variable must change the prediction; under a shared embedding a
+        # feature only shifts a weighted average and can be masked by the others.
+        masked = window.clone()
+        masked[:, :, 0] = 0.0
+        model.eval()
+        with torch.no_grad():
+            assert not torch.allclose(model(window), model(masked))

@@ -249,7 +249,13 @@ def test_forecast_binds_verified_score_manifest(monkeypatch, tmp_path, capsys):
             "close": [100.0],
         }
     )
-    panel = pd.DataFrame({"has_news": [1]})
+    panel = pd.DataFrame(
+        {
+            "has_news": [1],
+            "observation_date": [pd.Timestamp("2021-01-01")],
+            "target_date": [pd.Timestamp("2021-01-04")],
+        }
+    )
     captured = {}
     monkeypatch.setattr(cli_module, "_load_prices", lambda: prices)
     monkeypatch.setattr(forecasting_module, "assemble", lambda *_args: panel)

@@ -354,8 +354,13 @@ def test_listing_rows_pair_dates_with_nearest_article_url():
     ]
 
 def test_to_iso_parsing():
-    """Invalid timestamps are rejected; valid ones keep local timezone."""
+    """Every Vietstock timestamp shape resolves to the same ICT instant."""
+    # Legacy span form. `08/09` is 8 September: a naive pd.to_datetime reads this
+    # as 9 August, silently shifting an article by a month.
     assert news._to_iso("08/09/2022 16:35") == "2022-09-08T16:35:00+07:00"
+    # 2026 div form and the meta fallback describe the same instant.
+    assert news._to_iso("21-09-2026 14:30:00+07:00") == "2026-09-21T14:30:00+07:00"
+    assert news._to_iso("2026-09-21T14:30:00+07:00") == "2026-09-21T14:30:00+07:00"
     assert news._to_iso(None) is None
     assert news._to_iso("không hợp lệ") is None
 
