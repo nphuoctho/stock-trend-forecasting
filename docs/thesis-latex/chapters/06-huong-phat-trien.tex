@@ -29,11 +29,11 @@ thay vì để trống:
         đầu ra phân vị và diễn giải tầm quan trọng biến — chỉ nên thử sau khi đánh giá
         không rò rỉ thời điểm của bộ sinh cảm xúc hoàn tất.
   \item \textbf{Biến thể PhoBERT kết hợp CNN hoặc BiLSTM.} Xác thực chéo trên 1.306 mẫu
-        đã cho mức đo lớp NEGATIVE tốt hơn. Điểm kiểm triển khai đã được truyền sang nhánh
-        dự báo hồi cứu, nhưng đánh giá ngoài mẫu còn thiếu vì điểm kiểm này chứa nhãn sau
-        các ngày kiểm thử. Trước khi so sánh biến thể kiến trúc, cần tinh chỉnh lại trong
-        từng cửa sổ chỉ bằng nhãn quá khứ, hoặc đóng băng một điểm kiểm trước ngày kiểm thử
-        đầu tiên, rồi chấm lại kho tin và chạy đối chứng.
+        đã cho mức đo lớp NEGATIVE tốt hơn. Đánh giá ngoài mẫu của nhánh dự báo đã có
+        nhờ điểm kiểm đóng băng trước ngày kiểm thử đầu tiên
+        (Mục~\ref{sec:kq-point-in-time}); khi so sánh biến thể kiến trúc, mỗi biến thể
+        cũng cần một điểm kiểm đóng băng tương đương rồi chấm lại kho tin và chạy đối
+        chứng.
   \item \textbf{Hệ thống demo trực quan hóa.} Toàn bộ quy trình hiện được điều khiển qua
         giao diện dòng lệnh và ghi artifact ra tệp, đủ cho mục đích nghiên cứu và tái lập.
         Một giao diện trực quan hóa sẽ hữu ích cho việc thăm dò dữ liệu, nhưng không bổ sung
@@ -41,10 +41,10 @@ thay vì để trống:
         của kết quả.
 \end{enumerate}
 
-Ưu tiên cao nhất trong số các hướng của chương này là đánh giá không rò rỉ thời điểm: tinh
-chỉnh lại bộ sinh cảm xúc trong từng cửa sổ chỉ bằng nhãn quá khứ, hoặc dùng một điểm kiểm
-đóng băng trước ngày kiểm thử đầu tiên, sau đó chấm lại kho tin và chạy lại dự báo cùng đối
-chứng. Chỉ chuỗi thực nghiệm này mới cung cấp bằng chứng ngoài mẫu về tín hiệu cảm xúc.
+Ưu tiên cao nhất trong số các hướng của chương này là mở rộng lượt đối chứng kích
+thước tập sang nhiều hạt giống --- hiện chỉ có một hạt giống nên vai trò của nó là
+thăm dò --- và tinh chỉnh lại bộ sinh cảm xúc trong từng cửa sổ chỉ bằng nhãn quá
+khứ, thay vì một điểm kiểm đóng băng duy nhất.
 
 \section{Củng cố dữ liệu và giao thức point-in-time}
 

@@ -38,15 +38,17 @@ $+0{,}0080$ theo cửa sổ và $-0{,}0020$ theo ngày, khoảng tin cậy theo 
 $[-0{,}0120; +0{,}0081]$ chứa 0. Vì điểm kiểm cảm xúc học từ cả nhãn sau các ngày kiểm
 thử, đây là chênh lệch hồi cứu, không phải bằng chứng ngoài mẫu.
 
-\noindent Lượt ngoài mẫu \textbf{chưa được đo}. Giao thức đã cài đặt và khóa: điểm kiểm
-đóng băng chỉ từ 1.049 nhãn công bố trước ngày quan sát kiểm thử đầu tiên (21/10/2024),
-cùng một điểm kiểm đối chứng khớp đúng số nhãn mỗi lớp nhưng lấy từ mọi mốc thời gian, để
-tách ảnh hưởng của việc loại nhãn tương lai khỏi ảnh hưởng của tập huấn luyện nhỏ hơn.
-Lệnh dự báo xác minh mã băm bản kê điểm kiểm và ghi \texttt{point\_in\_time} kèm lý do.
-Hai điểm kiểm cần GPU nên được huấn luyện ngoài máy phát triển.
+\noindent Lượt ngoài mẫu \textbf{đã được đo và xác minh} (\texttt{point\_in\_time: true}):
+điểm kiểm đóng băng chỉ từ 1.049 nhãn công bố trước ngày quan sát kiểm thử đầu tiên
+(21/10/2024) cho đóng góp thông tin $+0{,}0049$ F1 vĩ mô theo cửa sổ và $-0{,}0023$
+theo ngày, khoảng tin cậy theo ngày $[-0{,}0126; +0{,}0082]$ chứa 0. Điểm kiểm đối
+chứng khớp đúng số nhãn mỗi lớp nhưng lấy từ mọi mốc thời gian (hạt giống 7, thăm
+dò) cho $+0{,}0090$ theo cửa sổ. Ba ước lượng điểm cùng dương: hướng của hiệu ứng
+không phải sản phẩm của rò rỉ thời điểm hay kích thước tập, nhưng chưa đủ mạnh để
+kết luận có cải thiện.
 
 \noindent Hạng mục còn lại của đề cương chưa thực hiện và được chuyển sang Chương 6 là
 biến thể PhoBERT kết hợp CNN hoặc BiLSTM, phân tầng ghép cặp theo điều kiện thị
-trường, và lượt đối chứng kích thước tập huấn luyện của bộ sinh cảm xúc.
+trường, và bổ sung hạt giống cho lượt đối chứng kích thước tập huấn luyện.
 Hệ thống demo đã có đường dự báo hằng ngày qua dòng lệnh và bản dashboard đọc
 artifact phục vụ 5 cấu hình mô hình; giao diện trực quan đầy đủ vẫn là hướng phát triển.

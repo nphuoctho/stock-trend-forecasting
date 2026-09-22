@@ -14,10 +14,9 @@ Quy trình gồm thu thập dữ liệu, kiểm tra thông tin truy nguyên và 
 cảm xúc, sinh xác suất của ba lớp, tổng hợp đặc trưng theo mã và ngày, tạo nhãn UP, FLAT
 và DOWN, huấn luyện, đánh giá cuốn chiếu theo thời gian và phân tích loại bỏ đặc trưng.
 Tiền xử lý của nhánh giá chỉ học từ tập huấn luyện, mốc cắt thông tin là 15 giờ và năm
-đoạn kiểm thử cuốn chiếu không chồng lấn. Thang dự báo chính dùng điểm kiểm cảm xúc học từ
-nhãn gồm cả giai đoạn kiểm thử nên là lượt hồi cứu. Giao thức cho một lượt ngoài mẫu
-hợp lệ --- điểm kiểm đóng băng trước ngày kiểm thử đầu tiên --- đã được cài đặt và xác
-minh, nhưng chưa được đo.
+nhãn gồm cả giai đoạn kiểm thử nên là lượt hồi cứu. Lượt ngoài mẫu hợp lệ --- điểm
+kiểm đóng băng trước ngày kiểm thử đầu tiên --- đã được cài đặt, xác minh và đo
+(Mục~\ref{sec:kq-point-in-time}).
 
 \section{Đối chiếu với mục tiêu và câu hỏi nghiên cứu}
 
@@ -64,17 +63,21 @@ cách lấy mẫu lặp không tạo thành một kết luận thống nhất. Q
 của lượt này đã học từ nhãn trong giai đoạn kiểm thử, nên mọi số liệu trên chỉ là chênh
 lệch hồi cứu.
 
-Giao thức cho đánh giá ngoài mẫu đã được cài đặt và khóa: một điểm kiểm tinh chỉnh chỉ
-trên 1.049 nhãn công bố trước ngày quan sát kiểm thử đầu tiên (21/10/2024), cùng một điểm
-kiểm đối chứng rút đúng số nhãn mỗi lớp đó nhưng từ mọi mốc thời gian, để tách ảnh hưởng
-của việc loại nhãn tương lai khỏi ảnh hưởng của việc huấn luyện trên ít dữ liệu hơn. Lệnh
-\texttt{forecast} xác minh mã băm bản kê điểm kiểm và ghi \texttt{point\_in\_time} kèm lý
-do vào tệp kết quả, nên chỉ artifact được xác minh mới có thể dùng làm bằng chứng.
+Lượt ngoài mẫu đã được đo: điểm kiểm tinh chỉnh chỉ trên 1.049 nhãn công bố trước
+ngày quan sát kiểm thử đầu tiên (21/10/2024), cùng một điểm kiểm đối chứng rút đúng
+số nhãn mỗi lớp đó nhưng từ mọi mốc thời gian. Lệnh \texttt{forecast} xác minh mã
+băm bản kê điểm kiểm và cả hai artifact đều ghi \texttt{point\_in\_time: true} với
+lý do \texttt{verified}. Đóng góp thông tin phân cực của LSTM hai nhánh là
+$+0{,}0049$ F1 vĩ mô theo cửa sổ (khoảng tin cậy $[-0{,}0056; +0{,}0180]$) và
+$-0{,}0023$ theo ngày ($[-0{,}0126; +0{,}0082]$); lượt đối chứng cùng kích thước cho
+$+0{,}0090$ theo cửa sổ. Ba ước lượng điểm cùng dương nên dấu của hiệu ứng không
+phải sản phẩm của rò rỉ thời điểm hay của kích thước tập, nhưng mọi khoảng tin cậy
+theo ngày vẫn chứa 0.
 
-Hai điểm kiểm này cần GPU và được huấn luyện ngoài máy phát triển; kết quả chưa được đo
-nên đồ án không đưa ra con số ngoài mẫu nào. Kết luận hiện có là kết luận hồi cứu: trên
-bộ dữ liệu và thiết lập này, \textbf{chưa có bằng chứng rằng cảm xúc tin tài chính tiếng
-Việt cải thiện dự báo xu hướng phiên kế tiếp}.
+Kết luận hiện có, tính cả lượt ngoài mẫu: trên bộ dữ liệu và thiết lập này,
+\textbf{chưa có bằng chứng đủ mạnh rằng cảm xúc tin tài chính tiếng Việt cải thiện
+dự báo xu hướng phiên kế tiếp}, dù hướng của hiệu ứng là nhất quán dương. Với TFT,
+đóng góp thông tin không dương ở bất kỳ bộ sinh nào.
 
 Mục tiêu thứ sáu là hệ thống demo hoàn chỉnh. Mục tiêu này \textbf{đã hoàn thành một phần}:
 đường dự báo hằng ngày (thu giá, thu tin, chấm cảm xúc, dự báo, đối soát kết quả thực tế)
@@ -160,17 +163,21 @@ Tầng TFT được chạy trên đúng giao thức đó và đạt $0{,}3619$ F
 thấp hơn $0{,}3756$ của LSTM. Thêm dung lượng và cơ chế chọn biến không đổi được kết
 luận trên quy mô dữ liệu này.
 
-Lượt ngoài mẫu chưa được đo. Giao thức của nó --- điểm kiểm đóng băng trước ngày kiểm
-thử đầu tiên, cùng một điểm kiểm đối chứng khớp kích thước và phân bố lớp --- đã được
-cài đặt, kiểm chứng bằng mã băm và pin bằng kiểm thử tự động, nhưng cần GPU ngoài máy
-phát triển. Đồ án vì vậy không trình bày con số ngoài mẫu nào.
+Lượt ngoài mẫu đã được đo và xác minh (\texttt{point\_in\_time: true}): điểm kiểm
+đóng băng trước ngày kiểm thử đầu tiên cho đóng góp thông tin $+0{,}0049$ F1 vĩ mô
+theo cửa sổ và $-0{,}0023$ theo ngày, khoảng tin cậy theo ngày $[-0{,}0126;
++0{,}0082]$ chứa 0. Điểm kiểm đối chứng khớp kích thước và phân bố lớp (hạt giống
+7, thăm dò) cho $+0{,}0090$ theo cửa sổ. Ba ước lượng điểm cùng dương nên dấu của
+hiệu ứng không phải sản phẩm của rò rỉ thời điểm hay kích thước tập.
 
 Kết luận trong phạm vi đã đo là: trên 10 mã HOSE giai đoạn 2020--2025 với nguồn tin
-Vietstock và chân trời một phiên, \textbf{chưa có bằng chứng rằng cảm xúc tin tài chính
-tiếng Việt cải thiện dự báo xu hướng phiên kế tiếp}. Giá trị của đồ án nằm ở chỗ phát
-biểu này được rút ra từ một quy trình đo có đối chứng ghép cặp giữ nguyên kiến trúc và
-độ phủ tin, và ghi rõ ranh giới giữa điều đã đo với điều chưa đo --- thay vì một ước
-lượng điểm dương báo cáo mà không kiểm tra thời điểm của bộ sinh.
+Vietstock và chân trời một phiên, \textbf{chưa có bằng chứng đủ mạnh rằng cảm xúc
+tin tài chính tiếng Việt cải thiện dự báo xu hướng phiên kế tiếp}, dù hướng của
+hiệu ứng là nhất quán dương trên cả ba bộ sinh cảm xúc. Giá trị của đồ án nằm ở chỗ
+phát biểu này được rút ra từ một quy trình đo có đối chứng ghép cặp giữ nguyên kiến
+trúc và độ phủ tin, có kiểm chứng point-in-time bằng mã băm, và ghi rõ ranh giới
+giữa điều đã đo với điều chưa đo --- thay vì một ước lượng điểm dương báo cáo mà
+không kiểm tra thời điểm của bộ sinh.
 
 Mọi diễn giải phải giữ đúng phạm vi 10 mã HOSE, giai đoạn 2020--2025, nguồn tin Vietstock và
 chân trời một phiên. Kết luận không được suy rộng thành lời hứa hiệu năng ngoài dữ liệu, và

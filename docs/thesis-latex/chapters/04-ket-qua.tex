@@ -517,28 +517,56 @@ cải thiện}, không phải ``cảm xúc làm mô hình tệ hơn'' hay ``cả
 
 Kết quả ở các mục trên dùng điểm kiểm cảm xúc tinh chỉnh trên toàn bộ 1.306 nhãn,
 trong đó có nhãn công bố sau ngày kiểm thử đầu tiên. Đó là phân tích hồi cứu, không
-phải bằng chứng ngoài mẫu.
+phải bằng chứng ngoài mẫu. Mục này báo cáo lượt ngoài mẫu đã được đo.
 
-Giao thức khắc phục đã được cài đặt và khóa như sau. Ngày quan sát kiểm thử đầu tiên
-của thang dự báo là 21/10/2024. Lệnh \texttt{sentiment-refit --before-date 2024-10-21}
-giữ lại các nhãn công bố \emph{nghiêm ngặt trước} mốc đó --- 1.049 trên 1.306 nhãn ---
-và ghi \texttt{label\_cutoff} vào bản kê điểm kiểm. Khi chạy dự báo, lệnh
-\texttt{forecast} đối chiếu mã băm của bản kê đó với mã băm đã lưu lúc chấm tin, so
-mốc cắt với ngày kiểm thử đầu tiên, rồi ghi \texttt{point\_in\_time} kèm lý do vào tệp
-kết quả. Chỉ artifact mang giá trị \texttt{true} mới được dùng làm bằng chứng ngoài mẫu.
+Ngày quan sát kiểm thử đầu tiên của thang dự báo là 21/10/2024. Lệnh
+\texttt{sentiment-refit --before-date 2024-10-21} giữ lại các nhãn công bố
+\emph{nghiêm ngặt trước} mốc đó --- 1.049 trên 1.306 nhãn --- và ghi
+\texttt{label\_cutoff} vào bản kê điểm kiểm. Khi chạy dự báo, lệnh \texttt{forecast}
+đối chiếu mã băm của bản kê đó với mã băm đã lưu lúc chấm tin, so mốc cắt với ngày
+kiểm thử đầu tiên, rồi ghi \texttt{point\_in\_time} kèm lý do vào tệp kết quả. Cả
+hai artifact của lượt ngoài mẫu đều mang \texttt{point\_in\_time: true} với lý do
+\texttt{verified}.
 
-Một điểm kiểm thứ ba được dự trù để tách hai nguyên nhân có thể làm đóng góp cảm xúc
-thay đổi giữa hai lượt. Lệnh \texttt{sentiment-refit --sample-like} rút đúng số nhãn mỗi
-lớp mà điểm kiểm đóng băng đã dùng, nhưng lấy từ mọi mốc thời gian. Đọc ba lượt cạnh
-nhau --- đầy đủ 1.306, đóng băng 1.049, đối chứng 1.049 --- phân biệt được ảnh hưởng của
-việc loại bỏ nhãn tương lai với ảnh hưởng của việc huấn luyện trên ít dữ liệu hơn. Bản kê
-của lượt đối chứng ghi rõ chiến lược lấy mẫu, hạt giống và mã băm danh sách dòng đã chọn,
-đồng thời đánh dấu \texttt{point\_in\_time: false} để không bị đọc nhầm thành một lượt
-sạch rò rỉ thứ hai.
+Một điểm kiểm thứ ba tách hai nguyên nhân có thể làm đóng góp cảm xúc thay đổi giữa
+hai lượt. Lệnh \texttt{sentiment-refit --sample-like} rút đúng số nhãn mỗi lớp mà
+điểm kiểm đóng băng đã dùng (167 NEGATIVE, 616 NEUTRAL, 266 POSITIVE), nhưng lấy từ
+mọi mốc thời gian. Đọc ba lượt cạnh nhau --- đầy đủ 1.306, đóng băng 1.049, đối
+chứng 1.049 --- phân biệt được ảnh hưởng của việc loại bỏ nhãn tương lai với ảnh
+hưởng của việc huấn luyện trên ít dữ liệu hơn. Bản kê của lượt đối chứng ghi rõ
+chiến lược lấy mẫu, hạt giống và mã băm danh sách dòng đã chọn, đồng thời đánh dấu
+\texttt{point\_in\_time: false} để không bị đọc nhầm thành một lượt sạch rò rỉ thứ
+hai. Lượt đối chứng hiện có một hạt giống (7) nên mang tính thăm dò: tập con nào
+được rút cũng là một yếu tố ngẫu nhiên, và một lần rút không tách được ảnh hưởng
+của kích thước tập khỏi ảnh hưởng của một lần rút không may.
 
-Hai điểm kiểm này cần GPU nên được huấn luyện ngoài máy phát triển; kết quả số chưa được
-điền vào báo cáo và mục này sẽ được cập nhật khi artifact hoàn tất. Không có con số nào
-của lượt ngoài mẫu được trình bày trước khi được đo.
+\begin{table}[H]
+  \centering
+  \caption{Đóng góp thông tin phân cực (F1 vĩ mô) của LSTM hai nhánh theo ba điểm kiểm cảm xúc, cùng cửa sổ kiểm thử.}
+  \label{tab:kq-pit}
+  \begin{tabular}{l c c c}
+    \toprule
+    Điểm kiểm & Hiệu số & KTC 95\% theo cửa sổ & KTC 95\% theo ngày \\
+    \midrule
+    Đầy đủ 1.306 nhãn (hồi cứu) & $+0{,}0080$ & $[-0{,}0000; +0{,}0160]$ & $[-0{,}0120; +0{,}0081]$ \\
+    Đóng băng 1.049 (ngoài mẫu) & $+0{,}0049$ & $[-0{,}0056; +0{,}0180]$ & $[-0{,}0126; +0{,}0082]$ \\
+    Đối chứng 1.049 (hạt giống 7) & $+0{,}0090$ & $[+0{,}0016; +0{,}0192]$ & $[-0{,}0109; +0{,}0092]$ \\
+    \bottomrule
+  \end{tabular}
+\noindent\textit{Nguồn: \texttt{information\_gain.json} trong \path{outputs/forecast_merged_sentiment_tft}, \path{outputs/forecast_pit_sentiment} và \path{outputs/forecast_sizematched_s7_sentiment}.}
+\end{table}
+
+Ba ước lượng điểm cùng dương và nằm trong khoảng $+0{,}005$ đến $+0{,}009$ F1 vĩ mô.
+Điều đó cho thấy dấu của đóng góp thông tin không phải sản phẩm của rò rỉ thời điểm
+(lượt đóng băng vẫn dương) và cũng không phải sản phẩm của việc tập huấn luyện nhỏ
+hơn (lượt đối chứng cùng kích thước cũng dương). Tuy nhiên, mọi khoảng tin cậy theo
+ngày --- căn cứ chính --- vẫn chứa 0, nên kết luận giữ nguyên: \textbf{chưa có bằng
+chứng đủ mạnh về cải thiện}, nhưng hướng của hiệu ứng là nhất quán dương trên cả ba
+bộ sinh cảm xúc.
+
+Với TFT, đóng góp thông tin là $-0{,}0057$ (hồi cứu), $-0{,}0002$ (đóng băng) và
+$-0{,}0009$ (đối chứng): không có lợi ích quan sát được ở bất kỳ bộ sinh nào, phù
+hợp với việc TFT chỉ giá đã thấp hơn LSTM chỉ giá trên quy mô dữ liệu này.
 
 
 \subsection{Giới hạn của kiểm tra theo điều kiện thị trường}
@@ -581,14 +609,13 @@ thử ngoài cho độ bao phủ 0,6803, thay vì 0,0619 trên 31 mẫu của l�
 bằng chứng chất lượng phân loại tốt hơn của cấu hình có trọng số trên tập mở rộng, không
 phải bằng chứng rằng tín hiệu cảm xúc đã cải thiện dự báo giá.
 
-\textbf{Câu hỏi thứ hai} --- xác suất cảm xúc có cải thiện dự báo hay không, và mức bao
-nhiêu. Ở lượt hồi cứu, so với đối chứng trung tính ghép cặp, ước lượng theo cửa sổ của
-đóng góp thông tin phân cực là $+0{,}0080$ F1 vĩ mô, nhưng ước lượng theo ngày --- căn cứ
 chính --- là $-0{,}0020$ với khoảng tin cậy $[-0{,}0120; +0{,}0081]$ chứa 0. Lượt ngoài
-mẫu với điểm kiểm đóng băng (Mục~\ref{sec:kq-point-in-time}) chưa được đo, nên câu hỏi
-này hiện chỉ được trả lời trong phạm vi hồi cứu. Kết luận:
+mẫu với điểm kiểm đóng băng (Mục~\ref{sec:kq-point-in-time}) đã được đo: đóng góp
+thông tin là $+0{,}0049$ theo cửa sổ và $-0{,}0023$ theo ngày, khoảng tin cậy theo
+ngày $[-0{,}0126; +0{,}0082]$ vẫn chứa 0. Kết luận:
 \textbf{chưa có bằng chứng rằng đặc trưng cảm xúc cải thiện dự báo xu hướng phiên kế
-tiếp}. Dữ liệu hiện tại không loại trừ cả cải thiện nhỏ lẫn suy giảm nhỏ.
+tiếp}, nhưng hướng của hiệu ứng là nhất quán dương trên cả ba bộ sinh cảm xúc. Dữ
+liệu hiện tại không loại trừ cả cải thiện nhỏ lẫn suy giảm nhỏ.
 
 Hiệu số trực tiếp $+0{,}0113$ trộn lẫn kiến trúc, sự hiện diện/khối lượng tin và xác suất
 cảm xúc; riêng thành phần kiến trúc và độ phủ tin là $+0{,}0034$. Đối chứng trung tính
@@ -632,9 +659,9 @@ Các điểm kiểm tra sau được thực hiện và ghi nhận kết quả th
         tách nên chưa thể kết luận về ảnh hưởng của mật độ tin.
   \item \textbf{Giới hạn thời điểm của bộ sinh}: thang dự báo chính dùng điểm kiểm đã học
         từ toàn bộ 1.306 nhãn, gồm cả nhãn sau các ngày kiểm thử năm 2024--2025, nên là
-        kết quả hồi cứu. Mục~\ref{sec:kq-point-in-time} mô tả giao thức của lượt ngoài
-        mẫu với điểm kiểm đóng băng trước ngày kiểm thử đầu tiên; lượt đó chưa được đo,
-        nên đồ án chưa có đánh giá ngoài mẫu.
+        kết quả hồi cứu. Lượt ngoài mẫu với điểm kiểm đóng băng trước ngày kiểm thử đầu
+        tiên đã được đo và xác minh (\texttt{point\_in\_time: true}); kết quả ở
+        Mục~\ref{sec:kq-point-in-time}.
   \item \textbf{Phạm vi phân tầng}: đối chứng ghép cặp kiểm soát sự hiện diện và khối lượng
         tin trên toàn bộ mẫu. Phân tầng ghép cặp theo mã, độ biến động và ngày sự kiện
         \textbf{chưa} được thực hiện, nên câu hỏi thứ ba của đề cương chưa được trả lời.
@@ -644,9 +671,9 @@ Các điểm kiểm tra sau được thực hiện và ghi nhận kết quả th
 \end{itemize}
 
 Ánh xạ thời điểm tin và các phép biến đổi của nhánh giá không có lỗi đã phát hiện, tập giữ
-lại của nhánh giá không bị sửa, và toàn bộ cấu hình được lưu trong tệp kết quả. Tuy nhiên,
-do giới hạn thời điểm của bộ sinh cảm xúc, các con số dự báo không được diễn giải là kết quả
-ngoài mẫu hoàn toàn.
+lại của nhánh giá không bị sửa, và toàn bộ cấu hình được lưu trong tệp kết quả. Các con số
+của thang chính vẫn là hồi cứu; đánh giá ngoài mẫu được báo cáo riêng ở
+Mục~\ref{sec:kq-point-in-time}.
 
 \subsection{Giới hạn của thực nghiệm}
 \label{sec:kq-limitations}
@@ -657,13 +684,13 @@ Vietstock, trong khi đề cương dự kiến bốn nguồn; độ phủ tin v�
 (MBB trên 2.000 liên kết, GAS 548). Thứ ba, dự báo phiên kế tiếp có thể quá ngắn để phản
 ánh tác động dài hạn của tin.
 
-Thứ tư, và là giới hạn quyết định: \textbf{điểm kiểm cảm xúc được tinh chỉnh trên toàn bộ
-1.306 nhãn, gồm cả bài sau các ngày kiểm thử dự báo}. Do đó các xác suất đầu vào của bảng
-giá có thể chịu ảnh hưởng gián tiếp từ văn bản và nhãn tương lai. Phép đối chứng ghép cặp
-vẫn đo nhất quán chênh lệch giữa xác suất thật và prior trung tính trên cùng dữ liệu hồi
-cứu, nhưng không chứng minh hiệu quả dự báo ngoài mẫu. Muốn có kết luận đó, cần tinh chỉnh
-lại trong từng cửa sổ chỉ bằng nhãn quá khứ, hoặc dùng một điểm kiểm đóng băng được huấn
-luyện hoàn toàn trước ngày kiểm thử đầu tiên.
+Thứ tư, điểm kiểm cảm xúc của thang chính được tinh chỉnh trên toàn bộ 1.306 nhãn,
+gồm cả bài sau các ngày kiểm thử dự báo, nên các con số của thang chính là hồi cứu.
+Giới hạn này đã được khắc phục bằng điểm kiểm đóng băng trước ngày kiểm thử đầu tiên
+và một điểm kiểm đối chứng khớp kích thước (Mục~\ref{sec:kq-point-in-time}); cả hai
+đã được đo và xác minh. Giới hạn còn lại là lượt đối chứng mới có một hạt giống, nên
+vai trò của nó là thăm dò chứ chưa phải ước lượng ổn định của ảnh hưởng kích thước
+tập.
 
 Thứ năm, ngưỡng phân vị một phần ba tạo lớp FLAT theo nghĩa thống kê, không theo nghĩa kinh
 tế: ngưỡng khoảng $\pm0{,}5\%$ (Bảng~\ref{tab:kq-windows}) là một lựa chọn thiết kế, không
@@ -756,6 +783,7 @@ Bảng~\ref{tab:kq-artifact} liệt kê lệnh và tệp kết quả tương ứ
     \ref{tab:kq-sentiment}, \ref{tab:kq-sentiment-class} & \texttt{stf.cli sentiment-cv}; \path{outputs/sentiment-cv-merged/cv_results.json} và tệp nén lần chạy có trọng số \\
     \ref{tab:kq-windows}, \ref{tab:kq-price-stats}, \ref{tab:ket-qua} & \texttt{stf.cli forecast --news-sentiment ...}; \path{outputs/forecast_merged_sentiment_tft/forecast_metrics.csv} \\
     \ref{tab:kq-ablation}, \ref{tab:kq-ablation-ci} & \texttt{stf.cli forecast --neutral-news-sentiment ...}, \texttt{stf.cli forecast-compare}; \path{outputs/forecast_merged_sentiment_tft/information_gain.json} \\
+    \ref{tab:kq-pit} & \texttt{stf.cli forecast} + \texttt{forecast-compare} trên \texttt{news\_sentiment\_pit.parquet} và \texttt{news\_sentiment\_sizematched\_s7.parquet}; \path{outputs/forecast_pit_sentiment/information_gain.json}, \path{outputs/forecast_sizematched_s7_sentiment/information_gain.json} \\
     \ref{tab:kq-strata} & \texttt{stf.cli label-candidates}; \texttt{to\_label\_batch2\_manifest.json} \\
     \bottomrule
   \end{tabular}
