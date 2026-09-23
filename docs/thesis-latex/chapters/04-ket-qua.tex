@@ -549,23 +549,25 @@ của kích thước tập khỏi ảnh hưởng của một lần rút không m
     Điểm kiểm & Hiệu số & KTC 95\% theo cửa sổ & KTC 95\% theo ngày \\
     \midrule
     Đầy đủ 1.306 nhãn (hồi cứu) & $+0{,}0080$ & $[-0{,}0000; +0{,}0160]$ & $[-0{,}0120; +0{,}0081]$ \\
-    Đóng băng 1.049 (ngoài mẫu) & $+0{,}0049$ & $[-0{,}0056; +0{,}0180]$ & $[-0{,}0126; +0{,}0082]$ \\
-    Đối chứng 1.049 (hạt giống 7) & $+0{,}0090$ & $[+0{,}0016; +0{,}0192]$ & $[-0{,}0109; +0{,}0092]$ \\
+    Đóng băng 1.049 (ngoài mẫu) & $+0{,}0094$ & $[-0{,}0022; +0{,}0243]$ & $[-0{,}0118; +0{,}0093]$ \\
+    Đối chứng 1.049 (hạt giống 7) & $+0{,}0028$ & $[-0{,}0070; +0{,}0127]$ & $[-0{,}0133; +0{,}0062]$ \\
     \bottomrule
   \end{tabular}
 \noindent\textit{Nguồn: \texttt{information\_gain.json} trong \path{outputs/forecast_merged_sentiment_tft}, \path{outputs/forecast_pit_sentiment} và \path{outputs/forecast_sizematched_s7_sentiment}.}
 \end{table}
 
-Ba ước lượng điểm cùng dương và nằm trong khoảng $+0{,}005$ đến $+0{,}009$ F1 vĩ mô.
-Điều đó cho thấy dấu của đóng góp thông tin không phải sản phẩm của rò rỉ thời điểm
-(lượt đóng băng vẫn dương) và cũng không phải sản phẩm của việc tập huấn luyện nhỏ
-hơn (lượt đối chứng cùng kích thước cũng dương). Tuy nhiên, mọi khoảng tin cậy theo
-ngày --- căn cứ chính --- vẫn chứa 0, nên kết luận giữ nguyên: \textbf{chưa có bằng
-chứng đủ mạnh về cải thiện}, nhưng hướng của hiệu ứng là nhất quán dương trên cả ba
-bộ sinh cảm xúc.
+Ba ước lượng điểm theo cửa sổ đều dương và nằm trong khoảng $+0{,}003$ đến $+0{,}009$
+F1 vĩ mô. Đáng chú ý, điểm kiểm đóng băng theo thời gian cho đóng góp cao hơn điểm
+kiểm đối chứng cùng kích thước ($+0{,}0094$ so với $+0{,}0028$): nếu rò rỉ thời điểm
+là nguyên nhân của chênh lệch thì điểm kiểm học cả nhãn tương lai phải cho kết quả
+cao hơn, và kích thước tập cũng không giải thích được vì hai tập cùng 1.049 nhãn.
+Tuy nhiên, mọi khoảng tin cậy theo ngày --- căn cứ chính --- vẫn chứa 0, và các ước
+lượng điểm theo ngày đều âm ($-0{,}0020$, $-0{,}0010$, $-0{,}0036$). Kết luận giữ
+nguyên: \textbf{chưa có bằng chứng đủ mạnh về cải thiện}; điều còn lại là bất định
+thống kê, không phải nghi ngờ về rò rỉ hay kích thước tập.
 
-Với TFT, đóng góp thông tin là $-0{,}0057$ (hồi cứu), $-0{,}0002$ (đóng băng) và
-$-0{,}0009$ (đối chứng): không có lợi ích quan sát được ở bất kỳ bộ sinh nào, phù
+Với TFT, đóng góp thông tin là $-0{,}0057$ (hồi cứu), $-0{,}0105$ (đóng băng) và
+$-0{,}0020$ (đối chứng): không có lợi ích quan sát được ở bất kỳ bộ sinh nào, phù
 hợp với việc TFT chỉ giá đã thấp hơn LSTM chỉ giá trên quy mô dữ liệu này.
 
 
@@ -609,13 +611,15 @@ thử ngoài cho độ bao phủ 0,6803, thay vì 0,0619 trên 31 mẫu của l�
 bằng chứng chất lượng phân loại tốt hơn của cấu hình có trọng số trên tập mở rộng, không
 phải bằng chứng rằng tín hiệu cảm xúc đã cải thiện dự báo giá.
 
+\textbf{Câu hỏi thứ hai} --- xác suất cảm xúc có cải thiện dự báo hay không, và mức bao
+nhiêu. Ở lượt hồi cứu, so với đối chứng trung tính ghép cặp, ước lượng theo cửa sổ của
+đóng góp thông tin phân cực là $+0{,}0080$ F1 vĩ mô, nhưng ước lượng theo ngày --- căn cứ
 chính --- là $-0{,}0020$ với khoảng tin cậy $[-0{,}0120; +0{,}0081]$ chứa 0. Lượt ngoài
 mẫu với điểm kiểm đóng băng (Mục~\ref{sec:kq-point-in-time}) đã được đo: đóng góp
-thông tin là $+0{,}0049$ theo cửa sổ và $-0{,}0023$ theo ngày, khoảng tin cậy theo
-ngày $[-0{,}0126; +0{,}0082]$ vẫn chứa 0. Kết luận:
+thông tin là $+0{,}0094$ theo cửa sổ và $-0{,}0010$ theo ngày, khoảng tin cậy theo
+ngày $[-0{,}0118; +0{,}0093]$ vẫn chứa 0. Kết luận:
 \textbf{chưa có bằng chứng rằng đặc trưng cảm xúc cải thiện dự báo xu hướng phiên kế
-tiếp}, nhưng hướng của hiệu ứng là nhất quán dương trên cả ba bộ sinh cảm xúc. Dữ
-liệu hiện tại không loại trừ cả cải thiện nhỏ lẫn suy giảm nhỏ.
+tiếp}. Dữ liệu hiện tại không loại trừ cả cải thiện nhỏ lẫn suy giảm nhỏ.
 
 Hiệu số trực tiếp $+0{,}0113$ trộn lẫn kiến trúc, sự hiện diện/khối lượng tin và xác suất
 cảm xúc; riêng thành phần kiến trúc và độ phủ tin là $+0{,}0034$. Đối chứng trung tính
