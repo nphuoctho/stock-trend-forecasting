@@ -50,11 +50,11 @@ function TickerCard({ t }: { t: LiveTodayTicker }) {
             đóng cửa <span className="font-medium text-foreground">{t.last_close.toFixed(2)}</span>
           </span>
         )}
-        {t.expected_band && (
+        {t.flat_band && (
           <span>
-            biên độ đi ngang{' '}
+            ngưỡng đi ngang{' '}
             <span className="font-medium text-foreground">
-              {t.expected_band.low.toFixed(2)} – {t.expected_band.high.toFixed(2)}
+              {t.flat_band.low.toFixed(2)} – {t.flat_band.high.toFixed(2)}
             </span>
           </span>
         )}
@@ -74,7 +74,7 @@ function TickerCard({ t }: { t: LiveTodayTicker }) {
             className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
           >
             <HugeiconsIcon icon={NewsIcon} className="size-3.5" />
-            {t.news.length} tin tức dẫn dắt {open ? '▴' : '▾'}
+            {t.news.length} tin liên quan {open ? '▴' : '▾'}
           </button>
           {open && (
             <ul className="mt-2 space-y-1.5">
@@ -135,9 +135,11 @@ export default function TodaySection() {
           </Badge>
         </CardTitle>
         <CardDescription>
-          Mô hình LSTM kết hợp giá và cảm xúc tin tức. "Đi ngang" nghĩa là biên động
-          trong khoảng ±0,5% quanh giá đóng cửa; vượt ngưỡng mới tính tăng/giảm.
-          Không phải khuyến nghị giao dịch.
+          Mô hình LSTM kết hợp giá và cảm xúc tin tức, dự đoán hướng phiên kế tiếp
+          (3 lớp). "Ngưỡng đi ngang" là ranh giới phân lớp học từ dữ liệu quá khứ —
+          mô hình không dự đoán biên độ cụ thể. Tin liên quan là các bài trong cửa
+          sổ 5 phiên mà mô hình đọc, không hẳn là nguyên nhân của dự đoán. Không
+          phải khuyến nghị giao dịch.
         </CardDescription>
       </CardHeader>
       <CardContent>

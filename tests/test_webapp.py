@@ -181,3 +181,97 @@ def test_live_status_and_history_split_prospective_from_replayed(
     # Accuracy covers the prospective row only: 1/1, not 1/2.
     assert history["accuracy"] == 1.0
     assert [d["target_date"] for d in history["by_date"]] == ["2026-09-21"]
+
+
+def test_live_today_is_point_in_time_for_issued_predictions(
+    client, tmp_path, monkeypatch
+):
+    """News after the session cutoff and later refits must not leak into the view.
+
+    The today endpoint explains an issued prediction: an article filed after the
+    15:00 cutoff anchors to the NEXT session and cannot appear, prices fetched
+    after issuance cannot move the displayed close, and a refit with different
+    thresholds cannot change the band stamped into the row.
+    """
+    from stf import config
+
+    live = tmp_path / "outputs" / "live" / "lstm_price_sentiment"
+    live.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "ticker": ["FPT"],
+            "observation_date": pd.to_datetime(["2026-09-23"]),
+            "has_news": [1],
+            "prob_down": [0.2],
+            "prob_flat": [0.3],
+            "prob_up": [0.5],
+            "y_pred": ["UP"],
+            "arm": ["lstm_price_sentiment"],
+            "issued_at": ["2026-09-23T08:30:00+00:00"],
+            # Issued under different boundaries than the current manifest.
+            "threshold_low": [-0.01],
+            "threshold_high": [0.01],
+        }
+    ).to_parquet(live / "latest.parquet", index=False)
+
+    # A refit moved the boundaries; the issued row's stamp must win.
+    model_dir = tmp_path / "models" / "forecast" / "lstm_price_sentiment"
+    model_dir.mkdir(parents=True)
+    (model_dir / "manifest.json").write_text(
+        json.dumps({"thresholds": [-0.5, 0.5]}), encoding="utf-8"
+    )
+
+    # Prices through 09-23 plus a later session fetched after issuance.
+    prices_dir = tmp_path / "data" / "raw" / "prices"
+    prices_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "ticker": ["FPT"] * 3,
+            "time": pd.to_datetime(["2026-09-21", "2026-09-22", "2026-09-23"]),
+            "open": [100.0] * 3,
+            "high": [101.0] * 3,
+            "low": [99.0] * 3,
+            "close": [100.0, 101.0, 102.0],
+            "volume": [1] * 3,
+        }
+    ).to_parquet(prices_dir / "FPT.parquet", index=False)
+
+    news_dir = tmp_path / "data" / "raw" / "news"
+    news_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "url": ["u1", "u2"],
+            "title": ["tin trước cutoff", "tin sau cutoff"],
+        }
+    ).to_parquet(news_dir / "articles.parquet", index=False)
+    processed = tmp_path / "data" / "processed"
+    processed.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "ticker": ["FPT", "FPT"],
+            "url": ["u1", "u2"],
+            # u1 filed before the 15:00 cutoff on 09-23 -> informs obs 09-23.
+            # u2 filed at 16:02 -> anchors to the NEXT session, not this one.
+            "published_at": [
+                "2026-09-23T10:00:00+07:00",
+                "2026-09-23T16:02:00+07:00",
+            ],
+            "prob_negative": [0.1, 0.9],
+            "prob_neutral": [0.2, 0.05],
+            "prob_positive": [0.7, 0.05],
+        }
+    ).to_parquet(processed / "news_sentiment_merged.parquet", index=False)
+
+    monkeypatch.setattr(config, "ROOT", tmp_path)
+    monkeypatch.setattr(config, "PRICES_DIR", prices_dir)
+    monkeypatch.setattr(config, "ARTICLES_PQ", news_dir / "articles.parquet")
+
+    data = client.get("/api/live/today").json()
+    ticker = data["tickers"][0]
+
+    # Close at the observation session, not the latest on disk.
+    assert ticker["last_close"] == 102.0
+    # Band from the issued row's thresholds (±1%), not the refit manifest (±50%).
+    assert ticker["flat_band"] == {"low": 100.98, "high": 103.02}
+    # Only the pre-cutoff article appears; the 16:02 story anchors to 09-24.
+    assert [n["url"] for n in ticker["news"]] == ["u1"]

@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -298,14 +299,15 @@ PRIMARY_LIVE_ARM = "lstm_price_sentiment"
 # prediction covers the same span.
 NEWS_LOOKBACK_SESSIONS = 5
 
-
 @app.get("/api/live/today")
 def live_today() -> dict:
-    """User-facing view: next-session call per ticker with its driving news.
+    """User-facing view: next-session call per ticker with related news.
 
     Joins the primary arm's latest issued predictions with the last close, the
-    issued class boundaries (as an expected price band), and the articles the
-    sentiment features were computed from.
+    issued class boundaries (training-return terciles -- NOT a predicted price
+    interval; magnitude forecasting is not implemented), and the articles that
+    fed the sentiment features. The articles are context the model read, not
+    proven causes: no attribution method is applied.
     """
     live = _live_dir() / PRIMARY_LIVE_ARM
     latest_path = live / "latest.parquet"
@@ -313,48 +315,54 @@ def live_today() -> dict:
         raise HTTPException(status_code=404, detail="no live predictions yet")
     predictions = pd.read_parquet(latest_path)
 
+    # Prefer the boundaries stamped into the issued rows; the manifest is only a
+    # fallback for predictions written before stamping existed, so a later refit
+    # cannot change what an old prediction displays.
     manifest_path = Path(config.ROOT) / "models" / "forecast" / PRIMARY_LIVE_ARM / "manifest.json"
     manifest = _read_json(manifest_path) if manifest_path.is_file() else {}
-    thresholds = manifest.get("thresholds")
-    if thresholds is None and {"threshold_low", "threshold_high"} <= set(
-        predictions.columns
-    ):
-        thresholds = [
-            float(predictions["threshold_low"].iloc[0]),
-            float(predictions["threshold_high"].iloc[0]),
-        ]
+    manifest_thresholds = manifest.get("thresholds")
 
     obs = pd.to_datetime(predictions["observation_date"]).max()
 
-    # Last close per ticker for the expected price band.
+    # Close at the observation session per ticker (not the latest close on disk:
+    # prices fetched after issuance must not move the displayed band).
     closes: dict[str, float] = {}
+    sessions: dict[str, np.ndarray] = {}
     for ticker in predictions["ticker"]:
         price_path = config.PRICES_DIR / f"{ticker}.parquet"
-        if price_path.is_file():
-            prices = pd.read_parquet(price_path)
-            closes[ticker] = float(prices["close"].iloc[-1])
+        if not price_path.is_file():
+            continue
+        prices = pd.read_parquet(price_path)
+        prices["_session"] = pd.to_datetime(prices["time"]).dt.normalize()
+        sessions[ticker] = np.sort(prices["_session"].unique())
+        at_obs = prices[prices["_session"] <= obs.normalize()]
+        if len(at_obs):
+            closes[ticker] = float(at_obs["close"].iloc[-1])
 
-    # Articles inside the model's trailing sentiment window, joined with their
-    # scored probabilities and titles.
+    # Articles that actually fed the prediction: anchored to one of the last
+    # NEWS_LOOKBACK_SESSIONS sessions ending at the observation date, using the
+    # same session alignment the model's features were built with. News filed
+    # after the session cutoff anchors to the NEXT session and is excluded.
     news_by_ticker: dict[str, list[dict]] = {t: [] for t in predictions["ticker"]}
     scored_path = (
         Path(config.ROOT) / "data" / "processed" / "news_sentiment_merged.parquet"
     )
     articles_path = config.ARTICLES_PQ
-    if scored_path.is_file() and articles_path.is_file():
+    if scored_path.is_file() and articles_path.is_file() and sessions:
+        from stf.forecasting import calendar as cal
+
         scored = pd.read_parquet(scored_path)
         articles = pd.read_parquet(articles_path)[["url", "title"]]
         merged = scored.merge(articles, on="url", how="left")
-        merged["published_at"] = pd.to_datetime(
-            merged["published_at"], format="ISO8601", utc=True
-        )
-        cutoff = merged["published_at"].max() - pd.Timedelta(
-            days=NEWS_LOOKBACK_SESSIONS + 2
-        )
-        recent = merged[merged["published_at"] >= cutoff]
-        for ticker, group in recent.groupby("ticker"):
-            if ticker not in news_by_ticker:
+        aligned = cal.align_news_to_sessions(merged, sessions)
+        mapped = aligned[aligned["mapping_status"].isin(cal.MAPPED_STATUSES)]
+        for ticker, group in mapped.groupby("ticker"):
+            if ticker not in news_by_ticker or ticker not in sessions:
                 continue
+            window_sessions = sessions[ticker][sessions[ticker] <= obs.normalize()][
+                -NEWS_LOOKBACK_SESSIONS:
+            ]
+            group = group[group["observation_date"].isin(window_sessions)]
             group = group.assign(
                 conviction=(group[["prob_negative", "prob_positive"]].max(axis=1))
             ).nlargest(5, "conviction")
@@ -362,7 +370,7 @@ def live_today() -> dict:
                 {
                     "title": row["title"] if isinstance(row["title"], str) else None,
                     "url": row["url"],
-                    "published_at": row["published_at"].isoformat(),
+                    "published_at": str(row["published_at"]),
                     "prob_negative": float(row["prob_negative"]),
                     "prob_neutral": float(row["prob_neutral"]),
                     "prob_positive": float(row["prob_positive"]),
@@ -374,6 +382,16 @@ def live_today() -> dict:
     for _, row in predictions.iterrows():
         ticker = row["ticker"]
         close = closes.get(ticker)
+        if {"threshold_low", "threshold_high"} <= set(predictions.columns):
+            low_t = row["threshold_low"]
+            high_t = row["threshold_high"]
+            thresholds = (
+                [float(low_t), float(high_t)]
+                if pd.notna(low_t) and pd.notna(high_t)
+                else manifest_thresholds
+            )
+        else:
+            thresholds = manifest_thresholds
         band = None
         if thresholds is not None and close is not None:
             band = {
@@ -392,7 +410,7 @@ def live_today() -> dict:
                 "prob_up": float(row["prob_up"]),
                 "has_news": bool(row["has_news"]),
                 "last_close": close,
-                "expected_band": band,
+                "flat_band": band,
                 "news": news_by_ticker.get(ticker, []),
             }
         )
@@ -405,7 +423,6 @@ def live_today() -> dict:
             if "issued_at" in predictions.columns
             else None
         ),
-        "thresholds": thresholds,
         "tickers": tickers,
     }
 

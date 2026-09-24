@@ -189,7 +189,7 @@ export interface LiveTodayTicker {
   prob_up: number
   has_news: boolean
   last_close: number | null
-  expected_band: { low: number; high: number } | null
+  flat_band: { low: number; high: number } | null
   news: LiveTodayNews[]
 }
 
@@ -197,7 +197,6 @@ export interface LiveToday {
   arm: string
   observation_date: string
   issued_at: string | null
-  thresholds: [number, number] | null
   tickers: LiveTodayTicker[]
 }
 
