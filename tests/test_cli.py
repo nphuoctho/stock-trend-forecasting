@@ -249,7 +249,13 @@ def test_forecast_binds_verified_score_manifest(monkeypatch, tmp_path, capsys):
             "close": [100.0],
         }
     )
-    panel = pd.DataFrame({"has_news": [1]})
+    panel = pd.DataFrame(
+        {
+            "has_news": [1],
+            "observation_date": [pd.Timestamp("2021-01-01")],
+            "target_date": [pd.Timestamp("2021-01-04")],
+        }
+    )
     captured = {}
     monkeypatch.setattr(cli_module, "_load_prices", lambda: prices)
     monkeypatch.setattr(forecasting_module, "assemble", lambda *_args: panel)
@@ -299,3 +305,305 @@ def test_forecast_binds_verified_score_manifest(monkeypatch, tmp_path, capsys):
     manifest_path.write_text("[]", encoding="utf-8")
     assert main(["forecast", "--news-sentiment", str(news_path)]) == 2
     assert "invalid score-news manifest" in capsys.readouterr().err
+
+
+def _point_in_time_verdict(monkeypatch, tmp_path, *, label_cutoff, tamper=False):
+    """Run `forecast` against a checkpoint with `label_cutoff` and return its verdict."""
+    from stf import cli as cli_module
+    from stf import forecasting as forecasting_module
+    from stf.forecasting import experiment as experiment_module
+    from stf.sentiment.dataset import file_fingerprint
+
+    checkpoint_manifest = tmp_path / "checkpoint-manifest.json"
+    checkpoint_manifest.write_text(
+        json.dumps({"provenance": {"label_cutoff": label_cutoff}}), encoding="utf-8"
+    )
+    news_path = tmp_path / "scored.parquet"
+    pd.DataFrame(
+        {
+            "ticker": ["FPT"],
+            "url": ["https://vietstock.vn/a.htm"],
+            "published_at": ["2021-01-01T10:00:00+07:00"],
+            "prob_negative": [0.1],
+            "prob_neutral": [0.2],
+            "prob_positive": [0.7],
+        }
+    ).to_parquet(news_path, index=False)
+    recorded_hash = file_fingerprint(checkpoint_manifest)
+    if tamper:
+        checkpoint_manifest.write_text(
+            json.dumps({"provenance": {"label_cutoff": "1999-01-01"}}), encoding="utf-8"
+        )
+    news_path.with_suffix(".manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "output": {"sha256": file_fingerprint(news_path), "rows": 1},
+                "checkpoint": {
+                    "directory_sha256": "checkpoint-v1",
+                    "manifest_path": str(checkpoint_manifest),
+                    "manifest_sha256": recorded_hash,
+                },
+                "inference": {
+                    "truncation_strategy": "head_tail",
+                    "max_len": 256,
+                    "batch_size": 32,
+                    "runtime": {},
+                },
+                "input": {"fingerprint": "inputs-v1"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    panel = pd.DataFrame(
+        {
+            "has_news": [1, 1],
+            "observation_date": pd.to_datetime(["2024-10-20", "2024-10-21"]),
+            "target_date": pd.to_datetime(["2024-10-21", "2024-10-22"]),
+        }
+    )
+    captured = {}
+    monkeypatch.setattr(
+        cli_module,
+        "_load_prices",
+        lambda: pd.DataFrame(
+            {"ticker": ["FPT"], "time": [pd.Timestamp("2024-10-21")], "close": [100.0]}
+        ),
+    )
+    monkeypatch.setattr(forecasting_module, "assemble", lambda *_args: panel)
+    monkeypatch.setattr(
+        experiment_module,
+        "first_test_observation_date",
+        lambda *_a, **_k: "2024-10-21",
+    )
+
+    def fake_run_experiment(panel, *, cfg, output_dir, provenance):
+        captured["provenance"] = provenance
+        return {
+            "panel_rows": len(panel),
+            "windows": [],
+            "chance_level": 1 / 3,
+            "summary": {},
+            "ablation": {},
+        }
+
+    monkeypatch.setattr(experiment_module, "run_experiment", fake_run_experiment)
+    assert (
+        main(
+            [
+                "forecast",
+                "--news-sentiment",
+                str(news_path),
+                "--output",
+                str(tmp_path / "forecast"),
+            ]
+        )
+        == 0
+    )
+    return captured["provenance"]["news_sentiment"]
+
+
+@pytest.mark.parametrize(
+    "label_cutoff, point_in_time",
+    [
+        ("2024-10-20", True),  # a day before the first test observation
+        ("2024-10-21", True),  # exactly on it: the filter is strictly-before, so valid
+        ("2024-10-22", False),  # a day after: the checkpoint saw a test-period label
+    ],
+)
+def test_point_in_time_verdict_at_the_cutoff_boundary(
+    monkeypatch, tmp_path, label_cutoff, point_in_time
+):
+    """Equality is the tight admissible case, and one day past it is not.
+
+    `sentiment-refit --before-date` keeps labels strictly before the cutoff, so a
+    cutoff equal to the first test observation proves no test-period label was seen.
+    An off-by-one here either voids a valid out-of-sample claim or, worse, endorses
+    a leaked one.
+    """
+    verdict = _point_in_time_verdict(monkeypatch, tmp_path, label_cutoff=label_cutoff)
+
+    assert verdict["first_test_observation_date"] == "2024-10-21"
+    assert verdict["point_in_time"] is point_in_time
+    assert verdict["point_in_time_reason"] == (
+        "verified" if point_in_time else "cutoff_after_test_start"
+    )
+
+
+def test_point_in_time_refuses_a_checkpoint_manifest_edited_after_scoring(
+    monkeypatch, tmp_path
+):
+    """A cutoff is only trusted when the manifest still hashes to what scoring saw."""
+    verdict = _point_in_time_verdict(
+        monkeypatch, tmp_path, label_cutoff="2024-10-21", tamper=True
+    )
+
+    assert verdict["point_in_time"] is False
+    assert verdict["point_in_time_reason"] == "hash_mismatch"
+    assert verdict["label_cutoff"] is None
+
+
+def test_sentiment_refit_rejects_a_before_date_with_a_time_component(
+    tmp_path, capsys
+):
+    """--before-date must be a calendar date, not a timestamp.
+
+    The cutoff is recorded in the manifest as a date and verified against the
+    first test observation date. Accepting '2024-10-21T15:00' would silently
+    record a different boundary than the one the operator asked for.
+    """
+    labels = tmp_path / "labels.csv"
+    pd.DataFrame(
+        {
+            "text": ["tin tốt", "tin xấu"],
+            "label": ["POSITIVE", "NEGATIVE"],
+            "published_at": [
+                "2024-01-01T10:00:00+07:00",
+                "2024-01-02T10:00:00+07:00",
+            ],
+        }
+    ).to_csv(labels, index=False)
+
+    assert (
+        main(
+            [
+                "sentiment-refit",
+                "--data",
+                str(labels),
+                "--cv-results",
+                str(tmp_path / "cv.json"),
+                "--epochs",
+                "1",
+                "--batch-size",
+                "4",
+                "--seed",
+                "42",
+                "--input-variant",
+                "title",
+                "--truncation-strategy",
+                "head_tail",
+                "--class-weighting",
+                "none",
+                "--output",
+                str(tmp_path / "out"),
+                "--before-date",
+                "2024-10-21T15:00",
+            ]
+        )
+        == 2
+    )
+    assert "must be a calendar date" in capsys.readouterr().err
+
+
+def test_in_window_alignment_report_uses_a_half_open_final_day(monkeypatch, tmp_path):
+    """The window covers all of its last day and none of the next one.
+
+    An article published after the 15:00 cutoff on the final day still belongs to
+    the study window even though it anchors to the next session; one published at
+    midnight the following day does not. An inclusive upper bound admits that
+    midnight row, and a 23:59:59 bound drops timestamps carrying fractional
+    seconds in the last second.
+    """
+    from stf import cli as cli_module
+    from stf import forecasting as forecasting_module
+    from stf.forecasting import experiment as experiment_module
+    from stf.sentiment.dataset import file_fingerprint
+
+    published = [
+        "2019-12-31T23:59:59.500000+07:00",  # before the window
+        "2020-01-01T09:00:00+07:00",  # first instant of the window
+        "2020-12-31T16:30:00+07:00",  # after the cutoff on the last day: in window
+        "2020-12-31T23:59:59.500000+07:00",  # fractional second in the last second
+        "2021-01-01T00:00:00+07:00",  # first instant after the window
+    ]
+    news_path = tmp_path / "scored.parquet"
+    pd.DataFrame(
+        {
+            "ticker": ["FPT"] * len(published),
+            "url": [f"https://vietstock.vn/{i}.htm" for i in range(len(published))],
+            "published_at": published,
+            "prob_negative": [0.1] * len(published),
+            "prob_neutral": [0.2] * len(published),
+            "prob_positive": [0.7] * len(published),
+        }
+    ).to_parquet(news_path, index=False)
+    news_path.with_suffix(".manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "output": {"sha256": file_fingerprint(news_path), "rows": len(published)},
+                "checkpoint": {"directory_sha256": "checkpoint-v1"},
+                "inference": {
+                    "truncation_strategy": "head_tail",
+                    "max_len": 256,
+                    "batch_size": 32,
+                    "runtime": {},
+                },
+                "input": {"fingerprint": "inputs-v1"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    sessions = pd.bdate_range("2019-12-02", "2021-01-29")
+    prices = pd.DataFrame(
+        {
+            "ticker": "FPT",
+            "time": sessions,
+            "open": 100.0,
+            "high": 101.0,
+            "low": 99.0,
+            "close": 100.0 + np.arange(len(sessions), dtype=float),
+            "volume": 1_000_000,
+        }
+    )
+    captured = {}
+    monkeypatch.setattr(cli_module, "_load_prices", lambda: prices)
+    monkeypatch.setattr(
+        forecasting_module,
+        "assemble",
+        lambda *_a: pd.DataFrame(
+            {
+                "has_news": [1],
+                "observation_date": pd.to_datetime(["2020-06-01"]),
+                "target_date": pd.to_datetime(["2020-06-02"]),
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        experiment_module,
+        "run_experiment",
+        lambda panel, *, cfg, output_dir, provenance: captured.update(
+            provenance=provenance
+        )
+        or {
+            "panel_rows": len(panel),
+            "windows": [],
+            "chance_level": 1 / 3,
+            "summary": {},
+            "ablation": {},
+        },
+    )
+
+    assert (
+        main(
+            [
+                "forecast",
+                "--news-sentiment",
+                str(news_path),
+                "--panel-end",
+                "2020-12-31",
+                "--output",
+                str(tmp_path / "forecast"),
+            ]
+        )
+        == 0
+    )
+
+    report = captured["provenance"]["alignment_report_in_window"]
+    assert report["window"] == ["2020-01-01", "2020-12-31"]
+    assert report["links"] == 3  # the two boundary rows outside are excluded
+    # Both 2020-12-31 articles are published after the 15:00 cutoff, so they roll
+    # onto the first 2021 session: published in window, unusable by a 2020 panel.
+    assert report["anchored_after_window"] == 2

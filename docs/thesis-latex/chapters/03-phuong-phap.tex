@@ -597,13 +597,15 @@ bảng điểm có lợi.
 
 \subsection{Tầng TFT mở rộng}
 
-TFT chỉ được chạy khi các đối chứng cơ sở và LSTM hai nhánh đã có số liệu, mốc cắt không còn
-lỗi và còn đủ nguồn lực. Mô hình nhận các biến thời gian, biến tĩnh hoặc biến quan sát
+TFT được chạy sau khi các đối chứng cơ sở và LSTM hai nhánh đã có số liệu và mốc cắt không còn
+lỗi. Mô hình nhận các biến thời gian, biến tĩnh hoặc biến quan sát
 theo cấu hình rõ ràng, dùng kích thước đầu ra bằng 3 và hàm mất mát phân loại. Các biến không được
 khai báo chỉ vì chúng có sẵn trong một bảng dữ liệu, mà phải được kiểm tra theo thời
 điểm có thể quan sát. Kết quả TFT chỉ được so sánh với các tầng trước khi dùng cùng
-các đoạn kiểm thử và quy tắc tạo nhãn. Nếu không kiểm soát được hàm mất mát hoặc thời gian
-chạy, TFT được loại khỏi thực nghiệm chính mà không ảnh hưởng đến mức sàn.
+các đoạn kiểm thử và quy tắc tạo nhãn. Trong đồ án này TFT được cài đặt tối giản bằng
+PyTorch thuần (\texttt{TemporalFusionClassifier}): nhúng từng biến, mạng chọn biến theo
+thời điểm, bộ mã hóa LSTM một tầng, chú ý đa đầu với cổng phần dư và đầu phân loại GRN;
+cấu hình hồi quy phân vị của thư viện không được dùng cho mục tiêu ba lớp.
 
 \subsection{Huấn luyện và kiểm soát độ phức tạp}
 

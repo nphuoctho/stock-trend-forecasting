@@ -354,10 +354,18 @@ def test_listing_rows_pair_dates_with_nearest_article_url():
     ]
 
 def test_to_iso_parsing():
-    """Invalid timestamps are rejected; valid ones keep local timezone."""
+    """Every Vietstock timestamp shape resolves to the same ICT instant."""
+    # Legacy span form. `08/09` is 8 September: a naive pd.to_datetime reads this
+    # as 9 August, silently shifting an article by a month.
     assert news._to_iso("08/09/2022 16:35") == "2022-09-08T16:35:00+07:00"
+    # 2026 div form and the meta fallback describe the same instant.
+    assert news._to_iso("21-09-2026 14:30:00+07:00") == "2026-09-21T14:30:00+07:00"
+    assert news._to_iso("2026-09-21T14:30:00+07:00") == "2026-09-21T14:30:00+07:00"
     assert news._to_iso(None) is None
     assert news._to_iso("không hợp lệ") is None
+    # A date-only meta value carries no publish time; anchoring it to midnight
+    # would leak an evening article into the same session.
+    assert news._to_iso("2026-09-21") is None
 
 
 def test_join_listings_articles_preserves_many_to_many_ticker_links():
@@ -1119,3 +1127,200 @@ def test_outer_split_uses_all_rows_for_ordinary_cross_validation():
 
     assert len(split.val) == 6  # ceil(10% * 57 outer-train rows)
     assert set(split.val["stratum"]) == {"train_negative"}
+
+
+def _listings_sandbox(monkeypatch, tmp_path):
+    """Point the news module's artifact paths at a temp dir with one ticker."""
+    from stf import config
+
+    monkeypatch.setattr(config, "NEWS_DIR", tmp_path)
+    monkeypatch.setattr(config, "LISTINGS_PQ", tmp_path / "listings.parquet")
+    monkeypatch.setattr(config, "ARTICLES_PQ", tmp_path / "articles.parquet")
+    monkeypatch.setattr(config, "NEWS_HTML_DIR", tmp_path / "html")
+    monkeypatch.setattr(config, "TICKERS", ["FPT"])
+    monkeypatch.setattr(config, "DATE_START", "2023-01-01")
+    (tmp_path / "html").mkdir(parents=True, exist_ok=True)
+
+
+def test_collect_listings_rewalks_a_year_left_partial_by_an_earlier_end(
+    monkeypatch, tmp_path
+):
+    """A year walked only up to a mid-year --end must not be treated as complete.
+
+    Inferring coverage from row presence cannot tell a fully walked year from one
+    that stopped at an earlier run's end date. Once the calendar rolls over, the
+    partial year stops being the end year and would be frozen with its tail
+    permanently missing.
+    """
+    _listings_sandbox(monkeypatch, tmp_path)
+    walked = []
+
+    def fake_walk(code, year, *, to_date):
+        walked.append((year, to_date))
+        return [(f"https://vietstock.vn/{year}/01/a-{year}.htm", f"05/01/{year}")], True
+
+    monkeypatch.setattr(news, "list_ticker_year", fake_walk)
+
+    news.collect_listings(end="2024-06-30")
+    walked.clear()
+
+    # Same request: every year is covered through what was asked, so nothing refetches.
+    news.collect_listings(end="2024-06-30")
+    assert walked == []
+
+    # Asking for more of 2024 must re-walk 2024, not reuse the mid-year cache.
+    news.collect_listings(end="2024-12-31")
+    assert walked == [(2024, "2024-12-31")]
+    walked.clear()
+
+    # A new end year re-walks only that year; 2024 is now covered to its full extent.
+    news.collect_listings(end="2025-03-01")
+    assert walked == [(2025, "2025-03-01")]
+
+    # A transient failure mid-walk must withhold the watermark, so the year is
+    # re-walked rather than frozen with whatever partial rows it produced.
+    monkeypatch.setattr(
+        news,
+        "list_ticker_year",
+        lambda code, year, *, to_date: (
+            [(f"https://vietstock.vn/{year}/01/b-{year}.htm", f"06/01/{year}")],
+            False,
+        ),
+    )
+    news.collect_listings(end="2025-06-01")
+    monkeypatch.setattr(news, "list_ticker_year", fake_walk)
+    walked.clear()
+    news.collect_listings(end="2025-06-01")
+    assert walked == [(2025, "2025-06-01")]
+
+
+def test_collect_listings_honours_an_end_earlier_than_the_cache(monkeypatch, tmp_path):
+    """A cache walked further than the request must still respect --end.
+
+    The watermark makes a year reusable, but reuse filtered by year alone would
+    hand back December rows for a June request, so --end would silently do nothing
+    whenever the cache happened to be ahead of it.
+    """
+    _listings_sandbox(monkeypatch, tmp_path)
+
+    def fake_walk(code, year, *, to_date):
+        return [
+            (f"https://vietstock.vn/{year}/{month:02d}/a-{month}.htm", f"15/{month:02d}/{year}")
+            for month in range(1, 13)
+        ], True
+
+    monkeypatch.setattr(news, "list_ticker_year", fake_walk)
+
+    full = news.collect_listings(end="2023-12-31")
+    assert len(full) == 12
+
+    reused = news.collect_listings(end="2023-06-30")
+    assert sorted(reused["list_date"]) == [f"15/{m:02d}/2023" for m in range(1, 7)]
+
+
+def test_fetch_articles_budget_counts_only_network_fetches(monkeypatch, tmp_path):
+    """--batch limits network work, and a timestamp-less page stops being retried.
+
+    Charging a cached re-parse against the budget lets a few permanently
+    unparseable articles consume the whole batch on every run, so the crawl stalls
+    before reaching any genuinely new article.
+    """
+    _listings_sandbox(monkeypatch, tmp_path)
+    from stf import config
+
+    stuck = "https://vietstock.vn/2024/01/stuck-111.htm"
+    fresh = "https://vietstock.vn/2024/01/fresh-222.htm"
+    (config.NEWS_HTML_DIR / "111.html").write_text(
+        "<html><title>no timestamp</title><body>text</body></html>", encoding="utf-8"
+    )
+    fetched = []
+
+    def fake_get(url):
+        fetched.append(url)
+        return type(
+            "R",
+            (),
+            {
+                "text": '<html><title>t</title>'
+                '<meta itemprop="datePublished" content="2024-01-05T10:00:00+07:00">'
+                "<body>body text</body></html>"
+            },
+        )()
+
+    monkeypatch.setattr(news, "get", fake_get)
+    monkeypatch.setattr(news, "SLEEP", 0)
+
+    first = news.fetch_articles([stuck, fresh], max_new=1)
+    # The cached unparseable page did not spend the budget, so the new URL was still
+    # fetched in the same run.
+    assert fetched == [fresh]
+    assert first.set_index("url").loc[stuck, "parse_failed"]
+
+    fetched.clear()
+    news.fetch_articles([stuck, fresh], max_new=1)
+    assert fetched == []  # nothing left to do; the stuck page is not retried
+
+    fetched.clear()
+    # The parser improves (or the cached page is replaced): a forced re-parse must
+    # clear the flag and pick up the timestamp without any network work.
+    (config.NEWS_HTML_DIR / "111.html").write_text(
+        '<html><title>t</title>'
+        '<meta itemprop="datePublished" content="2024-01-05T10:00:00+07:00">'
+        "<body>body text</body></html>",
+        encoding="utf-8",
+    )
+    retried = news.fetch_articles([stuck, fresh], max_new=1, retry_failed=True)
+    assert fetched == []
+    stuck_row = retried.set_index("url").loc[stuck]
+    assert not stuck_row["parse_failed"]
+    assert stuck_row["published_at"] == "2024-01-05T10:00:00+07:00"
+
+
+def test_collect_listings_keeps_rows_with_unparseable_list_dates(
+    monkeypatch, tmp_path
+):
+    """A row whose list_date the parser cannot read is kept, not silently dropped.
+
+    Dropping it would lose the article entirely and still mark the year complete,
+    so the crawl would never retry it. Keeping it preserves the URL for the
+    article stage, which has its own timestamp repair path.
+    """
+    _listings_sandbox(monkeypatch, tmp_path)
+
+    def fake_walk(code, year, *, to_date):
+        return [
+            ("https://vietstock.vn/2023/01/good.htm", "05/01/2023"),
+            ("https://vietstock.vn/2023/01/bad.htm", "không phải ngày"),
+        ], True
+
+    monkeypatch.setattr(news, "list_ticker_year", fake_walk)
+
+    listings = news.collect_listings(end="2023-12-31")
+    assert sorted(listings["url"]) == [
+        "https://vietstock.vn/2023/01/bad.htm",
+        "https://vietstock.vn/2023/01/good.htm",
+    ]
+
+
+def test_collect_listings_with_empty_cache_and_full_coverage_returns_empty(
+    monkeypatch, tmp_path
+):
+    """A fully-watermarked cache with no rows must not crash on reuse.
+
+    The reuse path filters the cached frame by year; an empty frame has no
+    'year' column, so indexing it raises KeyError and the crawl dies before it
+    can serve a legitimate empty result.
+    """
+    _listings_sandbox(monkeypatch, tmp_path)
+    from stf import config
+
+    monkeypatch.setattr(
+        news,
+        "list_ticker_year",
+        lambda code, year, *, to_date: ([], True),
+    )
+    first = news.collect_listings(end="2023-12-31")
+    assert first.empty
+
+    reused = news.collect_listings(end="2023-12-31")
+    assert reused.empty

@@ -25,16 +25,16 @@ Các con số trong Bảng~\ref{tab:kq-snapshot} là số liệu của bước c
 
 \begin{table}[H]
   \centering
-  \caption{Tổng hợp số liệu đầu vào đã kiểm kê.}
+  \caption{Tổng hợp số liệu đầu vào đã kiểm kê (kho tin là toàn bộ lần thu thập, gồm cả năm 2026; số dòng giá là của cửa sổ 2020--2025).}
   \label{tab:kq-snapshot}
   \begin{tabular}{p{8.8cm} c}
     \toprule
     Hạng mục & Số lượng \\
     \midrule
-    Bản ghi tin thô có URL duy nhất & 10.695 \\
-    Liên kết tin tức và mã trong bảng listings & 12.624 \\
+    Bản ghi tin thô có URL duy nhất & 12.140 \\
+    Liên kết tin tức và mã trong bảng listings & 14.256 \\
     Mã cổ phiếu được bao phủ & 10 \\
-    Ngày dương lịch có ít nhất một tin & 1.943 \\
+    Ngày dương lịch có ít nhất một tin & 2.101 \\
     Dòng dữ liệu giá OHLCV của 10 mã & 14.990 \\
     Mẫu trong tập hạt giống CafeF & 999 \\
     Mẫu trong miền dữ liệu đã rà soát, hợp nhất & 1.306 \\
@@ -59,7 +59,7 @@ Hai nhánh của hệ thống chạy trên hai môi trường khác nhau và đ�
 cảm xúc tinh chỉnh PhoBERT trên GPU của Kaggle; nhánh dự báo chạy trên CPU của máy cục
 bộ, vì mô hình LSTM ở quy mô này không cần GPU. Bảng~\ref{tab:kq-setup} ghi lại thiết
 lập thực tế của hai nhánh, đọc trực tiếp từ
-\texttt{outputs/forecast\_merged\_sentiment/forecast\_results.json} và
+\texttt{outputs/forecast\_merged\_sentiment\_tft/forecast\_results.json} và
 \texttt{models/sentiment/merged-refit/manifest.json}.
 
 \begin{table}[H]
@@ -116,14 +116,14 @@ từng cửa sổ nên thay đổi theo thời gian.
     \toprule
     Cửa sổ & Khoảng ngày kiểm thử & Ngưỡng dưới & Ngưỡng trên & Huấn luyện & DOWN/FLAT/UP \\
     \midrule
-    1 & 22/10/2024--14/01/2025 & $-0{,}00524$ & $0{,}00563$ & 11.290 & 169/311/120 \\
-    2 & 15/01/2025--16/04/2025 & $-0{,}00515$ & $0{,}00556$ & 11.890 & 165/259/176 \\
-    3 & 17/04/2025--14/07/2025 & $-0{,}00504$ & $0{,}00534$ & 12.490 & 138/240/222 \\
-    4 & 15/07/2025--08/10/2025 & $-0{,}00495$ & $0{,}00530$ & 13.090 & 213/168/219 \\
-    5 & 09/10/2025--31/12/2025 & $-0{,}00476$ & $0{,}00535$ & 13.690 & 234/143/223 \\
+    1 & 22/10/2024--14/01/2025 & $-0{,}00522$ & $0{,}00565$ & 11.350 & 169/311/120 \\
+    2 & 15/01/2025--16/04/2025 & $-0{,}00513$ & $0{,}00557$ & 11.950 & 165/259/176 \\
+    3 & 17/04/2025--14/07/2025 & $-0{,}00502$ & $0{,}00535$ & 12.550 & 139/239/222 \\
+    4 & 15/07/2025--08/10/2025 & $-0{,}00495$ & $0{,}00530$ & 13.150 & 213/168/219 \\
+    5 & 09/10/2025--31/12/2025 & $-0{,}00477$ & $0{,}00535$ & 13.750 & 234/143/223 \\
     \bottomrule
   \end{tabular}
-\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment/forecast\_results.json}.}
+\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment\_tft/forecast\_results.json}.}
 \end{table}
 
 Mỗi cửa sổ có 600 chuỗi xác thực và 600 chuỗi kiểm thử. Phân bố lớp trong tập kiểm thử
@@ -152,7 +152,7 @@ tạp chỉ có ý nghĩa khi được đặt cạnh các mốc trên chính d�
 
 Bảng~\ref{tab:kq-news-stats} ghi số bản ghi sau từng cổng xử lý và độ phủ tin trên bảng
 dữ liệu mã--phiên. Các con số được suy ra từ \texttt{stf.cli verify} và trường
-\texttt{provenance} của \texttt{outputs/forecast\_merged\_sentiment/forecast\_results.json}.
+\texttt{provenance} của \texttt{outputs/forecast\_merged\_sentiment\_tft/forecast\_results.json}.
 
 \begin{table}[H]
   \centering
@@ -162,28 +162,27 @@ dữ liệu mã--phiên. Các con số được suy ra từ \texttt{stf.cli veri
     \toprule
     Chỉ tiêu & Số lượng hoặc tỷ lệ \\
     \midrule
-    Bản ghi tin thô có URL duy nhất & 10.695 \\
-    Liên kết tin--mã cổ phiếu & 12.624 \\
+    Bài tin có URL duy nhất trong cửa sổ 2020--2025 & 10.695 \\
+    Liên kết tin--mã cổ phiếu trong cửa sổ & 12.624 \\
     Bản ghi có mốc thời gian hợp lệ & 10.695 (100\%) \\
     Bài có nội dung ngoài tiêu đề & 10.695 (100\%) \\
-    Tiêu đề trùng lặp trong kho & 1.089 \\
-    Liên kết được neo vào một phiên giao dịch & 12.613 \\
-    \quad trong đó neo vào chính phiên đó & 6.554 \\
-    \quad trong đó chuyển sang phiên kế tiếp & 6.059 \\
-    Liên kết không neo được và bị loại & 11 \\
+    Liên kết neo vào chính phiên đăng & 6.554 \\
+    Liên kết chuyển sang phiên kế tiếp & 6.070 \\
+    \quad trong đó rơi sang phiên năm 2026, ngoài cửa sổ & 11 \\
+    Liên kết dùng được trong bảng dữ liệu & 12.613 \\
     Dòng mã--phiên của bảng dữ liệu & 14.990 \\
-    Dòng mã--phiên có ít nhất một tin & 6.950 (46,36\%) \\
-    Dòng mã--phiên không có tin & 8.040 (53,64\%) \\
+    Dòng mã--phiên có ít nhất một tin & 6.948 (46,35\%) \\
+    Dòng mã--phiên không có tin & 8.042 (53,65\%) \\
     \bottomrule
   \end{tabular}
-\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment/forecast\_results.json}, trường \texttt{provenance}.}
+\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment\_tft/forecast\_results.json}, trường \texttt{provenance.alignment\_report\_in\_window} và \texttt{provenance.news\_coverage}.}
 \end{table}
 
 Có hai cách đếm độ phủ và hai cách cho hai con số khác nhau, nên cần nêu rõ định nghĩa.
 Nếu chỉ đối chiếu ngày đăng tin với ngày có phiên giao dịch, độ phủ là 37,8\%, vì tin
-cuối tuần, ngày lễ và tin sau 15:00 bị bỏ. Con số 46,36\% trong Bảng~\ref{tab:kq-news-stats}
+cuối tuần, ngày lễ và tin sau 15:00 bị bỏ. Con số 46,35\% trong Bảng~\ref{tab:kq-news-stats}
 là độ phủ của quy trình thực tế: tin sau mốc cắt được chuyển sang phiên kế tiếp thay vì
-bị loại, nên 6.059 liên kết vẫn được dùng. Toàn bộ chương này dùng định nghĩa thứ hai.
+bị loại, nên 6.059 liên kết chuyển phiên vẫn được dùng. Toàn bộ chương này dùng định nghĩa thứ hai.
 
 Độ phủ tin lệch mạnh giữa các mã: MBB và TCB có trên 2.000 liên kết mỗi mã, còn GAS chỉ
 có 548. Vì vậy, số tin và biến \texttt{has\_news} được giữ làm đặc trưng riêng, và ngày
@@ -197,7 +196,7 @@ Dữ liệu giá gồm 10 mã HOSE, mỗi mã đúng 1.499 phiên từ 02/01/202
 có giá trị thiếu, nên bảng dữ liệu mã--phiên có đủ $10 \times 1.499 = 14.990$ dòng. Số dòng
 thực sự đưa vào mô hình nhỏ hơn con số này: mỗi chuỗi cần một cửa sổ lịch sử 5 phiên đầy đủ
 và một phiên kế tiếp để tính nhãn, nên các phiên đầu và phiên cuối của mỗi mã không tạo được
-mẫu. Vì vậy tổng số chuỗi của một cửa sổ là 11.290 huấn luyện, 600 xác thực và 600 kiểm thử
+mẫu. Vì vậy tổng số chuỗi của một cửa sổ là 11.350 huấn luyện, 600 xác thực và 600 kiểm thử
 ở cửa sổ đầu tiên, chứ không phải 14.990 (Bảng~\ref{tab:kq-windows}).
 
 Tệp giá gốc trên đĩa còn chứa các phiên của năm 2026, ngoài cửa sổ nghiên cứu đã khóa; các
@@ -219,14 +218,14 @@ Bảng~\ref{tab:kq-price-stats} tổng hợp phân bố nhãn của tập kiểm
     \midrule
     1 & 169 & 311 & 120 & 600 \\
     2 & 165 & 259 & 176 & 600 \\
-    3 & 138 & 240 & 222 & 600 \\
+    3 & 139 & 239 & 222 & 600 \\
     4 & 213 & 168 & 219 & 600 \\
     5 & 234 & 143 & 223 & 600 \\
     \midrule
     Tổng & 919 & 1.121 & 960 & 3.000 \\
     \bottomrule
   \end{tabular}
-\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment/forecast\_results.json}.}
+\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment\_tft/forecast\_results.json}.}
 \end{table}
 
 Trên toàn bộ 3.000 dòng kiểm thử, tỷ lệ ba lớp là 30,6\% DOWN, 37,4\% FLAT và 32,0\% UP.
@@ -342,15 +341,18 @@ không báo cáo chỉ số kiểm thử mới. Manifest điểm kiểm xác nh�
 phân bố 194 NEGATIVE, 771 NEUTRAL và 341 POSITIVE, cùng môi trường GPU đã dùng.
 
 Các bảng dự báo lịch sử được tạo bằng bộ sinh 306 mẫu với \texttt{score-news} và
-\texttt{--context-chars 400}; 12.624 liên kết tin--mã đã nhận xác suất ba lớp. Phân bố
+\texttt{--context-chars 400}; 14.256 liên kết tin--mã đã nhận xác suất ba lớp, trong đó 12.624 thuộc cửa sổ 2020--2025 và 12.613 được đưa vào bảng dự báo. Phân bố
 nhãn đa số lịch sử là 2.095 NEGATIVE, 6.776 NEUTRAL và 3.753 POSITIVE. Nhánh dự báo luôn
 dùng phân phối xác suất mềm, không dùng nhãn cứng; các số lịch sử này chỉ giải thích
 artifact cũ, không được gán cho điểm kiểm 1.306 mẫu.
 
-Điểm kiểm mới đã chấm lại đúng 12.624 liên kết với \texttt{title\_context},
-\texttt{head\_tail} và giới hạn 400 ký tự. Có 12.613 liên kết neo được vào phiên theo mốc
-15 giờ, 11 liên kết bị loại vì không neo được; bảng dự báo mới có tin ở 6.950 trên 14.990
-dòng mã--phiên. Lần chạy mới và đối chứng ghép cặp dùng cùng các bài tin, thời điểm và số
+Điểm kiểm mới đã chấm lại đúng 14.256 liên kết với \texttt{title\_context},
+\texttt{head\_tail} và giới hạn 400 ký tự. Trong số đó 12.624 liên kết thuộc cửa sổ
+2020--2025; 12.613 neo được vào một phiên bên trong cửa sổ theo mốc 15 giờ, 11 liên kết
+đăng cuối ngày 31/12/2025 rơi sang phiên năm 2026 nên bị loại. 1.632 liên kết còn lại
+đăng trong năm 2026, ngoài cửa sổ nghiên cứu. Bảng dự báo có tin ở
+6.948 trên 14.990 dòng mã--phiên. Lần chạy mới và đối chứng ghép cặp dùng cùng các bài
+tin, thời điểm và số
 lượng tin; đối chứng chỉ thay ba xác suất mỗi bài bằng prior trung tính. Vì điểm kiểm được
 tinh chỉnh trên toàn bộ tập nhãn có cả bài năm 2025, kết quả dự báo này là hồi cứu và không
 được gọi là dự báo ngoài mẫu hoàn toàn theo giao thức ở Chương~\ref{ch:phuong-phap}.
@@ -371,29 +373,37 @@ chạy (5 cửa sổ $\times$ 3 hạt giống), kèm độ lệch chuẩn của 
     \toprule
     Mô hình & F1 vĩ mô & Độ chính xác cân bằng & Độ chính xác & AUC-ROC OvR \\
     \midrule
-    Đối chứng lớp phổ biến & 0,1603 $\pm$ 0,0269 & 0,3333 & 0,3200 & --- \\
+    Đối chứng lớp phổ biến & 0,1453 $\pm$ 0,0264 & 0,3333 & 0,2820 & --- \\
     Đối chứng ngẫu nhiên & 0,3289 $\pm$ 0,0184 & 0,3343 & 0,3339 & --- \\
-    Hồi quy logistic, chỉ giá & 0,3550 $\pm$ 0,0279 & 0,3789 & 0,4220 & 0,5603 \\
-    Hồi quy logistic, giá và cảm xúc & 0,3681 $\pm$ 0,0252 & 0,3880 & 0,4280 & 0,5572 \\
-    LSTM, chỉ giá & 0,3797 $\pm$ 0,0287 & 0,3915 & \textbf{0,4300} & \textbf{0,5721} \\
-    \textbf{LSTM hai nhánh, giá và cảm xúc} & \textbf{0,3907} $\pm$ 0,0281 & \textbf{0,3981} & 0,4296 & 0,5660 \\
-    TFT & \multicolumn{4}{c}{\textit{Chưa thực hiện --- xem Chương~\ref{ch:huong-phat-trien}}} \\
+    Hồi quy logistic, chỉ giá & 0,3551 $\pm$ 0,0281 & 0,3792 & 0,4220 & 0,5601 \\
+    Hồi quy logistic, giá và cảm xúc & 0,3667 $\pm$ 0,0250 & 0,3872 & 0,4270 & 0,5570 \\
+    LSTM, chỉ giá & 0,3756 $\pm$ 0,0321 & 0,3915 & \textbf{0,4341} & \textbf{0,5714} \\
+    \textbf{LSTM hai nhánh, giá và cảm xúc} & \textbf{0,3869} $\pm$ 0,0272 & \textbf{0,3953} & 0,4244 & 0,5655 \\
+    TFT, chỉ giá & 0,3619 $\pm$ 0,0352 & 0,3776 & 0,4123 & 0,5596 \\
+    TFT, giá và cảm xúc & 0,3597 $\pm$ 0,0201 & 0,3733 & 0,3936 & 0,5527 \\
     \bottomrule
   \end{tabular}
-\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment/forecast\_metrics.csv}.}
+\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment\_tft/forecast\_metrics.csv}.}
 \end{table}
 
-LSTM chỉ giá có F1 vĩ mô 0,3797, so với 0,3289 của mốc ngẫu nhiên và 0,1603 của
-mốc lớp phổ biến; AUC-ROC một-chống-còn-lại là 0,5721. Báo cáo không thực hiện
+LSTM chỉ giá có F1 vĩ mô 0,3756, so với 0,3289 của mốc ngẫu nhiên và 0,1453 của
+mốc lớp phổ biến; AUC-ROC một-chống-còn-lại là 0,5714. Báo cáo không thực hiện
 kiểm định ghép cặp với hai mốc đối chứng, nên đây chỉ là so sánh mô tả các điểm
 quan sát được. Điểm số hai nhánh được giữ để mô tả lần chạy hồi cứu, nhưng không
 là bằng chứng độc lập về giá trị của tin hay cảm xúc vì bộ sinh xác suất đã học từ
 nhãn tương lai tương đối với các cửa sổ kiểm thử.
 
+TFT đạt F1 vĩ mô 0,3619 khi chỉ dùng giá và 0,3597 khi có thêm cảm xúc, thấp hơn
+cả hai nhánh LSTM tương ứng (0,3756 và 0,3869). Trên bảng mã--ngày với 14.990
+dòng và cửa sổ đầu vào 5 phiên, kiến trúc có cổng và chú ý của TFT không tạo lợi
+thế so với LSTM hai nhánh; kết quả này phù hợp với nhận định rằng mô hình nhiều
+tham số cần dữ liệu lớn hơn để phát huy cơ chế chọn biến. TFT vì vậy được ghi nhận
+như một tầng đã chạy nhưng không vượt mức sàn, không phải hạng mục bỏ trống.
+
 \subsection{Báo cáo chỉ số theo lớp}
 
 Dự đoán chi tiết theo từng mã, ngày, cửa sổ và hạt giống được lưu tại
-\path{outputs/forecast_merged_sentiment/forecast_predictions.csv}. Chỉ số tổng hợp
+\path{outputs/forecast_merged_sentiment_tft/forecast_predictions.csv}. Chỉ số tổng hợp
 trong Bảng~\ref{tab:ket-qua} là trung bình trên 15 lần chạy; không thay bằng một bảng
 gộp dự đoán vì cách gộp làm đổi trọng số các cửa sổ. Các lớp vẫn được tạo bằng ngưỡng học
 từ từng tập huấn luyện, do đó F1 vĩ mô và độ chính xác cân bằng mới là chỉ số chính thay
@@ -410,9 +420,9 @@ vì độ chính xác đơn lẻ.
     \cmidrule(lr){2-4}\cmidrule(lr){5-7}
     Lớp & P & R & F1 & P & R & F1 \\
     \midrule
-    DOWN & 0,3631 & 0,2608 & 0,2929 & 0,3605 & 0,2861 & 0,3143 \\
-    FLAT & 0,4389 & 0,6017 & 0,5060 & 0,4453 & 0,5626 & 0,4960 \\
-    UP   & 0,3871 & 0,3121 & 0,3402 & 0,3950 & 0,3456 & 0,3619 \\
+    DOWN & 0,3775 & 0,2472 & 0,2862 & 0,3538 & 0,2741 & 0,3052 \\
+    FLAT & 0,4385 & 0,6193 & 0,5106 & 0,4415 & 0,5760 & 0,4985 \\
+    UP   & 0,3859 & 0,3081 & 0,3301 & 0,3921 & 0,3357 & 0,3571 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -448,21 +458,23 @@ phủ tin với khác biệt về xác suất cảm xúc.
     \toprule
     Mức & F1 vĩ mô \\
     \midrule
-    LSTM chỉ giá & 0,3797 \\
-    LSTM hai nhánh, phân phối tiên nghiệm trung tính & 0,3841 \\
-    LSTM hai nhánh, cảm xúc thật & 0,3907 \\
+    LSTM chỉ giá & 0,3756 \\
+    LSTM hai nhánh, phân phối tiên nghiệm trung tính & 0,3790 \\
+    LSTM hai nhánh, cảm xúc thật & 0,3869 \\
     \midrule
-    Hiệu ứng kiến trúc, sự hiện diện và khối lượng tin & $+0{,}0044$ \\
-    \textbf{Đóng góp thông tin phân cực} & $\mathbf{+0{,}0066}$ \\
-    Hiệu số trực tiếp (trộn lẫn hai thành phần) & $+0{,}0110$ \\
+    Hiệu ứng kiến trúc, sự hiện diện và khối lượng tin & $+0{,}0034$ \\
+    \textbf{Đóng góp thông tin phân cực} & $\mathbf{+0{,}0080}$ \\
+    Hiệu số trực tiếp (trộn lẫn hai thành phần) & $+0{,}0113$ \\
     \bottomrule
   \end{tabular}
-\noindent\textit{Nguồn: \path{outputs/forecast_merged_sentiment/information_gain.json}.}
+\noindent\textit{Nguồn: \path{outputs/forecast_merged_sentiment_tft/information_gain.json}.}
 \end{table}
 
-Trên trung bình năm cửa sổ, cảm xúc thật cao hơn đối chứng trung tính $0{,}0066$ F1 vĩ
-mô; bốn trong năm cửa sổ có hiệu số dương. Tuy nhiên, dấu dương của ước lượng điểm chưa đủ
-để suy ra cải thiện có thể tái lập.
+Trên trung bình năm cửa sổ, cảm xúc thật cao hơn đối chứng trung tính $0{,}0080$ F1 vĩ
+mô; bốn trong năm cửa sổ có hiệu số dương. Hiệu ứng kiến trúc và độ phủ tin đóng thêm
+$+0{,}0034$, nên hiệu số trực tiếp $+0{,}0113$ gộp cả hai thành phần --- đúng lý do phải
+tách chúng thay vì báo cáo một con số duy nhất. Tuy nhiên, dấu dương của ước lượng điểm
+chưa đủ để suy ra cải thiện có thể tái lập.
 
 Bảng~\ref{tab:kq-ablation-ci} báo cáo khoảng tin cậy theo hai cách lấy mẫu lặp. Cách thứ
 nhất lấy mẫu lặp trên năm cửa sổ; cách thứ hai lấy mẫu lặp trên 300 \textit{ngày} kiểm thử,
@@ -479,12 +491,12 @@ Khoảng theo ngày được ưu tiên vì chỉ có năm khối cửa sổ.
     \cmidrule(lr){2-3} \cmidrule(lr){4-5}
     Chỉ số & Hiệu số & Khoảng tin cậy 95\% & Hiệu số & Khoảng tin cậy 95\% \\
     \midrule
-    F1 vĩ mô & $+0{,}0066$ & $[+0{,}0011; +0{,}0128]$ & $+0{,}0014$ & $[-0{,}0087; +0{,}0116]$ \\
-    Độ chính xác cân bằng & $+0{,}0027$ & $[-0{,}0004; +0{,}0053]$ & $-0{,}0008$ & $[-0{,}0102; +0{,}0089]$ \\
-    Độ chính xác & $-0{,}0024$ & $[-0{,}0143; +0{,}0048]$ & $-0{,}0024$ & $[-0{,}0118; +0{,}0068]$ \\
+    F1 vĩ mô & $+0{,}0080$ & $[-0{,}0000; +0{,}0160]$ & $-0{,}0020$ & $[-0{,}0120; +0{,}0081]$ \\
+    Độ chính xác cân bằng & $+0{,}0017$ & $[-0{,}0031; +0{,}0070]$ & $-0{,}0071$ & $[-0{,}0165; +0{,}0025]$ \\
+    Độ chính xác & $-0{,}0104$ & $[-0{,}0307; +0{,}0050]$ & $-0{,}0104$ & $[-0{,}0200; -0{,}0007]$ \\
     \bottomrule
   \end{tabular}
-\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment/information\_gain.json}.}
+\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment\_tft/information\_gain.json}.}
 \end{table}
 
 Hai cột hiệu số là hai đại lượng khác nhau và được báo cáo kèm khoảng tin cậy tương ứng của
@@ -493,9 +505,70 @@ hiệu số theo ngày là hiệu số tính trên toàn bộ dự đoán gộp 
 gộp cho hai con số không bằng nhau vì các cửa sổ có phân bố lớp khác nhau, nên không được
 đặt khoảng tin cậy của cách này cạnh hiệu số của cách kia.
 
-Khoảng tin cậy theo ngày, là căn cứ chính, chứa 0 ở cả ba chỉ số. Theo đúng quy tắc đã đặt
-ở Chương~\ref{ch:phuong-phap}, kết luận phù hợp là \textbf{chưa có bằng chứng đủ mạnh về
+Khoảng tin cậy theo ngày, là căn cứ chính, chứa 0 ở F1 vĩ mô và độ chính xác cân bằng.
+Riêng độ chính xác có khoảng $[-0{,}0200; -0{,}0007]$ nằm hoàn toàn dưới 0, nhưng khoảng
+theo cửa sổ của cùng chỉ số đó vẫn chứa 0; hai cách lấy mẫu lặp giả định hai cấu trúc phụ
+thuộc khác nhau nên không tạo thành một kiểm định thống nhất. Theo đúng quy tắc đã đặt ở
+Chương~\ref{ch:phuong-phap}, kết luận phù hợp là \textbf{chưa có bằng chứng đủ mạnh về
 cải thiện}, không phải ``cảm xúc làm mô hình tệ hơn'' hay ``cảm xúc chắc chắn có ích''.
+
+\subsection{Đánh giá ngoài mẫu với điểm kiểm đóng băng}
+\label{sec:kq-point-in-time}
+
+Kết quả ở các mục trên dùng điểm kiểm cảm xúc tinh chỉnh trên toàn bộ 1.306 nhãn,
+trong đó có nhãn công bố sau ngày kiểm thử đầu tiên. Đó là phân tích hồi cứu, không
+phải bằng chứng ngoài mẫu. Mục này báo cáo lượt ngoài mẫu đã được đo.
+
+Ngày quan sát kiểm thử đầu tiên của thang dự báo là 21/10/2024. Lệnh
+\texttt{sentiment-refit --before-date 2024-10-21} giữ lại các nhãn công bố
+\emph{nghiêm ngặt trước} mốc đó --- 1.049 trên 1.306 nhãn --- và ghi
+\texttt{label\_cutoff} vào bản kê điểm kiểm. Khi chạy dự báo, lệnh \texttt{forecast}
+đối chiếu mã băm của bản kê đó với mã băm đã lưu lúc chấm tin, so mốc cắt với ngày
+kiểm thử đầu tiên, rồi ghi \texttt{point\_in\_time} kèm lý do vào tệp kết quả. Cả
+hai artifact của lượt ngoài mẫu đều mang \texttt{point\_in\_time: true} với lý do
+\texttt{verified}.
+
+Một điểm kiểm thứ ba tách hai nguyên nhân có thể làm đóng góp cảm xúc thay đổi giữa
+hai lượt. Lệnh \texttt{sentiment-refit --sample-like} rút đúng số nhãn mỗi lớp mà
+điểm kiểm đóng băng đã dùng (167 NEGATIVE, 616 NEUTRAL, 266 POSITIVE), nhưng lấy từ
+mọi mốc thời gian. Đọc ba lượt cạnh nhau --- đầy đủ 1.306, đóng băng 1.049, đối
+chứng 1.049 --- phân biệt được ảnh hưởng của việc loại bỏ nhãn tương lai với ảnh
+hưởng của việc huấn luyện trên ít dữ liệu hơn. Bản kê của lượt đối chứng ghi rõ
+chiến lược lấy mẫu, hạt giống và mã băm danh sách dòng đã chọn, đồng thời đánh dấu
+\texttt{point\_in\_time: false} để không bị đọc nhầm thành một lượt sạch rò rỉ thứ
+hai. Lượt đối chứng hiện có một hạt giống (7) nên mang tính thăm dò: tập con nào
+được rút cũng là một yếu tố ngẫu nhiên, và một lần rút không tách được ảnh hưởng
+của kích thước tập khỏi ảnh hưởng của một lần rút không may.
+
+\begin{table}[H]
+  \centering
+  \caption{Đóng góp thông tin phân cực (F1 vĩ mô) của LSTM hai nhánh theo ba điểm kiểm cảm xúc, cùng cửa sổ kiểm thử.}
+  \label{tab:kq-pit}
+  \begin{tabular}{l c c c}
+    \toprule
+    Điểm kiểm & Hiệu số & KTC 95\% theo cửa sổ & KTC 95\% theo ngày \\
+    \midrule
+    Đầy đủ 1.306 nhãn (hồi cứu) & $+0{,}0080$ & $[-0{,}0000; +0{,}0160]$ & $[-0{,}0120; +0{,}0081]$ \\
+    Đóng băng 1.049 (ngoài mẫu) & $+0{,}0094$ & $[-0{,}0022; +0{,}0243]$ & $[-0{,}0118; +0{,}0093]$ \\
+    Đối chứng 1.049 (hạt giống 7) & $+0{,}0028$ & $[-0{,}0070; +0{,}0127]$ & $[-0{,}0133; +0{,}0062]$ \\
+    \bottomrule
+  \end{tabular}
+\noindent\textit{Nguồn: \texttt{information\_gain.json} trong \path{outputs/forecast_merged_sentiment_tft}, \path{outputs/forecast_pit_sentiment} và \path{outputs/forecast_sizematched_s7_sentiment}.}
+\end{table}
+
+Ba ước lượng điểm theo cửa sổ đều dương và nằm trong khoảng $+0{,}003$ đến $+0{,}009$
+F1 vĩ mô. Trong lần rút hạt giống 7, điểm kiểm đóng băng theo thời gian cho ước
+lượng cao hơn điểm kiểm đối chứng cùng kích thước ($+0{,}0094$ so với $+0{,}0028$);
+đây là kết quả thăm dò từ một lần rút mẫu duy nhất, chưa tách chắc được ảnh hưởng
+của thời điểm huấn luyện khỏi thành phần mẫu được rút. Căn cứ chính vẫn là khoảng
+tin cậy theo ngày: mọi khoảng đều chứa 0 và các ước lượng điểm theo ngày đều âm
+($-0{,}0020$, $-0{,}0010$, $-0{,}0036$). Kết luận giữ nguyên: \textbf{chưa có bằng
+chứng đủ mạnh về cải thiện}.
+
+Với TFT, đóng góp thông tin là $-0{,}0057$ (hồi cứu), $-0{,}0105$ (đóng băng) và
+$-0{,}0020$ (đối chứng): không có lợi ích quan sát được ở bất kỳ bộ sinh nào, phù
+hợp với việc TFT chỉ giá đã thấp hơn LSTM chỉ giá trên quy mô dữ liệu này.
+
 
 \subsection{Giới hạn của kiểm tra theo điều kiện thị trường}
 \label{sec:kq-strat}
@@ -508,22 +581,21 @@ hạng mục chưa thực hiện.
 
 \subsection{Hạng mục chưa thực hiện}
 
-Hai hạng mục trong đề cương không được thực hiện trong phạm vi thời gian của đồ án và
+Một hạng mục trong đề cương không được thực hiện trong phạm vi thời gian của đồ án và
 không được điền bằng kết quả dự kiến:
 
 \begin{itemize}[nosep]
-  \item \textbf{TFT}: chưa cấu hình cho phân loại ba lớp và chưa chạy trên năm đoạn kiểm
-        thử cuốn chiếu. Chương~\ref{ch:phuong-phap} đã xác định TFT là phần mở rộng có điều
-        kiện, chỉ làm sau khi mức sàn đạt cổng chất lượng.
   \item \textbf{Biến thể PhoBERT kết hợp CNN hoặc BiLSTM}: chưa chạy, nên bảng cảm xúc chỉ
         có cấu hình tầng phân loại tuyến tính.
 \end{itemize}
 
-Cả hai được chuyển sang Chương~\ref{ch:huong-phat-trien}. Lý do là thứ tự ưu tiên: mức sàn
-gồm đối chứng cơ sở, mô hình chỉ giá, mô hình hai nhánh và phép tách đóng góp cảm xúc trả
-lời trực tiếp câu hỏi trung tâm của đề tài. Tuy nhiên, trước khi thay LSTM bằng kiến trúc
-phức tạp hơn, cần hoàn tất lượt đánh giá không rò rỉ thời điểm của bộ sinh cảm xúc; mô hình
-mới không khắc phục được giới hạn của đầu vào hiện tại.
+TFT đã được cấu hình cho phân loại ba lớp và chạy trên năm đoạn kiểm thử cuốn chiếu
+(Bảng~\ref{tab:ket-qua}); kết quả thấp hơn LSTM hai nhánh nên không thay đổi kết luận
+của đồ án. Hạng mục còn lại được chuyển sang Chương~\ref{ch:huong-phat-trien}. Lý do là
+thứ tự ưu tiên: mức sàn gồm đối chứng cơ sở, mô hình chỉ giá, mô hình hai nhánh và phép
+tách đóng góp cảm xúc trả lời trực tiếp câu hỏi trung tâm của đề tài. Tuy nhiên, trước
+khi thay LSTM bằng kiến trúc phức tạp hơn, cần hoàn tất lượt đánh giá không rò rỉ thời
+điểm của bộ sinh cảm xúc; mô hình mới không khắc phục được giới hạn của đầu vào hiện tại.
 
 \section{Bàn luận}
 \label{sec:kq-ban-luan}
@@ -539,15 +611,19 @@ bằng chứng chất lượng phân loại tốt hơn của cấu hình có tr�
 phải bằng chứng rằng tín hiệu cảm xúc đã cải thiện dự báo giá.
 
 \textbf{Câu hỏi thứ hai} --- xác suất cảm xúc có cải thiện dự báo hay không, và mức bao
-nhiêu. Khi so với đối chứng trung tính ghép cặp, ước lượng theo cửa sổ của đóng góp thông
-tin phân cực là $+0{,}0066$ F1 vĩ mô. Tuy nhiên, ước lượng theo ngày là $+0{,}0014$ với
-khoảng tin cậy $[-0{,}0087; +0{,}0116]$ chứa 0. Kết luận: \textbf{chưa có bằng chứng đủ
-mạnh rằng đặc trưng cảm xúc cải thiện dự báo xu hướng phiên kế tiếp} trong giao thức hồi
-cứu này. Dữ liệu hiện tại không loại trừ cả cải thiện nhỏ lẫn suy giảm nhỏ.
+nhiêu. Ở lượt hồi cứu, so với đối chứng trung tính ghép cặp, ước lượng theo cửa sổ của
+đóng góp thông tin phân cực là $+0{,}0080$ F1 vĩ mô, nhưng ước lượng theo ngày --- căn cứ
+chính --- là $-0{,}0020$ với khoảng tin cậy $[-0{,}0120; +0{,}0081]$ chứa 0. Lượt ngoài
+mẫu với điểm kiểm đóng băng (Mục~\ref{sec:kq-point-in-time}) đã được đo: đóng góp
+thông tin là $+0{,}0094$ theo cửa sổ và $-0{,}0010$ theo ngày, khoảng tin cậy theo
+ngày $[-0{,}0118; +0{,}0093]$ vẫn chứa 0. Kết luận:
+\textbf{chưa có bằng chứng rằng đặc trưng cảm xúc cải thiện dự báo xu hướng phiên kế
+tiếp}. Dữ liệu hiện tại không loại trừ cả cải thiện nhỏ lẫn suy giảm nhỏ.
 
-Hiệu số trực tiếp $+0{,}0110$ trộn lẫn kiến trúc, sự hiện diện/khối lượng tin và xác suất
-cảm xúc. Đối chứng trung tính ghép cặp giữ nguyên sự hiện diện và khối lượng tin, nên chỉ
-hiệu số $+0{,}0066$ giữa hai nhánh là phép đo của xác suất cảm xúc.
+Hiệu số trực tiếp $+0{,}0113$ trộn lẫn kiến trúc, sự hiện diện/khối lượng tin và xác suất
+cảm xúc; riêng thành phần kiến trúc và độ phủ tin là $+0{,}0034$. Đối chứng trung tính
+ghép cặp giữ nguyên sự hiện diện và khối lượng tin, nên chỉ hiệu số $+0{,}0080$ giữa hai
+nhánh là phép đo của xác suất cảm xúc.
 
 \textbf{Câu hỏi thứ ba} --- điều kiện nào cảm xúc phát huy tác dụng. Chưa có ước lượng ghép
 cặp phân tầng riêng theo điều kiện thị trường, ngày sự kiện hoặc mật độ tin. Vì vậy, đề tài
@@ -573,19 +649,22 @@ Các điểm kiểm tra sau được thực hiện và ghi nhận kết quả th
         này.
   \item \textbf{Số tham số}: mô hình một nhánh có 5.091 tham số, mô hình hai nhánh có
         11.203 tham số, tức gấp 2,20 lần (thêm 6.112 tham số). Đối chứng phân phối tiên
-        nghiệm trung tính tách đóng góp thông tin phân cực; chênh lệch $+0{,}0044$ F1 vĩ
-        mô còn bao gồm cả kiến trúc và đặc trưng sự hiện diện, khối lượng tin.
+        nghiệm trung tính tách đóng góp thông tin phân cực; chênh lệch $+0{,}0034$ F1 vĩ
+        mô là phần do kiến trúc và đặc trưng sự hiện diện, khối lượng tin đóng góp.
   \item \textbf{Tính tái lập}: hai lần chạy độc lập cho kết quả trùng khớp đến từng chữ số ở
         các mô hình chỉ giá. Trong quá trình thực nghiệm đã phát hiện và sửa một lỗi tái lập:
         trọng số mạng được khởi tạo trước khi gieo hạt giống, khiến kết quả của một cửa sổ phụ
         thuộc vào thứ tự chạy của các mô hình trước đó.
-  \item \textbf{Dữ liệu bị loại và mã ít tin}: 11 liên kết không neo được vào phiên nào và
-        bị loại, 0 bản ghi có mốc thời gian không hợp lệ. Độ phủ tin lệch mạnh giữa các mã,
+  \item \textbf{Dữ liệu bị loại và mã ít tin}: 11 liên kết đăng cuối ngày 31/12/2025 rơi
+        sang phiên năm 2026 nên bị loại; không có bản ghi nào thiếu mốc thời gian hợp lệ.
+        Độ phủ tin lệch mạnh giữa các mã,
         từ 548 liên kết (GAS) đến 2.165 liên kết (MBB); kết quả theo từng mã chưa được phân
         tách nên chưa thể kết luận về ảnh hưởng của mật độ tin.
-  \item \textbf{Giới hạn thời điểm của bộ sinh}: điểm kiểm đã học từ toàn bộ 1.306 nhãn,
-        gồm cả nhãn sau các ngày kiểm thử năm 2024--2025. Vì vậy phần chia của nhánh giá
-        không loại bỏ rò rỉ thời điểm qua bộ sinh cảm xúc; kết quả là hồi cứu.
+  \item \textbf{Giới hạn thời điểm của bộ sinh}: thang dự báo chính dùng điểm kiểm đã học
+        từ toàn bộ 1.306 nhãn, gồm cả nhãn sau các ngày kiểm thử năm 2024--2025, nên là
+        kết quả hồi cứu. Lượt ngoài mẫu với điểm kiểm đóng băng trước ngày kiểm thử đầu
+        tiên đã được đo và xác minh (\texttt{point\_in\_time: true}); kết quả ở
+        Mục~\ref{sec:kq-point-in-time}.
   \item \textbf{Phạm vi phân tầng}: đối chứng ghép cặp kiểm soát sự hiện diện và khối lượng
         tin trên toàn bộ mẫu. Phân tầng ghép cặp theo mã, độ biến động và ngày sự kiện
         \textbf{chưa} được thực hiện, nên câu hỏi thứ ba của đề cương chưa được trả lời.
@@ -595,9 +674,9 @@ Các điểm kiểm tra sau được thực hiện và ghi nhận kết quả th
 \end{itemize}
 
 Ánh xạ thời điểm tin và các phép biến đổi của nhánh giá không có lỗi đã phát hiện, tập giữ
-lại của nhánh giá không bị sửa, và toàn bộ cấu hình được lưu trong tệp kết quả. Tuy nhiên,
-do giới hạn thời điểm của bộ sinh cảm xúc, các con số dự báo không được diễn giải là kết quả
-ngoài mẫu hoàn toàn.
+lại của nhánh giá không bị sửa, và toàn bộ cấu hình được lưu trong tệp kết quả. Các con số
+của thang chính vẫn là hồi cứu; đánh giá ngoài mẫu được báo cáo riêng ở
+Mục~\ref{sec:kq-point-in-time}.
 
 \subsection{Giới hạn của thực nghiệm}
 \label{sec:kq-limitations}
@@ -608,13 +687,13 @@ Vietstock, trong khi đề cương dự kiến bốn nguồn; độ phủ tin v�
 (MBB trên 2.000 liên kết, GAS 548). Thứ ba, dự báo phiên kế tiếp có thể quá ngắn để phản
 ánh tác động dài hạn của tin.
 
-Thứ tư, và là giới hạn quyết định: \textbf{điểm kiểm cảm xúc được tinh chỉnh trên toàn bộ
-1.306 nhãn, gồm cả bài sau các ngày kiểm thử dự báo}. Do đó các xác suất đầu vào của bảng
-giá có thể chịu ảnh hưởng gián tiếp từ văn bản và nhãn tương lai. Phép đối chứng ghép cặp
-vẫn đo nhất quán chênh lệch giữa xác suất thật và prior trung tính trên cùng dữ liệu hồi
-cứu, nhưng không chứng minh hiệu quả dự báo ngoài mẫu. Muốn có kết luận đó, cần tinh chỉnh
-lại trong từng cửa sổ chỉ bằng nhãn quá khứ, hoặc dùng một điểm kiểm đóng băng được huấn
-luyện hoàn toàn trước ngày kiểm thử đầu tiên.
+Thứ tư, điểm kiểm cảm xúc của thang chính được tinh chỉnh trên toàn bộ 1.306 nhãn,
+gồm cả bài sau các ngày kiểm thử dự báo, nên các con số của thang chính là hồi cứu.
+Giới hạn này đã được khắc phục bằng điểm kiểm đóng băng trước ngày kiểm thử đầu tiên
+và một điểm kiểm đối chứng khớp kích thước (Mục~\ref{sec:kq-point-in-time}); cả hai
+đã được đo và xác minh. Giới hạn còn lại là lượt đối chứng mới có một hạt giống, nên
+vai trò của nó là thăm dò chứ chưa phải ước lượng ổn định của ảnh hưởng kích thước
+tập.
 
 Thứ năm, ngưỡng phân vị một phần ba tạo lớp FLAT theo nghĩa thống kê, không theo nghĩa kinh
 tế: ngưỡng khoảng $\pm0{,}5\%$ (Bảng~\ref{tab:kq-windows}) là một lựa chọn thiết kế, không
@@ -705,8 +784,9 @@ Bảng~\ref{tab:kq-artifact} liệt kê lệnh và tệp kết quả tương ứ
     Bảng & Lệnh và tệp kết quả \\
     \midrule
     \ref{tab:kq-sentiment}, \ref{tab:kq-sentiment-class} & \texttt{stf.cli sentiment-cv}; \path{outputs/sentiment-cv-merged/cv_results.json} và tệp nén lần chạy có trọng số \\
-    \ref{tab:kq-windows}, \ref{tab:kq-price-stats}, \ref{tab:ket-qua} & \texttt{stf.cli forecast --news-sentiment ...}; \path{outputs/forecast_merged_sentiment/forecast_metrics.csv} \\
-    \ref{tab:kq-ablation}, \ref{tab:kq-ablation-ci} & \texttt{stf.cli forecast --neutral-news-sentiment ...}, \texttt{stf.cli forecast-compare}; \path{outputs/forecast_merged_sentiment/information_gain.json} \\
+    \ref{tab:kq-windows}, \ref{tab:kq-price-stats}, \ref{tab:ket-qua} & \texttt{stf.cli forecast --news-sentiment ...}; \path{outputs/forecast_merged_sentiment_tft/forecast_metrics.csv} \\
+    \ref{tab:kq-ablation}, \ref{tab:kq-ablation-ci} & \texttt{stf.cli forecast --neutral-news-sentiment ...}, \texttt{stf.cli forecast-compare}; \path{outputs/forecast_merged_sentiment_tft/information_gain.json} \\
+    \ref{tab:kq-pit} & \texttt{stf.cli forecast} + \texttt{forecast-compare} trên \texttt{news\_sentiment\_pit.parquet} và \texttt{news\_sentiment\_sizematched\_s7.parquet}; \path{outputs/forecast_pit_sentiment/information_gain.json}, \path{outputs/forecast_sizematched_s7_sentiment/information_gain.json} \\
     \ref{tab:kq-strata} & \texttt{stf.cli label-candidates}; \texttt{to\_label\_batch2\_manifest.json} \\
     \bottomrule
   \end{tabular}

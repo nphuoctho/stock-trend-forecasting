@@ -46,12 +46,15 @@ LADDER: tuple[tuple[str, str, bool], ...] = (
     ("logreg_price_sentiment", "classical", True),
     ("lstm_price", "lstm", False),
     ("lstm_price_sentiment", "lstm", True),
+    ("tft_price", "tft", False),
+    ("tft_price_sentiment", "tft", True),
 )
 
 # Arms compared head-to-head to quantify the sentiment contribution.
 ABLATION_PAIRS: tuple[tuple[str, str], ...] = (
     ("logreg_price_sentiment", "logreg_price"),
     ("lstm_price_sentiment", "lstm_price"),
+    ("tft_price_sentiment", "tft_price"),
 )
 
 DELTA_METRICS: tuple[str, ...] = ("macro_f1", "balanced_accuracy", "accuracy")
@@ -75,6 +78,14 @@ class ForecastConfig:
     seeds: tuple[int, ...] = (42, 43, 44)
     bootstrap_samples: int = 2000
     bootstrap_seed: int = 7
+
+    def __post_init__(self) -> None:
+        # The TFT arm hard-codes num_heads=4; fail at config time instead of
+        # after the cheaper arms have already trained across every window.
+        if self.hidden % 4 != 0:
+            raise ValueError(
+                f"hidden={self.hidden} must be divisible by 4 (TFT num_heads)."
+            )
 
     def as_dict(self) -> dict:
         data = self.__dict__.copy()
@@ -101,6 +112,25 @@ def _date_bounds(frame: pd.DataFrame, col: str = "target_date") -> tuple[str, st
     if dates.empty:
         return ("", "")
     return (str(dates.min().date()), str(dates.max().date()))
+
+def first_test_observation_date(panel: pd.DataFrame, cfg: ForecastConfig) -> str:
+    """Return the earliest observation date in the first walk-forward test block.
+
+    This is the single source for the point-in-time verdict: the CLI must not
+    re-derive the split with its own kwargs, or a future change to
+    ``run_experiment``'s call would silently desynchronize the verdict from the
+    split that was actually scored.
+    """
+    first_window = walk_forward_windows(
+        panel,
+        n_windows=cfg.n_windows,
+        test_size=cfg.test_size,
+        val_size=cfg.val_size,
+        expanding=cfg.expanding,
+    )[0]
+    return str(
+        pd.to_datetime(panel.iloc[first_window.test]["observation_date"]).min().date()
+    )
 
 
 def _label_counts(frame: pd.DataFrame) -> dict[str, int]:
@@ -277,6 +307,7 @@ def _fit_arm(
         PriceLSTM,
         PriceSentimentLSTM,
         RandomBaseline,
+        TemporalFusionClassifier,
         fit_lstm,
         predict_lstm,
         set_seed,
@@ -294,6 +325,28 @@ def _fit_arm(
         model = ClassicalBaseline(seed=seed).fit(train[key], train["y"])
         proba = model.predict_proba(test[key])
         return proba.argmax(axis=1), proba, {}
+    if family == "tft":
+        set_seed(seed)
+        key = "X_both" if use_sentiment else "X_price"
+        net = TemporalFusionClassifier(
+            train[key].shape[-1],
+            hidden=cfg.hidden,
+            num_classes=len(TREND_LABELS),
+        )
+        info = fit_lstm(
+            net,
+            train[key],
+            train["y"],
+            X_val=val[key],
+            y_val=val["y"],
+            epochs=cfg.epochs,
+            batch_size=cfg.batch_size,
+            lr=cfg.lr,
+            patience=cfg.patience,
+            seed=seed,
+        )
+        proba = predict_lstm(net, test[key])
+        return proba.argmax(axis=1), proba, info
     if family != "lstm":
         raise ValueError(f"Unknown model family {family!r}.")
 

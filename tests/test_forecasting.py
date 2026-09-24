@@ -34,6 +34,7 @@ from stf.forecasting.models import (
     PriceLSTM,
     PriceSentimentLSTM,
     RandomBaseline,
+    TemporalFusionClassifier,
     evaluate_predictions,
     fit_lstm,
     make_sequences,
@@ -869,3 +870,87 @@ def test_information_gain_decomposition_is_exact_and_guards_config_drift(tmp_pat
     )
     with pytest.raises(ValueError, match="required pairing columns"):
         compare_information_gain(real_dir, control_dir)
+
+
+def test_tft_preserves_feature_identity():
+    """Each variable gets its own embedding, so the encoder sees more than one signal.
+
+    A single shared ``nn.Linear(1, hidden)`` across all features makes the
+    variable-selection sum telescope to ``w * sum_j(alpha_j * x_j) + b``, because the
+    softmax weights sum to one. The encoder input then spans two dimensions -- one
+    signal plus bias -- no matter how large ``hidden`` is or how many features are
+    supplied, which silently destroys the price-vs-price+sentiment ablation. A
+    forward-shape assertion cannot see this; the rank can.
+    """
+    import torch
+
+    set_seed(0)
+    for n_features in (6, 11):
+        model = TemporalFusionClassifier(n_features, hidden=32)
+        window = torch.randn(64, 5, n_features)
+
+        embedded = window.unsqueeze(-1) * model.feature_weight + model.feature_bias
+        weights = torch.softmax(model.variable_selection(window), dim=-1)
+        encoder_input = (embedded * weights.unsqueeze(-1)).sum(dim=2)
+
+        rank = int(torch.linalg.matrix_rank(encoder_input.reshape(-1, 32)))
+        assert rank == n_features, f"expected rank {n_features} for the encoder input, got {rank}"
+
+        # Zeroing one variable must change the prediction; under a shared embedding a
+        # feature only shifts a weighted average and can be masked by the others.
+        masked = window.clone()
+        masked[:, :, 0] = 0.0
+        model.eval()
+        with torch.no_grad():
+            assert not torch.allclose(model(window), model(masked))
+
+
+def test_tft_arm_survives_the_refit_load_round_trip(tmp_path):
+    """A reloaded TFT arm reproduces the probabilities it produced before saving.
+
+    refit_arm derives the input width from the concatenated feature matrix while
+    load_arm recomputes it from the manifest's feature lists. If those two ever
+    disagree the checkpoint loads into a mis-shaped net, which surfaces as silently
+    different live predictions rather than as an error.
+    """
+    from stf.forecasting.experiment import ForecastConfig
+    from stf.forecasting.serve import load_arm, predict_latest, refit_arm
+
+    prices = pd.concat([_prices("FPT", n=90), _prices("VNM", n=90)], ignore_index=True)
+    news = pd.DataFrame(
+        {
+            "ticker": ["FPT", "VNM"] * 20,
+            "published_at": [
+                f"2021-0{1 + i // 20}-{1 + i % 20:02d}T09:00:00+07:00" for i in range(40)
+            ],
+            "prob_negative": np.linspace(0.05, 0.5, 40),
+            "prob_neutral": np.linspace(0.5, 0.3, 40),
+            "prob_positive": np.linspace(0.45, 0.2, 40),
+        }
+    )
+    panel = assemble(prices, news)
+    cfg = ForecastConfig(epochs=1, patience=1, seeds=(42,), hidden=8)
+
+    refit_arm(panel, "tft_price_sentiment", cfg=cfg, output_dir=tmp_path / "arm")
+    arm = load_arm(tmp_path / "arm")
+    first = predict_latest(panel, arm)
+    second = predict_latest(panel, load_arm(tmp_path / "arm"))
+
+    probabilities = ["prob_down", "prob_flat", "prob_up"]
+    assert arm.family == "tft"
+    pd.testing.assert_frame_equal(first[probabilities], second[probabilities])
+    assert np.allclose(first[probabilities].sum(axis=1), 1.0)
+
+    # The served probabilities must come from the persisted weights, not from a
+    # freshly initialised net: corrupting the checkpoint has to change them.
+    import torch
+
+    state_files = sorted((tmp_path / "arm").glob("*.pt"))
+    assert state_files, "refit_arm persisted no weights"
+    for state_file in state_files:
+        state = torch.load(state_file, map_location="cpu", weights_only=True)
+        torch.save({k: torch.zeros_like(v) for k, v in state.items()}, state_file)
+    corrupted = predict_latest(panel, load_arm(tmp_path / "arm"))
+    assert not np.allclose(
+        first[probabilities].to_numpy(), corrupted[probabilities].to_numpy()
+    )

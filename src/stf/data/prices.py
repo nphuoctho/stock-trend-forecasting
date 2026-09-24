@@ -104,6 +104,16 @@ def collect(
             print(f"[prices] {sym}: FAIL")
             continue
         out = config.PRICES_DIR / f"{sym}.parquet"
+        if out.exists():
+            # Merge instead of overwrite: a plain `prices` run after a live
+            # `--end` run would otherwise delete every session past DATE_END.
+            existing = pd.read_parquet(out)
+            df = (
+                pd.concat([existing, df], ignore_index=True)
+                .drop_duplicates("time", keep="last")
+                .sort_values("time")
+                .reset_index(drop=True)
+            )
         df.to_parquet(out, index=False)
         result[sym] = len(df)
         lo, hi = str(df["time"].min())[:10], str(df["time"].max())[:10]

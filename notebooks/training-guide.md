@@ -166,6 +166,33 @@ huấn luyện trên toàn bộ nhãn đã duyệt với số epoch cố định
 thử mới từ lượt refit; manifest chỉ tham chiếu kết quả CV đã khóa. Sau khi tải checkpoint
 về, chạy `score-news`, hai lệnh `forecast` và `forecast-compare` theo `README.md`.
 
+## Checkpoint point-in-time (đánh giá ngoài mẫu hợp lệ)
+
+Checkpoint `merged-refit` học trên toàn bộ 1.306 nhãn, trong đó có nhãn sau các
+ngày kiểm thử của thang dự báo — kết quả forecast với nó chỉ là phân tích hồi
+cứu. Để có đánh giá ngoài mẫu, tinh chỉnh một checkpoint đóng băng chỉ từ nhãn
+trước ngày quan sát kiểm thử đầu tiên (2024-10-21 với cấu hình 5 cửa sổ × 60
+ngày kiểm thử trên panel kết thúc 2025-12-31):
+
+```bash
+uv run python -m stf.cli sentiment-refit \
+  --data data/labeled/indomain/labeled_merged.csv \
+  --cv-results outputs/sentiment-cv-merged/cv_results.json \
+  --input-variant title_context \
+  --truncation-strategy head_tail \
+  --class-weighting inverse_frequency \
+  --epochs 5 --batch-size 16 --seed 42 \
+  --before-date 2024-10-21 \
+  --output models/sentiment/point-in-time
+```
+
+`--before-date` lọc `published_at` nghiêm ngặt trước mốc cắt (1.049/1.306 nhãn),
+từ chối tệp thiếu ngày, và ghi `label_cutoff` vào manifest. `forecast` đọc lại
+manifest điểm kiểm qua sidecar `score-news` và ghi `point_in_time: true/false`
+vào `forecast_results.json` — chỉ artifact có `true` mới là bằng chứng ngoài mẫu.
+Sau khi tải checkpoint về, chạy lại `score-news` rồi hai lệnh `forecast` +
+`forecast-compare` vào thư mục output mới (không ghi đè artifact hồi cứu).
+
 ## Cải thiện tùy chọn
 - Nếu mở rộng nhãn, giữ một tầng lấy mẫu ngẫu nhiên độc lập cho đánh giá và đưa
   các tầng làm giàu chỉ vào huấn luyện; sau rà soát, hợp nhất vào

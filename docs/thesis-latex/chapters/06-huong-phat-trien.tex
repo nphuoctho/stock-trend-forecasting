@@ -18,24 +18,22 @@ nghiệm đã đo.
 \section{Hạng mục của đề cương được chuyển sang hướng phát triển}
 \label{sec:hpt-chuyen}
 
-Ba hạng mục nêu trong đề cương không được thực hiện trong phạm vi thời gian của đồ án. Việc
+Hai hạng mục nêu trong đề cương không được thực hiện trong phạm vi thời gian của đồ án. Việc
 chuyển chúng sang chương này là một quyết định về thứ tự ưu tiên, được ghi lại tường minh
 thay vì để trống:
 
 \begin{enumerate}[nosep]
-  \item \textbf{Temporal Fusion Transformer.} Chương~\ref{ch:phuong-phap} đã đặt TFT ở vị
-        trí mở rộng có điều kiện, chỉ thực hiện sau khi mức sàn đạt cổng chất lượng. Kết quả
-        hồi cứu ở Chương~\ref{ch:ket-qua} chưa cung cấp bằng chứng ngoài mẫu về đóng góp của
-        cảm xúc, nên ưu tiên đúng là hoàn tất đánh giá không rò rỉ thời điểm trước khi tăng
-        độ phức tạp của bộ dự báo. Khi thực hiện, TFT cần được cấu hình cho phân loại ba lớp
-        và chạy trên đúng các đoạn kiểm thử cuốn chiếu; phần quan trọng của biến và cơ chế
-        chú ý chỉ được diễn giải như mô tả phụ thuộc mô hình, không phải bằng chứng nhân quả.
+  \item \textbf{Temporal Fusion Transformer.} TFT đã được cài đặt tối giản và chạy trên
+        năm đoạn kiểm thử cuốn chiếu (Chương~\ref{ch:ket-qua}); kết quả thấp hơn LSTM hai
+        nhánh nên không thay đổi kết luận. Hướng mở còn lại là TFT đầy đủ với biến tĩnh,
+        đầu ra phân vị và diễn giải tầm quan trọng biến — chỉ nên thử sau khi đánh giá
+        không rò rỉ thời điểm của bộ sinh cảm xúc hoàn tất.
   \item \textbf{Biến thể PhoBERT kết hợp CNN hoặc BiLSTM.} Xác thực chéo trên 1.306 mẫu
-        đã cho mức đo lớp NEGATIVE tốt hơn. Điểm kiểm triển khai đã được truyền sang nhánh
-        dự báo hồi cứu, nhưng đánh giá ngoài mẫu còn thiếu vì điểm kiểm này chứa nhãn sau
-        các ngày kiểm thử. Trước khi so sánh biến thể kiến trúc, cần tinh chỉnh lại trong
-        từng cửa sổ chỉ bằng nhãn quá khứ, hoặc đóng băng một điểm kiểm trước ngày kiểm thử
-        đầu tiên, rồi chấm lại kho tin và chạy đối chứng.
+        đã cho mức đo lớp NEGATIVE tốt hơn. Đánh giá ngoài mẫu của nhánh dự báo đã có
+        nhờ điểm kiểm đóng băng trước ngày kiểm thử đầu tiên
+        (Mục~\ref{sec:kq-point-in-time}); khi so sánh biến thể kiến trúc, mỗi biến thể
+        cũng cần một điểm kiểm đóng băng tương đương rồi chấm lại kho tin và chạy đối
+        chứng.
   \item \textbf{Hệ thống demo trực quan hóa.} Toàn bộ quy trình hiện được điều khiển qua
         giao diện dòng lệnh và ghi artifact ra tệp, đủ cho mục đích nghiên cứu và tái lập.
         Một giao diện trực quan hóa sẽ hữu ích cho việc thăm dò dữ liệu, nhưng không bổ sung
@@ -43,10 +41,10 @@ thay vì để trống:
         của kết quả.
 \end{enumerate}
 
-Ưu tiên cao nhất trong số các hướng của chương này là đánh giá không rò rỉ thời điểm: tinh
-chỉnh lại bộ sinh cảm xúc trong từng cửa sổ chỉ bằng nhãn quá khứ, hoặc dùng một điểm kiểm
-đóng băng trước ngày kiểm thử đầu tiên, sau đó chấm lại kho tin và chạy lại dự báo cùng đối
-chứng. Chỉ chuỗi thực nghiệm này mới cung cấp bằng chứng ngoài mẫu về tín hiệu cảm xúc.
+Ưu tiên cao nhất trong số các hướng của chương này là mở rộng lượt đối chứng kích
+thước tập sang nhiều hạt giống --- hiện chỉ có một hạt giống nên vai trò của nó là
+thăm dò --- và tinh chỉnh lại bộ sinh cảm xúc trong từng cửa sổ chỉ bằng nhãn quá
+khứ, thay vì một điểm kiểm đóng băng duy nhất.
 
 \section{Củng cố dữ liệu và giao thức point-in-time}
 
