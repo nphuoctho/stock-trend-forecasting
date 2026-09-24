@@ -46,8 +46,9 @@ def add_rolling_sentiment(
 
     Each value covers the ``window`` sessions ending at the row's own observation
     date, so it only uses information available at that session's cutoff. A
-    single-row classical model sees a flat sentiment signal on the ~62% of
-    ticker-days without news; these trailing columns carry recent news forward so
+    single-row classical model sees a flat sentiment signal on the ~54% of
+    ticker-days without news (news_coverage.fraction = 0.4636); these trailing
+    columns carry recent news forward so
     the price-versus-price-plus-sentiment comparison is not null by construction.
     """
     if window < 1:

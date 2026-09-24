@@ -304,10 +304,10 @@ def live_today() -> dict:
     """User-facing view: next-session call per ticker with related news.
 
     Joins the primary arm's latest issued predictions with the last close, the
-    issued class boundaries (training-return terciles -- NOT a predicted price
-    interval; magnitude forecasting is not implemented), and the articles that
-    fed the sentiment features. The articles are context the model read, not
-    proven causes: no attribution method is applied.
+    issued class boundaries (terciles of all labeled historical returns -- NOT a
+    predicted price interval; magnitude forecasting is not implemented), and the
+    articles that fed the sentiment features. The articles are context the model
+    read, not proven causes: no attribution method is applied.
     """
     live = _live_dir() / PRIMARY_LIVE_ARM
     latest_path = live / "latest.parquet"
@@ -398,6 +398,10 @@ def live_today() -> dict:
                 "low": round(close * (1 + thresholds[0]), 2),
                 "high": round(close * (1 + thresholds[1]), 2),
             }
+        # A ticker whose observation predates the panel's latest session is a
+        # stale prediction (e.g. its price fetch failed), not a call for the
+        # next session.
+        row_obs = pd.to_datetime(row["observation_date"])
         tickers.append(
             {
                 "ticker": ticker,
@@ -411,6 +415,7 @@ def live_today() -> dict:
                 "has_news": bool(row["has_news"]),
                 "last_close": close,
                 "flat_band": band,
+                "stale": bool(row_obs < obs),
                 "news": news_by_ticker.get(ticker, []),
             }
         )

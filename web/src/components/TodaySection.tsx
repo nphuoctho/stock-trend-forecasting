@@ -38,6 +38,11 @@ function TickerCard({ t }: { t: LiveTodayTicker }) {
           <span className="text-base font-bold">{t.ticker}</span>
           <HugeiconsIcon icon={dir.icon} className={cn('size-5', dir.className)} />
           <span className={cn('text-sm font-semibold', dir.className)}>{dir.label}</span>
+          {t.stale && (
+            <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+              phiên cũ
+            </span>
+          )}
         </div>
         <span className="text-xs tabular-nums text-muted-foreground">
           tin cậy {fmtPct(t.confidence)}

@@ -47,6 +47,11 @@ Kho tin hiện có thời điểm đăng và nội dung cho các bản ghi đư�
 mã cổ phiếu dựa trên bảng listings tạo ra các liên kết theo mã, vì vậy số liên kết có
 thể lớn hơn số URL tin duy nhất. Phần thống kê sau loại trùng theo nội dung, phân bố
 nhãn và số mẫu cuối cùng của từng phần chia chỉ được khóa sau khi quy trình xử lý hoàn tất.
+Rà soát nhãn ghi nhận một số ít liên kết nhiễu do trang listings gom cả tin của
+mã liên quan (ví dụ bài về MIG xuất hiện trong trang MBB, bài về FOX trong trang
+FPT); ba trường hợp được đánh dấu trong \texttt{annotation\_notes.csv} và giữ
+nguyên trong tập nhãn vì nhãn NEUTRAL phản ánh đúng nội dung bài, không phải lỗi
+gán nhãn.
 Các chỉ số của PhoBERT và mô hình dự báo được trình bày ở các mục sau khi có bản kê
 huấn luyện tương ứng.
 
@@ -81,7 +86,7 @@ lập thực tế của hai nhánh, đọc trực tiếp từ
     Cân bằng lớp & \texttt{inverse\_frequency} theo từng lượt & không (lớp đã cân bằng theo thiết kế) \\
     Hạt giống & gốc 42, mỗi lượt $42+k$ & 42, 43, 44 (bình quân 3 hạt giống) \\
     Chia dữ liệu & phân tầng 5 lượt & 5 cửa sổ cuốn chiếu mở rộng \\
-    Hash dữ liệu & nhãn \texttt{18d896d8}\ldots & giá \texttt{2f4cd0b8}\ldots, bảng \texttt{4671ce39}\ldots, cảm xúc \texttt{afba3975}\ldots \\
+    Hash dữ liệu & nhãn \texttt{18d896d8}\ldots & giá \texttt{19fc9e0c}\ldots, bảng \texttt{3855c4cb}\ldots, cảm xúc \texttt{f5109dc1}\ldots \\
     \bottomrule
   \end{tabular}
 \noindent\textit{Nguồn: Tác giả tổng hợp từ bản kê của hai lần chạy.}
@@ -179,10 +184,14 @@ dữ liệu mã--phiên. Các con số được suy ra từ \texttt{stf.cli veri
 \end{table}
 
 Có hai cách đếm độ phủ và hai cách cho hai con số khác nhau, nên cần nêu rõ định nghĩa.
-Nếu chỉ đối chiếu ngày đăng tin với ngày có phiên giao dịch, độ phủ là 37,8\%, vì tin
-cuối tuần, ngày lễ và tin sau 15:00 bị bỏ. Con số 46,35\% trong Bảng~\ref{tab:kq-news-stats}
-là độ phủ của quy trình thực tế: tin sau mốc cắt được chuyển sang phiên kế tiếp thay vì
-bị loại, nên 6.059 liên kết chuyển phiên vẫn được dùng. Toàn bộ chương này dùng định nghĩa thứ hai.
+Nếu chỉ đối chiếu ngày đăng tin với ngày có phiên giao dịch, độ phủ là 43,7\%
+(6.556 trên 14.990 dòng mã--phiên có tin đăng đúng ngày); nếu thêm điều kiện tin
+phải đăng trước mốc cắt 15:00 thì còn 29,2\% (4.377 dòng). Cách thứ nhất chỉ bỏ
+tin cuối tuần và ngày lễ; cách thứ hai bỏ thêm tin sau mốc cắt. Con số 46,35\% trong Bảng~\ref{tab:kq-news-stats}
+là độ phủ của quy trình thực tế: tin sau mốc cắt được chuyển sang phiên kế tiếp
+thay vì bị loại, nên 6.059 liên kết chuyển phiên trong cửa sổ vẫn được dùng
+(6.070 liên kết \texttt{next\_session} trừ 11 liên kết neo sang phiên ngoài cửa
+sổ). Toàn bộ chương này dùng định nghĩa thứ hai.
 
 Độ phủ tin lệch mạnh giữa các mã: MBB và TCB có trên 2.000 liên kết mỗi mã, còn GAS chỉ
 có 548. Vì vậy, số tin và biến \texttt{has\_news} được giữ làm đặc trưng riêng, và ngày
@@ -426,6 +435,7 @@ vì độ chính xác đơn lẻ.
     \bottomrule
   \end{tabular}
 \end{table}
+\noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment\_tft/per\_class\_metrics.csv}, trung bình trên 15 tổ hợp cửa sổ--hạt giống.}
 
 Giá trị là trung bình của chỉ số tính riêng trên mỗi tổ hợp cửa sổ--hạt giống,
 nên nhất quán với Bảng~\ref{tab:ket-qua}; chúng không suy ra từ một bảng dự đoán
@@ -527,6 +537,12 @@ Ngày quan sát kiểm thử đầu tiên của thang dự báo là 21/10/2024. 
 kiểm thử đầu tiên, rồi ghi \texttt{point\_in\_time} kèm lý do vào tệp kết quả. Cả
 hai artifact của lượt ngoài mẫu đều mang \texttt{point\_in\_time: true} với lý do
 \texttt{verified}.
+
+Cần nêu rõ phạm vi của chứng nhận này: điểm kiểm đóng băng chỉ loại bỏ
+\emph{nhãn huấn luyện} công bố sau mốc cắt. Việc chọn cấu hình
+(\texttt{title\_context}, \texttt{head\_tail}, \texttt{inverse\_frequency}) vẫn
+dựa trên xác thực chéo chạy trên toàn bộ 1.306 nhãn, nên lượt ngoài mẫu kiểm
+chứng được rò rỉ nhãn, không kiểm chứng được rò rỉ trong bước chọn mô hình.
 
 Một điểm kiểm thứ ba tách hai nguyên nhân có thể làm đóng góp cảm xúc thay đổi giữa
 hai lượt. Lệnh \texttt{sentiment-refit --sample-like} rút đúng số nhãn mỗi lớp mà

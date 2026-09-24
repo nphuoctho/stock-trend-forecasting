@@ -468,14 +468,18 @@ def resolve_predictions(
         merged["y_true"].isna(), pd.NA, merged["y_true"] == merged["y_pred"]
     )
     # A row counts as a prospective (genuinely live) forecast only when its
-    # issuance stamp precedes the target session. Rows replayed after the fact
-    # -- or written before issuance stamping existed -- stay in the file but are
-    # excluded from the live track record.
+    # issuance stamp falls on the observation date itself: the protocol is
+    # "predict the next session on the evening the observation session closes".
+    # Rows issued on a later day are replays -- even if the target session has
+    # not traded yet -- and stay excluded from the live track record.
     if "issued_at" in merged.columns:
+        from stf import config
+
         issued = pd.to_datetime(merged["issued_at"], errors="coerce", utc=True)
+        issued_local = issued.dt.tz_convert(config.TIMEZONE)
         obs = pd.to_datetime(merged["observation_date"])
         merged["prospective"] = (
-            issued.dt.tz_convert(None).dt.normalize() <= obs.dt.normalize()
+            issued_local.dt.normalize().dt.tz_localize(None) <= obs.dt.normalize()
         ).fillna(False)
     else:
         merged["prospective"] = False

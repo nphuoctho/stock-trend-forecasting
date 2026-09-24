@@ -55,6 +55,7 @@ STEP="score-news"
 uv run python -m stf.cli score-news \
   --model-dir "$SENTIMENT_MODEL" \
   --input-variant title_context \
+  --context-chars 400 \
   --incremental \
   --output "$SCORED_NEWS"
 
@@ -73,8 +74,18 @@ for arm in $ARMS; do
   fi
   echo "[daily] $(date -Is) predicting with $arm"
   STEP="forecast-predict $arm"
+  # Exit code 2 = dated file already exists with different content (e.g. a
+  # late-crawled article changed today's features). Keep the issued file and
+  # continue with the remaining arms instead of aborting the whole loop.
   uv run python -m stf.cli forecast-predict \
-    --model-dir "$model_dir" --output-dir "$live_dir" "${extra[@]}"
+    --model-dir "$model_dir" --output-dir "$live_dir" "${extra[@]}" || {
+      rc=$?
+      if [ "$rc" -eq 2 ]; then
+        echo "[daily] $arm: dated prediction already issued; keeping it"
+      else
+        exit "$rc"
+      fi
+    }
   STEP="forecast-resolve $arm"
   uv run python -m stf.cli forecast-resolve \
     --model-dir "$model_dir" --predictions-dir "$live_dir" "${extra[@]}"

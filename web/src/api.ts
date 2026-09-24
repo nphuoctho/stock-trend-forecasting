@@ -190,6 +190,7 @@ export interface LiveTodayTicker {
   has_news: boolean
   last_close: number | null
   flat_band: { low: number; high: number } | null
+  stale: boolean
   news: LiveTodayNews[]
 }
 
