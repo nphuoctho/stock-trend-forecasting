@@ -277,6 +277,11 @@ def get(
             if response.status_code == 200:
                 response.encoding = "utf-8"
                 return response
+            if response.status_code in (301, 302, 303, 307, 308):
+                # Redirects are never followed, but the response is returned so
+                # callers can distinguish "out of range" (Vietstock 302s to
+                # /Error/Index past the last listing page) from a hard failure.
+                return response
             if response.status_code < 500 and response.status_code != 429:
                 return None
 
@@ -294,13 +299,16 @@ def list_ticker_year(
     """Walk every news page for one ticker in one year.
 
     Returns ``(rows, complete)``. ``complete`` is True only when pagination ended
-    on a page that genuinely had nothing new. A fetch failure or hitting
-    ``MAX_PAGES`` yields whatever was collected with ``complete=False``, so a
-    caller cannot mistake a truncated walk for a finished one.
+    on a page that genuinely had nothing new, reached the page count declared in
+    the listing header, or redirected to /Error/Index past that count. A fetch
+    failure or hitting ``MAX_PAGES`` yields whatever was collected with
+    ``complete=False``, so a caller cannot mistake a truncated walk for a
+    finished one.
     """
     rows: list[tuple[str, str]] = []
     seen: set[str] = set()
     complete = False
+    total_pages: int | None = None
     for page in range(1, MAX_PAGES + 1):
         r = get(
             BASE,
@@ -318,6 +326,27 @@ def list_ticker_year(
         if r is None:
             _log(f"[listings] {code} {year}: fetch failed on page {page}; walk incomplete")
             break
+        if r.status_code != 200:
+            # Vietstock redirects out-of-range pages to /Error/Index instead of
+            # serving an empty page. Past the declared last page that redirect
+            # IS the end of the listing; before it, something else went wrong.
+            if (
+                r.status_code in (301, 302, 303, 307, 308)
+                and "/Error" in (r.headers.get("location") or "")
+                and total_pages is not None
+                and page > total_pages
+            ):
+                complete = True
+            else:
+                _log(
+                    f"[listings] {code} {year}: HTTP {r.status_code} on page "
+                    f"{page}; walk incomplete"
+                )
+            break
+        if total_pages is None:
+            m = re.search(r"Trang\s+\d+\s*/\s*(\d+)", r.text)
+            if m:
+                total_pages = int(m.group(1))
         new = [
             (href, date)
             for href, date in _listing_rows(r.text)
@@ -329,6 +358,11 @@ def list_ticker_year(
         for h, d in new:
             seen.add(h)
             rows.append((h, d))
+        if total_pages is not None and page >= total_pages:
+            # The page header declares the range ends here; the next page would
+            # redirect to /Error/Index, so stop without spending a request.
+            complete = True
+            break
         time.sleep(SLEEP)
     else:
         _log(f"[listings] {code} {year}: hit MAX_PAGES={MAX_PAGES}; walk incomplete")

@@ -1379,3 +1379,60 @@ def test_collect_listings_keeps_cached_links_when_a_walk_is_incomplete(
     # The parquet on disk reflects the same merge, not just the returned frame.
     on_disk = pd.read_parquet(config.LISTINGS_PQ)
     assert set(on_disk["url"]) == urls
+
+
+def test_listing_walk_treats_out_of_range_redirect_as_end(monkeypatch, tmp_path):
+    """Vietstock 302s to /Error/Index past the last page; that ends the walk.
+
+    The listing header declares 'Trang 1 / N'. A redirect before N is a real
+    failure (incomplete), but one past N is how the site now signals the range
+    is exhausted -- treating it as a failure would re-walk the year forever.
+    """
+    _listings_sandbox(monkeypatch, tmp_path)
+
+    def page_html(page: int, total: int = 2) -> str:
+        links = "".join(
+            f'<a href="https://vietstock.vn/2023/01/x-{page}-{i}.htm">x</a>'
+            f"<span>0{i + 1}/01/2023</span>"
+            for i in range(2)
+        )
+        return f'<div>Trang {page} / {total}</div>{links}'
+
+    class Resp:
+        def __init__(self, status, text="", location=None):
+            self.status_code = status
+            self.text = text
+            self.headers = {"location": location} if location else {}
+            self.encoding = "utf-8"
+
+    calls = []
+
+    def fake_get(url, params=None, tries=4):
+        page = params["page"]
+        calls.append(page)
+        if page <= 2:
+            return Resp(200, page_html(page))
+        return Resp(302, location="/Error/Index")
+
+    monkeypatch.setattr(news, "get", fake_get)
+    monkeypatch.setattr(news, "SLEEP", 0)
+
+    rows, complete = news.list_ticker_year("FPT", 2023, to_date="2023-12-31")
+    assert complete is True
+    assert len(rows) == 4
+    assert calls == [1, 2]  # declared total reached: no wasted request for page 3
+
+    # A redirect BEFORE the declared last page is a genuine failure.
+    calls.clear()
+
+    def early_redirect(url, params=None, tries=4):
+        page = params["page"]
+        calls.append(page)
+        if page == 1:
+            return Resp(200, page_html(1, total=3))
+        return Resp(302, location="/Error/Index")
+
+    monkeypatch.setattr(news, "get", early_redirect)
+    rows, complete = news.list_ticker_year("FPT", 2023, to_date="2023-12-31")
+    assert complete is False
+    assert len(rows) == 2
