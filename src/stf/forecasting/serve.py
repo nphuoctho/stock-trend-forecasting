@@ -425,6 +425,10 @@ def predict_latest(panel: pd.DataFrame, arm: LoadedArm) -> pd.DataFrame:
     out["prob_up"] = proba[:, TREND2ID["UP"]]
     out["y_pred"] = [ID2TREND[int(i)] for i in pred]
     out["arm"] = arm.name
+    # Freeze the class boundaries the prediction was issued under: a later refit
+    # shifts the thresholds, and resolving old rows against the new boundaries
+    # would rewrite history.
+    out["threshold_low"], out["threshold_high"] = arm.thresholds
     return out
 
 
@@ -436,14 +440,30 @@ def resolve_predictions(
     """Join stored predictions with realized next-session labels.
 
     ``predictions`` needs ``ticker``, ``observation_date``, ``y_pred``, ``arm``.
-    Rows whose target session has not traded yet keep ``y_true`` empty.
+    Rows whose target session has not traded yet keep ``y_true`` empty. Each row
+    is scored under the thresholds it was issued with (``threshold_low`` /
+    ``threshold_high`` stamped at predict time); rows predating the stamp fall
+    back to ``thresholds`` so a refit never rewrites issued history.
     """
-    labeled = label_panel(panel, thresholds)
-    truth = labeled[["ticker", "observation_date", "target_date", "target_label"]]
+    truth = panel[["ticker", "observation_date", "target_date", "target_return"]]
     merged = predictions.merge(
         truth, on=["ticker", "observation_date"], how="left", validate="many_to_one"
     )
-    merged = merged.rename(columns={"target_label": "y_true"})
+    if "threshold_low" in merged.columns:
+        low = pd.to_numeric(merged["threshold_low"], errors="coerce").fillna(
+            thresholds[0]
+        )
+        high = pd.to_numeric(merged["threshold_high"], errors="coerce").fillna(
+            thresholds[1]
+        )
+    else:
+        low = pd.Series(thresholds[0], index=merged.index)
+        high = pd.Series(thresholds[1], index=merged.index)
+    ret = pd.to_numeric(merged["target_return"], errors="coerce")
+    merged["y_true"] = np.select(
+        [ret < low, ret > high], ["DOWN", "UP"], default="FLAT"
+    )
+    merged.loc[ret.isna(), "y_true"] = pd.NA
     merged["correct"] = np.where(
         merged["y_true"].isna(), pd.NA, merged["y_true"] == merged["y_pred"]
     )

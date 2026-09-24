@@ -1252,13 +1252,23 @@ def cmd_forecast_resolve(args: argparse.Namespace) -> int:
 
     scored = resolved.dropna(subset=["y_true"])
     pending = int(resolved["y_true"].isna().sum())
+    prospective = scored[scored["prospective"].astype(bool)]
     print(
         f"[forecast-resolve] rows={len(resolved)} resolved={len(scored)} "
+        f"(prospective={len(prospective)} replayed={len(scored) - len(prospective)}) "
         f"pending={pending} -> {out_path}"
     )
-    if len(scored):
-        acc = float(scored["correct"].astype(bool).mean())
-        print(f"[forecast-resolve] live accuracy={acc:.4f} over {len(scored)} rows")
+    if len(prospective):
+        acc = float(prospective["correct"].astype(bool).mean())
+        print(
+            f"[forecast-resolve] live accuracy={acc:.4f} over "
+            f"{len(prospective)} prospective rows"
+        )
+    elif len(scored):
+        print(
+            "[forecast-resolve] no prospective rows yet; resolved rows are "
+            "replays and do not count toward the live track record"
+        )
     return 0
 
 

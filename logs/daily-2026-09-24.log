@@ -233,3 +233,465 @@ Mới (New): from vnstock.api.quote import Quote
 [listings] FPT 2021: 177 articles (ticker running total 336)
 [listings] FPT 2022: fetch failed on page 9; walk incomplete
 [listings] FPT 2022: 156 articles (ticker running total 492)
+[daily] 2026-09-24T08:57:56+07:00 fetching prices
+📦 Vnstock 4.0.8 is available
+Current: 4.0.2 (Python 3.12 (venv))
+Update: /home/nphuoctho/Documents/MySpace/Researcher/stock-trend-forecasting/.venv/bin/python -m pip install vnstock --upgrade
+Release: https://vnstocks.com/docs/tai-lieu/lich-su-phien-ban
+📦 Vnai 2.6.1 is available
+Current: 2.5.9 (Python 3.12 (venv))
+Update: /home/nphuoctho/Documents/MySpace/Researcher/stock-trend-forecasting/.venv/bin/python -m pip install vnai --upgrade
+Release: https://pypi.org/project/vnai/#history
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                                                                                 ┃
+┃                                                                                 ┃
+┃  🚀 VNSTOCK INSIDERS PROGRAM - NÂNG TẦM TRẢI NGHIỆM CỦA BẠN! 🚀                 ┃
+┃                                                                                 ┃
+┃  Nếu bạn cảm thấy khó chịu với các thông báo và quảng cáo:                      ┃
+┃                                                                                 ┃
+┃  ✨ Ẩn toàn bộ thông báo và quảng cáo phiền hà                                  ┃
+┃  🔓 Mở rộng khả năng sử dụng API tối đa                                         ┃
+┃  ⚡ Tăng tốc tải dữ liệu từ 5-8 lần                                              ┃
+┃  📈 Tăng giới hạn truy cập API lên đến 5 lần                                    ┃
+┃  🤖 Dùng AI Agent viết code hiệu quả với tài liệu Agent Guide                   ┃
+┃                                                                                 ┃
+┃  🔗 Tham gia ngay: https://vnstocks.com/insiders-program.                       ┃
+┃                                                                                 ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+[prices] FPT: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] GAS: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] HPG: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] MBB: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] MWG: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] TCB: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] VCB: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] VHM: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] VIC: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] VNM: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+[prices] 10/10 tickers OK, 17590 price rows total
+[daily] 2026-09-24T08:58:06+07:00 crawling news
+[listings] reusing 14256 cached rows; re-walking years [2020, 2021, 2022, 2023, 2024, 2025, 2026]
+[listings] FPT 2020: fetch failed on page 9; walk incomplete
+[listings] FPT 2020: 159 articles (ticker running total 159)
+[listings] FPT 2021: fetch failed on page 10; walk incomplete
+[listings] FPT 2021: 177 articles (ticker running total 336)
+[listings] FPT 2022: fetch failed on page 9; walk incomplete
+[listings] FPT 2022: 156 articles (ticker running total 492)
+[listings] FPT 2023: fetch failed on page 11; walk incomplete
+[listings] FPT 2023: 189 articles (ticker running total 681)
+[listings] FPT 2024: fetch failed on page 13; walk incomplete
+[listings] FPT 2024: 237 articles (ticker running total 918)
+[listings] FPT 2025: fetch failed on page 13; walk incomplete
+[listings] FPT 2025: 228 articles (ticker running total 1146)
+[listings] FPT 2026: fetch failed on page 10; walk incomplete
+[listings] FPT 2026: 161 articles (ticker running total 1307)
+[listings] GAS 2020: fetch failed on page 6; walk incomplete
+[listings] GAS 2020: 92 articles (ticker running total 92)
+[listings] GAS 2021: fetch failed on page 6; walk incomplete
+[listings] GAS 2021: 87 articles (ticker running total 179)
+[listings] GAS 2022: fetch failed on page 6; walk incomplete
+[listings] GAS 2022: 89 articles (ticker running total 268)
+[listings] GAS 2023: fetch failed on page 6; walk incomplete
+[listings] GAS 2023: 91 articles (ticker running total 359)
+[listings] GAS 2024: fetch failed on page 6; walk incomplete
+[listings] GAS 2024: 99 articles (ticker running total 458)
+[listings] GAS 2025: fetch failed on page 6; walk incomplete
+[listings] GAS 2025: 90 articles (ticker running total 548)
+[listings] GAS 2026: fetch failed on page 6; walk incomplete
+[listings] GAS 2026: 96 articles (ticker running total 644)
+[listings] HPG 2020: fetch failed on page 9; walk incomplete
+[listings] HPG 2020: 146 articles (ticker running total 146)
+[listings] HPG 2021: fetch failed on page 10; walk incomplete
+[listings] HPG 2021: 177 articles (ticker running total 323)
+[listings] HPG 2022: fetch failed on page 10; walk incomplete
+[listings] HPG 2022: 174 articles (ticker running total 497)
+[listings] HPG 2023: fetch failed on page 12; walk incomplete
+[listings] HPG 2023: 204 articles (ticker running total 701)
+[listings] HPG 2024: fetch failed on page 9; walk incomplete
+[listings] HPG 2024: 142 articles (ticker running total 843)
+[listings] HPG 2025: fetch failed on page 9; walk incomplete
+[listings] HPG 2025: 146 articles (ticker running total 989)
+[listings] HPG 2026: fetch failed on page 7; walk incomplete
+[listings] HPG 2026: 109 articles (ticker running total 1098)
+[listings] MBB 2020: fetch failed on page 14; walk incomplete
+[listings] MBB 2020: 255 articles (ticker running total 255)
+[listings] MBB 2021: fetch failed on page 13; walk incomplete
+[listings] MBB 2021: 225 articles (ticker running total 480)
+[listings] MBB 2022: fetch failed on page 14; walk incomplete
+[listings] MBB 2022: 260 articles (ticker running total 740)
+[listings] MBB 2023: fetch failed on page 26; walk incomplete
+[listings] MBB 2023: 485 articles (ticker running total 1225)
+[listings] MBB 2024: fetch failed on page 31; walk incomplete
+[listings] MBB 2024: 592 articles (ticker running total 1817)
+[listings] MBB 2025: fetch failed on page 19; walk incomplete
+[listings] MBB 2025: 348 articles (ticker running total 2165)
+[listings] MBB 2026: fetch failed on page 19; walk incomplete
+[listings] MBB 2026: 358 articles (ticker running total 2523)
+[listings] MWG 2020: fetch failed on page 10; walk incomplete
+[listings] MWG 2020: 169 articles (ticker running total 169)
+[listings] MWG 2021: fetch failed on page 11; walk incomplete
+[listings] MWG 2021: 200 articles (ticker running total 369)
+[listings] MWG 2022: fetch failed on page 10; walk incomplete
+[listings] MWG 2022: 165 articles (ticker running total 534)
+[listings] MWG 2023: fetch failed on page 10; walk incomplete
+[listings] MWG 2023: 163 articles (ticker running total 697)
+[listings] MWG 2024: fetch failed on page 12; walk incomplete
+[listings] MWG 2024: 206 articles (ticker running total 903)
+[listings] MWG 2025: fetch failed on page 9; walk incomplete
+[listings] MWG 2025: 158 articles (ticker running total 1061)
+[listings] MWG 2026: fetch failed on page 7; walk incomplete
+[listings] MWG 2026: 117 articles (ticker running total 1178)
+[listings] TCB 2020: fetch failed on page 12; walk incomplete
+[listings] TCB 2020: 204 articles (ticker running total 204)
+[listings] TCB 2021: fetch failed on page 14; walk incomplete
+[listings] TCB 2021: 259 articles (ticker running total 463)
+[listings] TCB 2022: fetch failed on page 15; walk incomplete
+[listings] TCB 2022: 267 articles (ticker running total 730)
+[listings] TCB 2023: fetch failed on page 23; walk incomplete
+[listings] TCB 2023: 437 articles (ticker running total 1167)
+[listings] TCB 2024: fetch failed on page 26; walk incomplete
+[listings] TCB 2024: 483 articles (ticker running total 1650)
+[listings] TCB 2025: fetch failed on page 21; walk incomplete
+[listings] TCB 2025: 400 articles (ticker running total 2050)
+[listings] TCB 2026: fetch failed on page 13; walk incomplete
+[listings] TCB 2026: 236 articles (ticker running total 2286)
+[listings] VCB 2020: fetch failed on page 10; walk incomplete
+[listings] VCB 2020: 169 articles (ticker running total 169)
+[listings] VCB 2021: fetch failed on page 12; walk incomplete
+[listings] VCB 2021: 206 articles (ticker running total 375)
+[listings] VCB 2022: fetch failed on page 13; walk incomplete
+[listings] VCB 2022: 233 articles (ticker running total 608)
+[listings] VCB 2023: fetch failed on page 19; walk incomplete
+[listings] VCB 2023: 341 articles (ticker running total 949)
+[listings] VCB 2024: fetch failed on page 13; walk incomplete
+[listings] VCB 2024: 230 articles (ticker running total 1179)
+[listings] VCB 2025: fetch failed on page 13; walk incomplete
+[listings] VCB 2025: 227 articles (ticker running total 1406)
+[listings] VCB 2026: fetch failed on page 9; walk incomplete
+[listings] VCB 2026: 149 articles (ticker running total 1555)
+[listings] VHM 2020: fetch failed on page 7; walk incomplete
+[listings] VHM 2020: 114 articles (ticker running total 114)
+[listings] VHM 2021: fetch failed on page 9; walk incomplete
+[listings] VHM 2021: 145 articles (ticker running total 259)
+[listings] VHM 2022: fetch failed on page 7; walk incomplete
+[listings] VHM 2022: 105 articles (ticker running total 364)
+[listings] VHM 2023: fetch failed on page 11; walk incomplete
+[listings] VHM 2023: 190 articles (ticker running total 554)
+[listings] VHM 2024: fetch failed on page 11; walk incomplete
+[listings] VHM 2024: 190 articles (ticker running total 744)
+[listings] VHM 2025: fetch failed on page 9; walk incomplete
+[listings] VHM 2025: 145 articles (ticker running total 889)
+[listings] VHM 2026: fetch failed on page 9; walk incomplete
+[listings] VHM 2026: 158 articles (ticker running total 1047)
+[listings] VIC 2020: fetch failed on page 9; walk incomplete
+[listings] VIC 2020: 143 articles (ticker running total 143)
+[listings] VIC 2021: fetch failed on page 10; walk incomplete
+[listings] VIC 2021: 177 articles (ticker running total 320)
+[listings] VIC 2022: fetch failed on page 9; walk incomplete
+[listings] VIC 2022: 155 articles (ticker running total 475)
+[listings] VIC 2023: fetch failed on page 11; walk incomplete
+[listings] VIC 2023: 196 articles (ticker running total 671)
+[listings] VIC 2024: fetch failed on page 10; walk incomplete
+[listings] VIC 2024: 172 articles (ticker running total 843)
+[listings] VIC 2025: fetch failed on page 14; walk incomplete
+[listings] VIC 2025: 253 articles (ticker running total 1096)
+[listings] VIC 2026: fetch failed on page 10; walk incomplete
+[listings] VIC 2026: 162 articles (ticker running total 1258)
+[listings] VNM 2020: fetch failed on page 16; walk incomplete
+[listings] VNM 2020: 284 articles (ticker running total 284)
+[listings] VNM 2021: fetch failed on page 13; walk incomplete
+[listings] VNM 2021: 223 articles (ticker running total 507)
+[listings] VNM 2022: fetch failed on page 11; walk incomplete
+[listings] VNM 2022: 200 articles (ticker running total 707)
+[listings] VNM 2023: fetch failed on page 12; walk incomplete
+[listings] VNM 2023: 203 articles (ticker running total 910)
+[listings] VNM 2024: fetch failed on page 11; walk incomplete
+[listings] VNM 2024: 197 articles (ticker running total 1107)
+[listings] VNM 2025: fetch failed on page 10; walk incomplete
+[listings] VNM 2025: 167 articles (ticker running total 1274)
+[listings] VNM 2026: fetch failed on page 6; walk incomplete
+[listings] VNM 2026: 100 articles (ticker running total 1374)
+[listings] 2020: walk incomplete, watermark withheld
+[listings] 2021: walk incomplete, watermark withheld
+[listings] 2022: walk incomplete, watermark withheld
+[listings] 2023: walk incomplete, watermark withheld
+[listings] 2024: walk incomplete, watermark withheld
+[listings] 2025: walk incomplete, watermark withheld
+[listings] 2026: walk incomplete, watermark withheld
+[listings] done: 14270 rows, 12154 unique urls
+[news] 12154 unique urls to fetch content for
+[articles] loaded 12140 existing articles (12140 already have a body)
+
+News summary
+articles : 12154 total | 12154 with timestamp | 12154 with body
+[daily] 2026-09-24T09:44:42+07:00 scoring new articles
+[score-news] incremental: 14 new rows (14256 already scored)
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:   2%|▏         | 4/201 [00:00<00:07, 26.99it/s]Loading weights:   7%|▋         | 15/201 [00:00<00:02, 62.48it/s]Loading weights:  11%|█▏        | 23/201 [00:00<00:02, 61.68it/s]Loading weights:  15%|█▌        | 31/201 [00:00<00:03, 55.74it/s]Loading weights:  18%|█▊        | 37/201 [00:00<00:04, 39.91it/s]Loading weights:  21%|██▏       | 43/201 [00:00<00:03, 41.05it/s]Loading weights:  28%|██▊       | 56/201 [00:01<00:02, 60.14it/s]Loading weights:  32%|███▏      | 64/201 [00:01<00:02, 61.92it/s]Loading weights:  40%|███▉      | 80/201 [00:01<00:01, 85.28it/s]Loading weights:  45%|████▍     | 90/201 [00:01<00:01, 83.65it/s]Loading weights:  50%|████▉     | 100/201 [00:01<00:01, 69.54it/s]Loading weights:  55%|█████▌    | 111/201 [00:01<00:01, 73.08it/s]Loading weights:  62%|██████▏   | 125/201 [00:01<00:00, 88.49it/s]Loading weights:  67%|██████▋   | 135/201 [00:02<00:00, 76.52it/s]Loading weights:  72%|███████▏  | 144/201 [00:02<00:00, 68.42it/s]Loading weights:  76%|███████▌  | 152/201 [00:02<00:00, 68.64it/s]Loading weights:  80%|███████▉  | 160/201 [00:02<00:00, 60.40it/s]Loading weights:  86%|████████▌ | 172/201 [00:02<00:00, 73.20it/s]Loading weights:  90%|█████████ | 181/201 [00:03<00:00, 43.32it/s]Loading weights: 100%|██████████| 201/201 [00:03<00:00, 66.64it/s]
+[score-news] scored 14270 rows -> data/processed/news_sentiment_merged.parquet (manifest data/processed/news_sentiment_merged.manifest.json)
+[daily] 2026-09-24T09:46:04+07:00 predicting with lstm_price_sentiment
+[forecast-predict] arm=lstm_price_sentiment date=2026-09-23 tickers=10
+  FPT    FLAT  UP=0.293 FLAT=0.357 DOWN=0.350 news=no
+  GAS    UP    UP=0.370 FLAT=0.306 DOWN=0.324 news=no
+  HPG    FLAT  UP=0.294 FLAT=0.401 DOWN=0.305 news=no
+  MBB    FLAT  UP=0.337 FLAT=0.396 DOWN=0.267 news=yes
+  MWG    FLAT  UP=0.340 FLAT=0.341 DOWN=0.319 news=no
+  TCB    UP    UP=0.376 FLAT=0.331 DOWN=0.293 news=no
+  VCB    FLAT  UP=0.331 FLAT=0.355 DOWN=0.314 news=no
+  VHM    DOWN  UP=0.289 FLAT=0.268 DOWN=0.444 news=no
+  VIC    DOWN  UP=0.286 FLAT=0.235 DOWN=0.479 news=no
+  VNM    FLAT  UP=0.270 FLAT=0.387 DOWN=0.343 news=yes
+[forecast-predict] -> outputs/live/lstm_price_sentiment/predictions_2026-09-23.parquet
+[forecast-resolve] rows=30 resolved=20 pending=10 -> outputs/live/lstm_price_sentiment/resolved.parquet
+[forecast-resolve] live accuracy=0.4000 over 20 rows
+[daily] 2026-09-24T09:46:28+07:00 predicting with lstm_price
+[forecast-predict] arm=lstm_price date=2026-09-23 tickers=10
+  FPT    DOWN  UP=0.316 FLAT=0.327 DOWN=0.357 news=no
+  GAS    UP    UP=0.368 FLAT=0.293 DOWN=0.340 news=no
+  HPG    FLAT  UP=0.330 FLAT=0.353 DOWN=0.316 news=no
+  MBB    DOWN  UP=0.330 FLAT=0.333 DOWN=0.337 news=no
+  MWG    DOWN  UP=0.333 FLAT=0.332 DOWN=0.335 news=no
+  TCB    UP    UP=0.357 FLAT=0.305 DOWN=0.338 news=no
+  VCB    FLAT  UP=0.329 FLAT=0.371 DOWN=0.299 news=no
+  VHM    DOWN  UP=0.330 FLAT=0.288 DOWN=0.382 news=no
+  VIC    DOWN  UP=0.330 FLAT=0.263 DOWN=0.407 news=no
+  VNM    FLAT  UP=0.304 FLAT=0.359 DOWN=0.337 news=no
+[forecast-predict] -> outputs/live/lstm_price/predictions_2026-09-23.parquet
+[forecast-resolve] rows=30 resolved=20 pending=10 -> outputs/live/lstm_price/resolved.parquet
+[forecast-resolve] live accuracy=0.3500 over 20 rows
+[daily] 2026-09-24T09:46:34+07:00 predicting with logreg_price_sentiment
+[forecast-predict] arm=logreg_price_sentiment date=2026-09-23 tickers=10
+  FPT    DOWN  UP=0.337 FLAT=0.302 DOWN=0.362 news=no
+  GAS    FLAT  UP=0.295 FLAT=0.396 DOWN=0.309 news=no
+  HPG    FLAT  UP=0.311 FLAT=0.347 DOWN=0.341 news=no
+  MBB    UP    UP=0.386 FLAT=0.301 DOWN=0.313 news=yes
+  MWG    FLAT  UP=0.321 FLAT=0.354 DOWN=0.325 news=no
+  TCB    UP    UP=0.368 FLAT=0.296 DOWN=0.336 news=no
+  VCB    FLAT  UP=0.298 FLAT=0.390 DOWN=0.312 news=no
+  VHM    DOWN  UP=0.347 FLAT=0.272 DOWN=0.381 news=no
+  VIC    DOWN  UP=0.357 FLAT=0.234 DOWN=0.409 news=no
+  VNM    DOWN  UP=0.319 FLAT=0.333 DOWN=0.348 news=yes
+[forecast-predict] -> outputs/live/logreg_price_sentiment/predictions_2026-09-23.parquet
+[forecast-resolve] rows=30 resolved=20 pending=10 -> outputs/live/logreg_price_sentiment/resolved.parquet
+[forecast-resolve] live accuracy=0.2500 over 20 rows
+[daily] 2026-09-24T09:47:02+07:00 predicting with tft_price_sentiment
+[forecast-predict] arm=tft_price_sentiment date=2026-09-23 tickers=10
+  FPT    DOWN  UP=0.350 FLAT=0.279 DOWN=0.371 news=no
+  GAS    UP    UP=0.348 FLAT=0.309 DOWN=0.343 news=no
+  HPG    FLAT  UP=0.315 FLAT=0.346 DOWN=0.339 news=no
+  MBB    UP    UP=0.358 FLAT=0.345 DOWN=0.297 news=yes
+  MWG    DOWN  UP=0.319 FLAT=0.332 DOWN=0.350 news=no
+  TCB    UP    UP=0.354 FLAT=0.304 DOWN=0.342 news=no
+  VCB    FLAT  UP=0.316 FLAT=0.358 DOWN=0.327 news=no
+  VHM    DOWN  UP=0.379 FLAT=0.233 DOWN=0.388 news=no
+  VIC    DOWN  UP=0.382 FLAT=0.213 DOWN=0.405 news=no
+  VNM    FLAT  UP=0.301 FLAT=0.363 DOWN=0.337 news=yes
+[forecast-predict] -> outputs/live/tft_price_sentiment/predictions_2026-09-23.parquet
+[forecast-resolve] rows=20 resolved=10 pending=10 -> outputs/live/tft_price_sentiment/resolved.parquet
+[forecast-resolve] live accuracy=0.0000 over 10 rows
+[daily] 2026-09-24T09:47:27+07:00 predicting with tft_price
+[forecast-predict] arm=tft_price date=2026-09-23 tickers=10
+  FPT    DOWN  UP=0.341 FLAT=0.282 DOWN=0.377 news=no
+  GAS    UP    UP=0.383 FLAT=0.273 DOWN=0.345 news=no
+  HPG    FLAT  UP=0.318 FLAT=0.357 DOWN=0.325 news=no
+  MBB    DOWN  UP=0.358 FLAT=0.276 DOWN=0.366 news=no
+  MWG    FLAT  UP=0.295 FLAT=0.353 DOWN=0.351 news=no
+  TCB    DOWN  UP=0.340 FLAT=0.284 DOWN=0.376 news=no
+  VCB    FLAT  UP=0.324 FLAT=0.367 DOWN=0.309 news=no
+  VHM    DOWN  UP=0.347 FLAT=0.259 DOWN=0.393 news=no
+  VIC    DOWN  UP=0.323 FLAT=0.259 DOWN=0.418 news=no
+  VNM    FLAT  UP=0.285 FLAT=0.364 DOWN=0.351 news=no
+[forecast-predict] -> outputs/live/tft_price/predictions_2026-09-23.parquet
+[forecast-resolve] rows=20 resolved=10 pending=10 -> outputs/live/tft_price/resolved.parquet
+[forecast-resolve] live accuracy=0.1000 over 10 rows
+[daily] 2026-09-24T09:47:32+07:00 done

@@ -123,6 +123,38 @@ def test_resolve_marks_only_stamped_predictions_as_prospective(panel, tmp_path):
     assert not resolved["prospective"].any()
 
 
+
+def test_resolve_scores_rows_under_their_issued_thresholds(panel, tmp_path):
+    """A refit that shifts the class boundaries must not rewrite issued history.
+
+    resolve_predictions used to label every stored row with the CURRENT arm's
+    thresholds, so refitting into the same model_dir silently re-scored past
+    predictions under boundaries they were never issued against.
+    """
+    cfg = ForecastConfig(val_size=10, seeds=(42,))
+    refit_arm(panel, "logreg_price", cfg=cfg, output_dir=tmp_path / "arm")
+    arm = load_arm(tmp_path / "arm")
+
+    cutoff = panel["observation_date"].sort_values().unique()[-2]
+    past_panel = panel[panel["observation_date"] <= cutoff]
+    predictions = predict_latest(past_panel, arm)
+    assert {"threshold_low", "threshold_high"} <= set(predictions.columns)
+
+    issued = resolve_predictions(predictions, panel, arm.thresholds)
+
+    # Simulate a refit with different boundaries: the same stored predictions
+    # must resolve to identical labels under their stamped thresholds.
+    shifted = (arm.thresholds[0] * 0.5, arm.thresholds[1] * 2.0)
+    resolved = resolve_predictions(predictions, panel, shifted)
+    pd.testing.assert_series_equal(
+        issued["y_true"], resolved["y_true"], check_names=False
+    )
+
+    # Rows predating the stamp still resolve under the caller's thresholds.
+    legacy = predictions.drop(columns=["threshold_low", "threshold_high"])
+    legacy_resolved = resolve_predictions(legacy, panel, shifted)
+    assert legacy_resolved["y_true"].notna().all()
+
 def test_sentiment_arm_requires_sentiment_columns(panel, tmp_path):
     cfg = ForecastConfig(val_size=10, seeds=(42,))
     refit_arm(
