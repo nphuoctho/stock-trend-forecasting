@@ -1173,11 +1173,42 @@ def cmd_forecast_predict(args: argparse.Namespace) -> int:
     panel = assemble(prices, news)
     predictions = predict_latest(panel, arm)
 
+    # Stamp issuance evidence: a resolved row only counts as a live forecast when
+    # it was provably written before the target session traded.
+    from stf.sentiment.dataset import file_fingerprint
+
+    predictions["issued_at"] = pd.Timestamp.now(tz="UTC").isoformat()
+    manifest_path = Path(args.model_dir) / "manifest.json"
+    predictions["checkpoint_manifest_sha256"] = (
+        file_fingerprint(manifest_path) if manifest_path.is_file() else None
+    )
+
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     obs_date = pd.to_datetime(predictions["observation_date"]).max().date().isoformat()
     dated_path = out_dir / f"predictions_{obs_date}.parquet"
-    predictions.to_parquet(dated_path, index=False)
+    if dated_path.exists():
+        # Issued predictions are an audit trail: re-running for the same session
+        # must reproduce them bit-for-bit (ignoring the issuance stamp) or stop,
+        # never silently rewrite history.
+        existing = pd.read_parquet(dated_path)
+        shared = [c for c in predictions.columns if c in existing.columns]
+        comparable = [c for c in shared if c not in ("issued_at",)]
+        same = len(existing) == len(predictions) and existing[
+            comparable
+        ].reset_index(drop=True).equals(
+            predictions[comparable].reset_index(drop=True)
+        )
+        if not same:
+            print(
+                f"forecast-predict: {dated_path} already holds different "
+                "predictions; refusing to overwrite issued output. Delete it "
+                "explicitly if the earlier issuance was invalid.",
+                file=sys.stderr,
+            )
+            return 2
+    else:
+        predictions.to_parquet(dated_path, index=False)
     predictions.to_parquet(out_dir / "latest.parquet", index=False)
 
     print(f"[forecast-predict] arm={arm.name} date={obs_date} tickers={len(predictions)}")

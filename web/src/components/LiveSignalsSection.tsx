@@ -159,7 +159,9 @@ export default function LiveSignalsSection() {
                 >
                   <span className="font-medium">{armLabel(a.arm)}</span>
                   <span className="ml-2 text-muted-foreground">
-                    {a.resolved} đã đối chiếu · {a.pending} chờ
+                    {a.prospective_resolved} phát hành trước phiên
+                    {a.replayed_resolved > 0 && ` · ${a.replayed_resolved} replay`}
+                    {a.pending > 0 && ` · ${a.pending} chờ`}
                   </span>
                   {a.accuracy !== null && (
                     <span

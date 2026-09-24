@@ -154,6 +154,8 @@ export interface LiveArmHistory {
   arm: string
   total: number
   resolved: number
+  prospective_resolved: number
+  replayed_resolved: number
   pending: number
   accuracy: number | null
   by_date: { target_date: string; n: number; accuracy: number }[]

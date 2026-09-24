@@ -447,4 +447,16 @@ def resolve_predictions(
     merged["correct"] = np.where(
         merged["y_true"].isna(), pd.NA, merged["y_true"] == merged["y_pred"]
     )
+    # A row counts as a prospective (genuinely live) forecast only when its
+    # issuance stamp precedes the target session. Rows replayed after the fact
+    # -- or written before issuance stamping existed -- stay in the file but are
+    # excluded from the live track record.
+    if "issued_at" in merged.columns:
+        issued = pd.to_datetime(merged["issued_at"], errors="coerce", utc=True)
+        obs = pd.to_datetime(merged["observation_date"])
+        merged["prospective"] = (
+            issued.dt.tz_convert(None).dt.normalize() <= obs.dt.normalize()
+        ).fillna(False)
+    else:
+        merged["prospective"] = False
     return merged

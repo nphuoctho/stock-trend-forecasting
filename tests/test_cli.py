@@ -496,6 +496,78 @@ def test_sentiment_refit_rejects_a_before_date_with_a_time_component(
     assert "must be a calendar date" in capsys.readouterr().err
 
 
+def test_forecast_predict_stamps_issuance_and_refuses_to_rewrite(
+    monkeypatch, tmp_path, capsys
+):
+    """Issued predictions are an audit trail, not a cache.
+
+    Every dated parquet carries when it was issued and which checkpoint produced
+    it; a re-run that would change the content must stop instead of silently
+    rewriting what was already published.
+    """
+    from stf import cli as cli_module
+    from stf import forecasting as forecasting_module
+    from stf.forecasting import serve as serve_module
+
+    model_dir = tmp_path / "arm"
+    model_dir.mkdir()
+    (model_dir / "manifest.json").write_text("{}", encoding="utf-8")
+
+    arm = type("A", (), {"name": "logreg_price", "use_sentiment": False})()
+    monkeypatch.setattr(serve_module, "load_arm", lambda *_a, **_k: arm)
+    monkeypatch.setattr(
+        cli_module, "_load_prices", lambda: pd.DataFrame({"ticker": ["FPT"]})
+    )
+    monkeypatch.setattr(
+        forecasting_module, "assemble", lambda *_a: pd.DataFrame({"x": [1]})
+    )
+
+    frame = pd.DataFrame(
+        {
+            "ticker": ["FPT"],
+            "observation_date": pd.to_datetime(["2026-09-21"]),
+            "has_news": [0],
+            "prob_down": [0.2],
+            "prob_flat": [0.3],
+            "prob_up": [0.5],
+            "y_pred": ["UP"],
+            "arm": ["logreg_price"],
+        }
+    )
+    monkeypatch.setattr(
+        serve_module, "predict_latest", lambda *_a, **_k: frame.copy()
+    )
+
+    out_dir = tmp_path / "live"
+    args = [
+        "forecast-predict",
+        "--model-dir",
+        str(model_dir),
+        "--output-dir",
+        str(out_dir),
+    ]
+    assert main(args) == 0
+    written = pd.read_parquet(out_dir / "predictions_2026-09-21.parquet")
+    assert written["issued_at"].notna().all()
+    assert written["checkpoint_manifest_sha256"].notna().all()
+
+    # Same content re-run: idempotent, keeps the original issuance stamp.
+    assert main(args) == 0
+    reread = pd.read_parquet(out_dir / "predictions_2026-09-21.parquet")
+    assert reread["issued_at"].equals(written["issued_at"])
+
+    # Different content for the same session: refused, file untouched.
+    changed = frame.copy()
+    changed["y_pred"] = ["DOWN"]
+    monkeypatch.setattr(
+        serve_module, "predict_latest", lambda *_a, **_k: changed.copy()
+    )
+    assert main(args) == 2
+    assert "refusing to overwrite" in capsys.readouterr().err
+    after = pd.read_parquet(out_dir / "predictions_2026-09-21.parquet")
+    assert after["y_pred"].tolist() == ["UP"]
+
+
 def test_in_window_alignment_report_uses_a_half_open_final_day(monkeypatch, tmp_path):
     """The window covers all of its last day and none of the next one.
 

@@ -92,6 +92,37 @@ def test_resolve_scores_older_observation(panel, tmp_path):
     assert resolved["correct"].isin([True, False]).all()
 
 
+def test_resolve_marks_only_stamped_predictions_as_prospective(panel, tmp_path):
+    """The live track record counts only rows provably issued before the session.
+
+    A prediction written today for yesterday's observation is a replay, not a
+    forecast; mixing it into the accuracy figure would fabricate a live record.
+    """
+    cfg = ForecastConfig(val_size=10, seeds=(42,))
+    refit_arm(panel, "logreg_price", cfg=cfg, output_dir=tmp_path / "arm")
+    arm = load_arm(tmp_path / "arm")
+
+    cutoff = panel["observation_date"].sort_values().unique()[-2]
+    past_panel = panel[panel["observation_date"] <= cutoff]
+    predictions = predict_latest(past_panel, arm)
+
+    # Issued now, for an observation whose target already traded: a replay.
+    predictions["issued_at"] = pd.Timestamp.now(tz="UTC").isoformat()
+    resolved = resolve_predictions(predictions, panel, arm.thresholds)
+    assert not resolved["prospective"].any()
+
+    # Issued on the observation date itself: genuinely prospective.
+    obs = pd.to_datetime(predictions["observation_date"]).max()
+    predictions["issued_at"] = (obs - pd.Timedelta(hours=1)).isoformat()
+    resolved = resolve_predictions(predictions, panel, arm.thresholds)
+    assert resolved["prospective"].all()
+
+    # Files written before issuance stamping existed never count as live.
+    del predictions["issued_at"]
+    resolved = resolve_predictions(predictions, panel, arm.thresholds)
+    assert not resolved["prospective"].any()
+
+
 def test_sentiment_arm_requires_sentiment_columns(panel, tmp_path):
     cfg = ForecastConfig(val_size=10, seeds=(42,))
     refit_arm(

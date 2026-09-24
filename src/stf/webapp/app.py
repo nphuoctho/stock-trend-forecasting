@@ -226,10 +226,18 @@ def live_history() -> dict:
             continue
         frame = pd.read_parquet(resolved_path)
         scored = frame.dropna(subset=["y_true"])
+        # Only rows issued before their target session count as a live forecast;
+        # replayed or pre-stamping rows are reported separately so the headline
+        # number cannot silently mix the two.
+        prospective = (
+            scored[scored["prospective"].astype(bool)]
+            if "prospective" in scored.columns
+            else scored.iloc[0:0]
+        )
         by_date = []
-        if len(scored):
-            grouped = scored.groupby(
-                pd.to_datetime(scored["target_date"]).dt.date, sort=True
+        if len(prospective):
+            grouped = prospective.groupby(
+                pd.to_datetime(prospective["target_date"]).dt.date, sort=True
             )
             for date, block in grouped:
                 by_date.append(
@@ -244,9 +252,11 @@ def live_history() -> dict:
                 "arm": name,
                 "total": int(len(frame)),
                 "resolved": int(len(scored)),
+                "prospective_resolved": int(len(prospective)),
+                "replayed_resolved": int(len(scored) - len(prospective)),
                 "pending": int(frame["y_true"].isna().sum()),
-                "accuracy": float(scored["correct"].astype(bool).mean())
-                if len(scored)
+                "accuracy": float(prospective["correct"].astype(bool).mean())
+                if len(prospective)
                 else None,
                 "by_date": by_date,
             }
