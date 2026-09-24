@@ -250,13 +250,24 @@ def cmd_sentiment_refit(args: argparse.Namespace) -> int:
             )
             return 2
         try:
-            cutoff = pd.Timestamp(args.before_date, tz=config.TIMEZONE)
+            cutoff = pd.Timestamp(args.before_date)
         except ValueError:
             print(
                 f"sentiment-refit: --before-date {args.before_date!r} is not a date.",
                 file=sys.stderr,
             )
             return 2
+        if cutoff != cutoff.normalize():
+            print(
+                "sentiment-refit: --before-date must be a calendar date "
+                f"(YYYY-MM-DD); got a time component in {args.before_date!r}.",
+                file=sys.stderr,
+            )
+            return 2
+        if cutoff.tzinfo is None:
+            cutoff = cutoff.tz_localize(config.TIMEZONE)
+        else:
+            cutoff = cutoff.tz_convert(config.TIMEZONE)
         try:
             dates = to_local(df["published_at"])
         except (ValueError, TypeError):
@@ -298,35 +309,56 @@ def cmd_sentiment_refit(args: argparse.Namespace) -> int:
             )
             return 2
         wanted = reference.get("class_distribution")
+        reference_cutoff = reference.get("provenance", {}).get("label_cutoff")
+        if reference_cutoff is None:
+            print(
+                f"sentiment-refit: {args.sample_like} is not a point-in-time "
+                "manifest (no provenance.label_cutoff); --sample-like must "
+                "reference the frozen checkpoint it controls for.",
+                file=sys.stderr,
+            )
+            return 2
         if not wanted:
             print(
                 f"sentiment-refit: {args.sample_like} has no class_distribution.",
                 file=sys.stderr,
             )
             return 2
-        available = df["label"].value_counts().to_dict()
+        if "sample_id" not in df.columns:
+            print(
+                "sentiment-refit: --sample-like requires a sample_id column "
+                "to identify the drawn rows.",
+                file=sys.stderr,
+            )
+            return 2
+    frame = dataset.prepare_model_input(df, args.input_variant)
+    if args.sample_like:
+        available = frame["label"].value_counts().to_dict()
         short = {k: v for k, v in wanted.items() if v > available.get(k, 0)}
         if short:
             print(
-                f"sentiment-refit: not enough labels to match {short}.",
+                f"sentiment-refit: not enough labels to match {short} "
+                "after deduplication.",
                 file=sys.stderr,
             )
             return 2
         drawn = [
-            df.loc[df["label"] == name].sample(
+            frame.loc[frame["label"] == name].sample(
                 n=int(count), random_state=args.sample_seed
             )
             for name, count in sorted(wanted.items())
         ]
-        df = pd.concat(drawn).sort_index().reset_index(drop=True)
+        frame = pd.concat(drawn).sort_index().reset_index(drop=True)
         # Which rows were drawn is itself a random factor, so record the identity of
         # the draw. Without it a second seed cannot be told apart from this one, and
         # the control cannot be reproduced or compared across seeds.
-        selected = sorted(str(value) for value in df["sample_id"])
+        selected = sorted(str(value) for value in frame["sample_id"])
         subset_provenance = {
             "strategy": "class_matched_random",
             "reference_manifest": str(args.sample_like),
-            "reference_class_distribution": wanted,
+            "reference_manifest_sha256": hashlib.sha256(
+                Path(args.sample_like).read_bytes()
+            ).hexdigest(),
             "sample_seed": args.sample_seed,
             "selected_rows": len(selected),
             "selected_sample_id_sha256": hashlib.sha256(
@@ -335,13 +367,12 @@ def cmd_sentiment_refit(args: argparse.Namespace) -> int:
             "point_in_time": False,
         }
         print(
-            f"Refit restricted to {len(df)} labels matching the class counts of "
+            f"Refit restricted to {len(frame)} labels matching the class counts of "
             f"{args.sample_like} ({wanted}, seed {args.sample_seed}). This is a "
             "training-size control only; it draws from every date and is NOT "
             "point-in-time."
         )
         print("Subset id:", subset_provenance["selected_sample_id_sha256"][:16])
-    frame = dataset.prepare_model_input(df, args.input_variant)
     cfg = model.TrainConfig(
         epochs=args.epochs,
         batch_size=args.batch_size,
@@ -818,8 +849,12 @@ def cmd_forecast(args: argparse.Namespace) -> int:
     per-window delta with a bootstrap interval.
     """
     from stf.forecasting import assemble
-    from stf.forecasting.experiment import ForecastConfig, frame_hash, run_experiment
-    from stf.forecasting.split import walk_forward_windows
+    from stf.forecasting.experiment import (
+        ForecastConfig,
+        first_test_observation_date,
+        frame_hash,
+        run_experiment,
+    )
 
     prices = _load_prices()
     provenance: dict = {
@@ -881,14 +916,14 @@ def cmd_forecast(args: argparse.Namespace) -> int:
     # discard the first in-window outcome of every ticker and silently shift every
     # walk-forward split.
     panel_start = args.panel_start or config.DATE_START
+    panel_end = args.panel_end or config.DATE_END
     target = pd.to_datetime(panel["target_date"])
     panel = panel[target >= pd.Timestamp(panel_start)].reset_index(drop=True)
+    panel = panel[
+        pd.to_datetime(panel["target_date"]) <= pd.Timestamp(panel_end)
+    ].reset_index(drop=True)
     provenance["panel_start"] = panel_start
-    if args.panel_end:
-        panel = panel[
-            pd.to_datetime(panel["target_date"]) <= pd.Timestamp(args.panel_end)
-        ].reset_index(drop=True)
-        provenance["panel_end"] = args.panel_end
+    provenance["panel_end"] = panel_end
     if "alignment_report" in panel.attrs:
         # This report covers every scored link handed to assemble, including any
         # published outside the study window, so it cannot describe the evaluated
@@ -901,7 +936,7 @@ def cmd_forecast(args: argparse.Namespace) -> int:
             to_local,
         )
 
-        window_end = args.panel_end or config.DATE_END
+        window_end = panel_end
         published = to_local(news["published_at"])
         # Half-open on the final day: an article published on window_end after the
         # 15:00 cutoff is still published inside the study window even though it
@@ -945,26 +980,18 @@ def cmd_forecast(args: argparse.Namespace) -> int:
     )
     if provenance["news_sentiment"] is not None:
         # Point-in-time verdict: the scoring checkpoint must have been trained
-        # only on labels published before the first test observation date.
+        # only on labels published before the first test observation date. The
+        # first test observation comes from the same walk-forward call the
+        # experiment uses, so the verdict cannot drift from the scored split.
         first_test_obs = None
         try:
-            first_window = walk_forward_windows(
-                panel,
-                n_windows=cfg.n_windows,
-                test_size=cfg.test_size,
-                val_size=cfg.val_size,
-                expanding=cfg.expanding,
-            )[0]
-            first_test_obs = str(
-                pd.to_datetime(
-                    panel.iloc[first_window.test]["observation_date"]
-                ).min().date()
-            )
-        except ValueError:
+            first_test_obs = first_test_observation_date(panel, cfg)
+        except (ValueError, KeyError):
             first_test_obs = None
         checkpoint = provenance["news_sentiment"]["score_manifest"]
         manifest_path = checkpoint.get("checkpoint_manifest_path")
         label_cutoff = None
+        config_selection_size = None
         reason = "manifest_missing"
         if manifest_path and Path(manifest_path).is_file():
             expected = checkpoint.get("checkpoint_manifest_sha256")
@@ -981,8 +1008,12 @@ def cmd_forecast(args: argparse.Namespace) -> int:
                 reason = "hash_mismatch"
             else:
                 try:
-                    label_cutoff = (
-                        json.loads(raw).get("provenance", {}).get("label_cutoff")
+                    manifest_doc = json.loads(raw)
+                    label_cutoff = manifest_doc.get("provenance", {}).get("label_cutoff")
+                    config_selection_size = (
+                        manifest_doc.get("selection", {})
+                        .get("evaluation_reference", {})
+                        .get("data_size")
                     )
                     reason = "no_label_cutoff" if label_cutoff is None else "verified"
                 except (json.JSONDecodeError, AttributeError):
@@ -998,6 +1029,11 @@ def cmd_forecast(args: argparse.Namespace) -> int:
         provenance["news_sentiment"]["first_test_observation_date"] = first_test_obs
         provenance["news_sentiment"]["point_in_time"] = point_in_time
         provenance["news_sentiment"]["point_in_time_reason"] = reason
+        # The verdict certifies the *training labels* only: the checkpoint's
+        # hyperparameters were selected on a CV whose data_size may exceed the
+        # frozen subset, so config selection is not claimed point-in-time.
+        provenance["news_sentiment"]["point_in_time_scope"] = "training_labels"
+        provenance["news_sentiment"]["config_selection_data_size"] = config_selection_size
     record = run_experiment(
         panel, cfg=cfg, output_dir=Path(args.output), provenance=provenance
     )
@@ -1079,6 +1115,11 @@ def cmd_forecast_refit(args: argparse.Namespace) -> int:
     panel = assemble(prices, news)
     if "alignment_report" in panel.attrs:
         provenance["alignment_report"] = panel.attrs["alignment_report"]
+    # Serving fits on every available row, which may extend past the configured
+    # study window; record the actual fitted range, not the config constant.
+    target_dates = pd.to_datetime(panel["target_date"]).dropna()
+    provenance["panel_start"] = str(target_dates.min().date())
+    provenance["panel_end"] = str(target_dates.max().date())
     provenance["panel_hash"] = frame_hash(panel)
 
     cfg = ForecastConfig(
@@ -1387,6 +1428,23 @@ def cmd_forecast_compare(args: argparse.Namespace) -> int:
     report = compare_information_gain(
         Path(args.real), Path(args.control), arm=args.arm, price_arm=args.price_arm
     )
+    # Traceability: the report must name its inputs and their point-in-time
+    # verdicts, or it cannot be tied back to a specific pair of runs.
+    for label, run_dir in (("real", args.real), ("control", args.control)):
+        try:
+            prov = json.loads(
+                (Path(run_dir) / "forecast_results.json").read_text(encoding="utf-8")
+            ).get("provenance", {})
+            news_prov = prov.get("news_sentiment") or {}
+            report[f"{label}_run"] = {
+                "dir": str(run_dir),
+                "point_in_time": news_prov.get("point_in_time"),
+                "point_in_time_reason": news_prov.get("point_in_time_reason"),
+                "panel_start": prov.get("panel_start"),
+                "panel_end": prov.get("panel_end"),
+            }
+        except (OSError, json.JSONDecodeError):
+            report[f"{label}_run"] = {"dir": str(run_dir)}
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
@@ -1656,14 +1714,17 @@ def main(argv: list[str] | None = None) -> int:
         "--panel-end",
         default=None,
         metavar="YYYY-MM-DD",
-        help="drop panel rows after this observation date (keeps the evaluation window fixed when price data extends past the study window)",
+        help=(
+            "drop panel rows whose target date is after this date "
+            f"(default: the study window end, {config.DATE_END})"
+        ),
     )
     p_forecast.add_argument(
         "--panel-start",
         default=None,
         metavar="YYYY-MM-DD",
         help=(
-            "drop panel rows before this observation date "
+            "drop panel rows whose target date is before this date "
             f"(default: the study window start, {config.DATE_START})"
         ),
     )

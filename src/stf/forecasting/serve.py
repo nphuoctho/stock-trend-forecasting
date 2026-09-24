@@ -247,6 +247,12 @@ def refit_arm(
         "use_sentiment": use_sentiment,
         "config": cfg.as_dict(),
         "seeds": list(cfg.seeds),
+        # The TFT encoder is fixed at one LSTM layer with dropout 0.1 regardless
+        # of cfg.num_layers / the LSTM arms' zero dropout, so record what was
+        # actually built rather than let the shared config imply otherwise.
+        "architecture_overrides": (
+            {"num_layers": 1, "dropout": 0.1} if family == "tft" else {}
+        ),
         "thresholds": [float(thresholds[0]), float(thresholds[1])],
         "price_features": price_cols,
         "sentiment_features": sent_cols,
@@ -291,13 +297,13 @@ def load_arm(model_dir: Path) -> LoadedArm:
                     if manifest["use_sentiment"]
                     else len(manifest["price_features"])
                 )
-                net: torch.nn.Module = TemporalFusionClassifier(
+                net = TemporalFusionClassifier(
                     n_in,
                     hidden=cfg.hidden,
                     num_classes=len(TREND_LABELS),
                 )
             elif manifest["use_sentiment"]:
-                net: torch.nn.Module = PriceSentimentLSTM(
+                net = PriceSentimentLSTM(
                     len(manifest["price_features"]),
                     len(manifest["sentiment_features"]),
                     hidden=cfg.hidden,
@@ -398,20 +404,17 @@ def predict_latest(panel: pd.DataFrame, arm: LoadedArm) -> pd.DataFrame:
             probs = predict_lstm(
                 model, X_price, X_sent if arm.use_sentiment else None
             )
-        elif arm.family == "tft":
-            key = (
-                np.concatenate([X_price, X_sent], axis=2)
-                if arm.use_sentiment
-                else X_price
-            )
-            probs = predict_lstm(model, key)
         else:
             key = (
                 np.concatenate([X_price, X_sent], axis=2)
                 if arm.use_sentiment
                 else X_price
             )
-            probs = model.predict_proba(key)
+            probs = (
+                predict_lstm(model, key)
+                if arm.family == "tft"
+                else model.predict_proba(key)
+            )
         probas.append(probs)
     proba = np.mean(probas, axis=0)
     pred = proba.argmax(axis=1)

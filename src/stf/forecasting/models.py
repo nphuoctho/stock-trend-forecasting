@@ -132,8 +132,11 @@ class TemporalFusionClassifier(nn.Module):
     panel without static covariates needs: per-feature linear embeddings, a variable
     selection network that re-weights features per timestep, a single-layer LSTM
     encoder, multi-head self-attention with a gated residual, and a GRN head over
-    the last position. ``n_features`` is the concatenated price (+ sentiment)
-    feature count, so the same class serves both the price-only and the fused arm.
+    the last position. Deviation from the paper: the self-attention is not causally
+    masked -- only ``fused[:, -1, :]`` is consumed and the whole window is
+    historical, so no future position can leak into the prediction.
+    ``n_features`` is the concatenated price (+ sentiment) feature count, so the
+    same class serves both the price-only and the fused arm.
     """
 
     def __init__(

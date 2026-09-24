@@ -371,17 +371,31 @@ def collect_listings(refresh: bool = False, end: str | None = None) -> pd.DataFr
         return end if year == end_year else f"{year}-12-31"
 
     def _within_window(frame: pd.DataFrame) -> pd.DataFrame:
-        """Keep only rows whose listing date lies inside [DATE_START, end].
+        """Keep rows whose listing date lies inside [DATE_START, end].
 
         Filtering by ``year`` alone is not enough: a cache walked through December
         still carries rows past a mid-year ``--end``, so the flag would be ignored
-        on the reuse path. ``list_date`` is Vietstock's ``dd/mm/yyyy``.
+        on the reuse path. ``list_date`` is Vietstock's ``dd/mm/yyyy`` recovered by
+        a nearest-date heuristic, so it is not authoritative: rows whose date could
+        not be parsed are kept in the crawl set (over-crawling is safe, the
+        authoritative ``published_at`` bounds the corpus downstream) and counted,
+        while rows parsed outside the window are dropped and counted. A markup
+        change that empties ``list_date`` therefore widens the crawl instead of
+        silently producing a zero-coverage year that still earns a watermark.
         """
-        if frame.empty:
+        if frame.empty or "list_date" not in frame.columns:
             return frame.reset_index(drop=True)
         listed = pd.to_datetime(frame["list_date"], format="%d/%m/%Y", errors="coerce")
+        unparsed = listed.isna()
         keep = listed.between(pd.Timestamp(config.DATE_START), pd.Timestamp(end))
-        return frame[keep.fillna(False)].reset_index(drop=True)
+        dropped = int((~keep & ~unparsed).sum())
+        kept_unparsed = int(unparsed.sum())
+        if dropped or kept_unparsed:
+            _log(
+                f"[listings] window filter: dropped {dropped} out-of-window rows, "
+                f"kept {kept_unparsed} rows with unparseable list_date"
+            )
+        return frame[(keep | unparsed)].reset_index(drop=True)
 
     cached: pd.DataFrame | None = None
     years = list(range(start_year, end_year + 1))
@@ -394,15 +408,16 @@ def collect_listings(refresh: bool = False, end: str | None = None) -> pd.DataFr
             if coverage.get(str(year), "") >= _wanted_through(year)
         }
         years = [year for year in range(start_year, end_year + 1) if year not in covered]
-        if cached.empty:
-            cached = None
-        elif not years:
+        if not years:
             df = _within_window(cached)
             _log(
-                f"[listings] reused: {len(df)} rows, {df['url'].nunique()} urls, "
+                f"[listings] reused: {len(df)} rows, "
+                f"{df['url'].nunique() if 'url' in df.columns else 0} urls, "
                 f"every year covered through its requested end"
             )
             return df
+        if cached.empty:
+            cached = None
         else:
             _log(
                 f"[listings] reusing {len(cached)} cached rows; "
@@ -424,6 +439,15 @@ def collect_listings(refresh: bool = False, end: str | None = None) -> pd.DataFr
         for year in years:
             stale.pop(str(year), None)
         _atomic_write_json(_coverage_path(), stale)
+    if not years:
+        # Nothing to walk (e.g. start_year > end_year, or an empty cache whose
+        # coverage already claims every year). Returning here keeps the parquet
+        # schema intact instead of overwriting it with a column-less frame.
+        df = _within_window(cached) if cached is not None else pd.DataFrame(
+            columns=["ticker", "url", "list_date", "year"]
+        )
+        _log(f"[listings] done: {len(df)} rows, 0 unique urls (no years to walk)")
+        return df
     for code in config.TICKERS:
         tot = 0
         for year in years:
@@ -453,20 +477,26 @@ def collect_listings(refresh: bool = False, end: str | None = None) -> pd.DataFr
         config.NEWS_DIR.mkdir(parents=True, exist_ok=True)
         if cached is not None and len(cached):
             kept = cached[~cached["year"].isin(years)]
-            merged = pd.concat([kept, pd.DataFrame(recs)], ignore_index=True)
+            merged = pd.concat(
+                [kept, pd.DataFrame(recs, columns=["ticker", "url", "list_date", "year"])],
+                ignore_index=True,
+            )
         else:
-            merged = pd.DataFrame(recs)
+            merged = pd.DataFrame(recs, columns=["ticker", "url", "list_date", "year"])
         _atomic_to_parquet(merged, config.LISTINGS_PQ)  # save incrementally after each ticker
 
     if cached is not None and len(cached):
         df = pd.concat(
-            [cached[~cached["year"].isin(years)], pd.DataFrame(recs)],
+            [cached[~cached["year"].isin(years)],
+             pd.DataFrame(recs, columns=["ticker", "url", "list_date", "year"])],
             ignore_index=True,
         )
     else:
-        df = pd.DataFrame(recs)
-    # Drop rows outside the configured window so the artifact keeps meaning
-    # "listings in [DATE_START, end]" even after a run with a later --end.
+        df = pd.DataFrame(recs, columns=["ticker", "url", "list_date", "year"])
+    # Drop rows outside the configured window from the returned crawl set so it
+    # keeps meaning "listings in [DATE_START, end]" even after a run with a later
+    # --end. The parquet itself keeps every discovered row; load_ticker_articles
+    # applies its own bound when reading it back.
     df = _within_window(df)
     # The watermark is written only here, after every ticker finished every year in
     # this run, and only for years whose every walk ended on an empty page. A crash
@@ -479,7 +509,10 @@ def collect_listings(refresh: bool = False, end: str | None = None) -> pd.DataFr
         else:
             _log(f"[listings] {year}: walk incomplete, watermark withheld")
     _atomic_write_json(_coverage_path(), coverage)
-    _log(f"[listings] done: {len(df)} rows, {df['url'].nunique()} unique urls")
+    _log(
+        f"[listings] done: {len(df)} rows, "
+        f"{df['url'].nunique() if 'url' in df.columns else 0} unique urls"
+    )
     return df
 
 
@@ -550,8 +583,11 @@ def parse_article(html: str) -> dict[str, str | None]:
 def _to_iso(ts: str | None) -> str | None:
     if not ts:
         return None
-    # ISO 8601 (from meta tag or already-normalized strings)
-    if "T" in ts or (len(ts) >= 10 and ts[4] == "-" and ts[7] == "-"):
+    # ISO 8601 (from meta tag or already-normalized strings). A date-only value
+    # carries no publish time, so anchoring it would silently assume midnight --
+    # before the session cutoff -- and leak an evening article into the same
+    # session. Reject it instead of guessing.
+    if "T" in ts or (len(ts) > 10 and ts[4] == "-" and ts[7] == "-"):
         iso = pd.to_datetime(ts, errors="coerce")
         if not pd.isna(iso):
             if iso.tzinfo is None:
@@ -634,7 +670,7 @@ def fetch_articles(
     if limit_urls is not None:
         urls = urls[:limit_urls]
 
-    def _needs_body(url: str) -> bool:
+    def _needs_work(url: str) -> bool:
         rec = store.get(url)
         if rec is None or not _has_body(rec.get("body")):
             return True
@@ -652,7 +688,7 @@ def fetch_articles(
     n_parsed = 0  # records written this run, for flush cadence and progress
     n_fetched = 0  # network fetches, the only thing --batch limits
     for i, url in enumerate(urls, 1):
-        if not _needs_body(url):
+        if not _needs_work(url):
             continue
         aid_m = ART_ID.search(url)
         aid = aid_m.group(1) if aid_m else sha256(url.encode()).hexdigest()[:16]

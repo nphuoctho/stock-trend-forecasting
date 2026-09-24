@@ -79,6 +79,14 @@ class ForecastConfig:
     bootstrap_samples: int = 2000
     bootstrap_seed: int = 7
 
+    def __post_init__(self) -> None:
+        # The TFT arm hard-codes num_heads=4; fail at config time instead of
+        # after the cheaper arms have already trained across every window.
+        if self.hidden % 4 != 0:
+            raise ValueError(
+                f"hidden={self.hidden} must be divisible by 4 (TFT num_heads)."
+            )
+
     def as_dict(self) -> dict:
         data = self.__dict__.copy()
         data["seeds"] = list(self.seeds)
@@ -104,6 +112,25 @@ def _date_bounds(frame: pd.DataFrame, col: str = "target_date") -> tuple[str, st
     if dates.empty:
         return ("", "")
     return (str(dates.min().date()), str(dates.max().date()))
+
+def first_test_observation_date(panel: pd.DataFrame, cfg: ForecastConfig) -> str:
+    """Return the earliest observation date in the first walk-forward test block.
+
+    This is the single source for the point-in-time verdict: the CLI must not
+    re-derive the split with its own kwargs, or a future change to
+    ``run_experiment``'s call would silently desynchronize the verdict from the
+    split that was actually scored.
+    """
+    first_window = walk_forward_windows(
+        panel,
+        n_windows=cfg.n_windows,
+        test_size=cfg.test_size,
+        val_size=cfg.val_size,
+        expanding=cfg.expanding,
+    )[0]
+    return str(
+        pd.to_datetime(panel.iloc[first_window.test]["observation_date"]).min().date()
+    )
 
 
 def _label_counts(frame: pd.DataFrame) -> dict[str, int]:

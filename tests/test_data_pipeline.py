@@ -363,6 +363,9 @@ def test_to_iso_parsing():
     assert news._to_iso("2026-09-21T14:30:00+07:00") == "2026-09-21T14:30:00+07:00"
     assert news._to_iso(None) is None
     assert news._to_iso("không hợp lệ") is None
+    # A date-only meta value carries no publish time; anchoring it to midnight
+    # would leak an evening article into the same session.
+    assert news._to_iso("2026-09-21") is None
 
 
 def test_join_listings_articles_preserves_many_to_many_ticker_links():
@@ -1258,5 +1261,66 @@ def test_fetch_articles_budget_counts_only_network_fetches(monkeypatch, tmp_path
     assert fetched == []  # nothing left to do; the stuck page is not retried
 
     fetched.clear()
-    news.fetch_articles([stuck, fresh], max_new=1, retry_failed=True)
-    assert fetched == []  # cached HTML is re-parsed without network work
+    # The parser improves (or the cached page is replaced): a forced re-parse must
+    # clear the flag and pick up the timestamp without any network work.
+    (config.NEWS_HTML_DIR / "111.html").write_text(
+        '<html><title>t</title>'
+        '<meta itemprop="datePublished" content="2024-01-05T10:00:00+07:00">'
+        "<body>body text</body></html>",
+        encoding="utf-8",
+    )
+    retried = news.fetch_articles([stuck, fresh], max_new=1, retry_failed=True)
+    assert fetched == []
+    stuck_row = retried.set_index("url").loc[stuck]
+    assert not stuck_row["parse_failed"]
+    assert stuck_row["published_at"] == "2024-01-05T10:00:00+07:00"
+
+
+def test_collect_listings_keeps_rows_with_unparseable_list_dates(
+    monkeypatch, tmp_path
+):
+    """A row whose list_date the parser cannot read is kept, not silently dropped.
+
+    Dropping it would lose the article entirely and still mark the year complete,
+    so the crawl would never retry it. Keeping it preserves the URL for the
+    article stage, which has its own timestamp repair path.
+    """
+    _listings_sandbox(monkeypatch, tmp_path)
+
+    def fake_walk(code, year, *, to_date):
+        return [
+            ("https://vietstock.vn/2023/01/good.htm", "05/01/2023"),
+            ("https://vietstock.vn/2023/01/bad.htm", "không phải ngày"),
+        ], True
+
+    monkeypatch.setattr(news, "list_ticker_year", fake_walk)
+
+    listings = news.collect_listings(end="2023-12-31")
+    assert sorted(listings["url"]) == [
+        "https://vietstock.vn/2023/01/bad.htm",
+        "https://vietstock.vn/2023/01/good.htm",
+    ]
+
+
+def test_collect_listings_with_empty_cache_and_full_coverage_returns_empty(
+    monkeypatch, tmp_path
+):
+    """A fully-watermarked cache with no rows must not crash on reuse.
+
+    The reuse path filters the cached frame by year; an empty frame has no
+    'year' column, so indexing it raises KeyError and the crawl dies before it
+    can serve a legitimate empty result.
+    """
+    _listings_sandbox(monkeypatch, tmp_path)
+    from stf import config
+
+    monkeypatch.setattr(
+        news,
+        "list_ticker_year",
+        lambda code, year, *, to_date: ([], True),
+    )
+    first = news.collect_listings(end="2023-12-31")
+    assert first.empty
+
+    reused = news.collect_listings(end="2023-12-31")
+    assert reused.empty

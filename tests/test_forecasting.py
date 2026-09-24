@@ -940,3 +940,17 @@ def test_tft_arm_survives_the_refit_load_round_trip(tmp_path):
     assert arm.family == "tft"
     pd.testing.assert_frame_equal(first[probabilities], second[probabilities])
     assert np.allclose(first[probabilities].sum(axis=1), 1.0)
+
+    # The served probabilities must come from the persisted weights, not from a
+    # freshly initialised net: corrupting the checkpoint has to change them.
+    import torch
+
+    state_files = sorted((tmp_path / "arm").glob("*.pt"))
+    assert state_files, "refit_arm persisted no weights"
+    for state_file in state_files:
+        state = torch.load(state_file, map_location="cpu", weights_only=True)
+        torch.save({k: torch.zeros_like(v) for k, v in state.items()}, state_file)
+    corrupted = predict_latest(panel, load_arm(tmp_path / "arm"))
+    assert not np.allclose(
+        first[probabilities].to_numpy(), corrupted[probabilities].to_numpy()
+    )

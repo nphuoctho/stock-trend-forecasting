@@ -372,12 +372,10 @@ def _point_in_time_verdict(monkeypatch, tmp_path, *, label_cutoff, tamper=False)
         ),
     )
     monkeypatch.setattr(forecasting_module, "assemble", lambda *_args: panel)
-    from stf.forecasting import split as split_module
-
     monkeypatch.setattr(
-        split_module,
-        "walk_forward_windows",
-        lambda *_a, **_k: [type("W", (), {"test": [1]})()],
+        experiment_module,
+        "first_test_observation_date",
+        lambda *_a, **_k: "2024-10-21",
     )
 
     def fake_run_experiment(panel, *, cfg, output_dir, provenance):
@@ -444,6 +442,58 @@ def test_point_in_time_refuses_a_checkpoint_manifest_edited_after_scoring(
     assert verdict["point_in_time"] is False
     assert verdict["point_in_time_reason"] == "hash_mismatch"
     assert verdict["label_cutoff"] is None
+
+
+def test_sentiment_refit_rejects_a_before_date_with_a_time_component(
+    tmp_path, capsys
+):
+    """--before-date must be a calendar date, not a timestamp.
+
+    The cutoff is recorded in the manifest as a date and verified against the
+    first test observation date. Accepting '2024-10-21T15:00' would silently
+    record a different boundary than the one the operator asked for.
+    """
+    labels = tmp_path / "labels.csv"
+    pd.DataFrame(
+        {
+            "text": ["tin tốt", "tin xấu"],
+            "label": ["POSITIVE", "NEGATIVE"],
+            "published_at": [
+                "2024-01-01T10:00:00+07:00",
+                "2024-01-02T10:00:00+07:00",
+            ],
+        }
+    ).to_csv(labels, index=False)
+
+    assert (
+        main(
+            [
+                "sentiment-refit",
+                "--data",
+                str(labels),
+                "--cv-results",
+                str(tmp_path / "cv.json"),
+                "--epochs",
+                "1",
+                "--batch-size",
+                "4",
+                "--seed",
+                "42",
+                "--input-variant",
+                "title",
+                "--truncation-strategy",
+                "head_tail",
+                "--class-weighting",
+                "none",
+                "--output",
+                str(tmp_path / "out"),
+                "--before-date",
+                "2024-10-21T15:00",
+            ]
+        )
+        == 2
+    )
+    assert "must be a calendar date" in capsys.readouterr().err
 
 
 def test_in_window_alignment_report_uses_a_half_open_final_day(monkeypatch, tmp_path):
