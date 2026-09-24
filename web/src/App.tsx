@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import TodaySection from './components/TodaySection'
 import LiveSignalsSection from './components/LiveSignalsSection'
 import OverviewCards from './components/OverviewCards'
 import MetricsTable from './components/MetricsTable'
@@ -138,6 +139,8 @@ export default function App() {
           <Skeleton className="h-64" />
         </div>
       )}
+
+      <TodaySection />
 
       <LiveSignalsSection />
 

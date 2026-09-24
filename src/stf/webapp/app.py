@@ -291,6 +291,124 @@ def live_status() -> dict:
         )
     return {"last_run": last_run, "arms": arms}
 
+
+PRIMARY_LIVE_ARM = "lstm_price_sentiment"
+# Matches ROLLING_WINDOW in stf.forecasting.sentiment_agg: the model reads a
+# trailing 5-session sentiment window, so the news shown to explain a
+# prediction covers the same span.
+NEWS_LOOKBACK_SESSIONS = 5
+
+
+@app.get("/api/live/today")
+def live_today() -> dict:
+    """User-facing view: next-session call per ticker with its driving news.
+
+    Joins the primary arm's latest issued predictions with the last close, the
+    issued class boundaries (as an expected price band), and the articles the
+    sentiment features were computed from.
+    """
+    live = _live_dir() / PRIMARY_LIVE_ARM
+    latest_path = live / "latest.parquet"
+    if not latest_path.is_file():
+        raise HTTPException(status_code=404, detail="no live predictions yet")
+    predictions = pd.read_parquet(latest_path)
+
+    manifest_path = Path(config.ROOT) / "models" / "forecast" / PRIMARY_LIVE_ARM / "manifest.json"
+    manifest = _read_json(manifest_path) if manifest_path.is_file() else {}
+    thresholds = manifest.get("thresholds")
+    if thresholds is None and {"threshold_low", "threshold_high"} <= set(
+        predictions.columns
+    ):
+        thresholds = [
+            float(predictions["threshold_low"].iloc[0]),
+            float(predictions["threshold_high"].iloc[0]),
+        ]
+
+    obs = pd.to_datetime(predictions["observation_date"]).max()
+
+    # Last close per ticker for the expected price band.
+    closes: dict[str, float] = {}
+    for ticker in predictions["ticker"]:
+        price_path = config.PRICES_DIR / f"{ticker}.parquet"
+        if price_path.is_file():
+            prices = pd.read_parquet(price_path)
+            closes[ticker] = float(prices["close"].iloc[-1])
+
+    # Articles inside the model's trailing sentiment window, joined with their
+    # scored probabilities and titles.
+    news_by_ticker: dict[str, list[dict]] = {t: [] for t in predictions["ticker"]}
+    scored_path = (
+        Path(config.ROOT) / "data" / "processed" / "news_sentiment_merged.parquet"
+    )
+    articles_path = config.ARTICLES_PQ
+    if scored_path.is_file() and articles_path.is_file():
+        scored = pd.read_parquet(scored_path)
+        articles = pd.read_parquet(articles_path)[["url", "title"]]
+        merged = scored.merge(articles, on="url", how="left")
+        merged["published_at"] = pd.to_datetime(
+            merged["published_at"], format="ISO8601", utc=True
+        )
+        cutoff = merged["published_at"].max() - pd.Timedelta(
+            days=NEWS_LOOKBACK_SESSIONS + 2
+        )
+        recent = merged[merged["published_at"] >= cutoff]
+        for ticker, group in recent.groupby("ticker"):
+            if ticker not in news_by_ticker:
+                continue
+            group = group.assign(
+                conviction=(group[["prob_negative", "prob_positive"]].max(axis=1))
+            ).nlargest(5, "conviction")
+            news_by_ticker[ticker] = [
+                {
+                    "title": row["title"] if isinstance(row["title"], str) else None,
+                    "url": row["url"],
+                    "published_at": row["published_at"].isoformat(),
+                    "prob_negative": float(row["prob_negative"]),
+                    "prob_neutral": float(row["prob_neutral"]),
+                    "prob_positive": float(row["prob_positive"]),
+                }
+                for _, row in group.iterrows()
+            ]
+
+    tickers = []
+    for _, row in predictions.iterrows():
+        ticker = row["ticker"]
+        close = closes.get(ticker)
+        band = None
+        if thresholds is not None and close is not None:
+            band = {
+                "low": round(close * (1 + thresholds[0]), 2),
+                "high": round(close * (1 + thresholds[1]), 2),
+            }
+        tickers.append(
+            {
+                "ticker": ticker,
+                "y_pred": row["y_pred"],
+                "confidence": float(
+                    row[["prob_down", "prob_flat", "prob_up"]].max()
+                ),
+                "prob_down": float(row["prob_down"]),
+                "prob_flat": float(row["prob_flat"]),
+                "prob_up": float(row["prob_up"]),
+                "has_news": bool(row["has_news"]),
+                "last_close": close,
+                "expected_band": band,
+                "news": news_by_ticker.get(ticker, []),
+            }
+        )
+
+    return {
+        "arm": PRIMARY_LIVE_ARM,
+        "observation_date": obs.date().isoformat(),
+        "issued_at": (
+            str(predictions["issued_at"].iloc[0])
+            if "issued_at" in predictions.columns
+            else None
+        ),
+        "thresholds": thresholds,
+        "tickers": tickers,
+    }
+
 def mount_frontend() -> None:
     """Serve the built dashboard when ``web/dist`` exists."""
     if not WEB_DIST.is_dir():

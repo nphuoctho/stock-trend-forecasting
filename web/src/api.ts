@@ -171,6 +171,36 @@ export interface LiveStatus {
   arms: { arm: string; observation_date: string; issued_at: string | null }[]
 }
 
+export interface LiveTodayNews {
+  title: string | null
+  url: string
+  published_at: string
+  prob_negative: number
+  prob_neutral: number
+  prob_positive: number
+}
+
+export interface LiveTodayTicker {
+  ticker: string
+  y_pred: 'UP' | 'FLAT' | 'DOWN'
+  confidence: number
+  prob_down: number
+  prob_flat: number
+  prob_up: number
+  has_news: boolean
+  last_close: number | null
+  expected_band: { low: number; high: number } | null
+  news: LiveTodayNews[]
+}
+
+export interface LiveToday {
+  arm: string
+  observation_date: string
+  issued_at: string | null
+  thresholds: [number, number] | null
+  tickers: LiveTodayTicker[]
+}
+
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path)
@@ -208,4 +238,5 @@ export const api = {
   liveLatest: () => getOr404<{ arms: LiveArmLatest[] }>('/api/live/latest'),
   liveHistory: () => getOr404<{ arms: LiveArmHistory[] }>('/api/live/history'),
   liveStatus: () => getOr404<LiveStatus>('/api/live/status'),
+  liveToday: () => getOr404<LiveToday>('/api/live/today'),
 }
