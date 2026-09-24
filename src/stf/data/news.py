@@ -429,6 +429,24 @@ def collect_listings(refresh: bool = False, end: str | None = None) -> pd.DataFr
     # page. One transient fetch failure anywhere in the year withholds it, so the
     # next run re-walks instead of freezing a gap.
     year_complete = {year: True for year in years}
+    # Per (ticker, year) completion: a completed walk replaces its cached slice
+    # wholesale, but an incomplete one must merge with it -- otherwise a single
+    # failed page would erase every link that year had already crawled.
+    completed_pairs: set[tuple[str, int]] = set()
+
+    def _merge_with_cache(new_recs: list[dict]) -> pd.DataFrame:
+        fresh = pd.DataFrame(
+            new_recs, columns=["ticker", "url", "list_date", "year"]
+        )
+        if cached is None or not len(cached):
+            return fresh
+        replaced = cached.apply(
+            lambda r: r["year"] in years
+            and (r["ticker"], r["year"]) in completed_pairs,
+            axis=1,
+        )
+        merged = pd.concat([cached[~replaced], fresh], ignore_index=True)
+        return merged.drop_duplicates(["ticker", "url"], keep="last")
     # Drop the watermark for every year about to be rewritten, before the first
     # partial write. The parquet is replaced after each ticker, so a crash between
     # here and the end would otherwise leave partial rows that a stale watermark
@@ -455,6 +473,8 @@ def collect_listings(refresh: bool = False, end: str | None = None) -> pd.DataFr
             to_date = end if year == end_year else f"{year}-12-31"
             rows, complete = list_ticker_year(code, year, to_date=to_date)
             year_complete[year] = year_complete[year] and complete
+            if complete:
+                completed_pairs.add((code, year))
             for href, d in rows:
                 if href.startswith("//"):
                     url = f"https:{href}"
@@ -475,24 +495,11 @@ def collect_listings(refresh: bool = False, end: str | None = None) -> pd.DataFr
                 f"[listings] {code} {year}: {len(rows)} articles (ticker running total {tot})"
             )
         config.NEWS_DIR.mkdir(parents=True, exist_ok=True)
-        if cached is not None and len(cached):
-            kept = cached[~cached["year"].isin(years)]
-            merged = pd.concat(
-                [kept, pd.DataFrame(recs, columns=["ticker", "url", "list_date", "year"])],
-                ignore_index=True,
-            )
-        else:
-            merged = pd.DataFrame(recs, columns=["ticker", "url", "list_date", "year"])
-        _atomic_to_parquet(merged, config.LISTINGS_PQ)  # save incrementally after each ticker
+        _atomic_to_parquet(
+            _merge_with_cache(recs), config.LISTINGS_PQ
+        )  # save incrementally after each ticker
 
-    if cached is not None and len(cached):
-        df = pd.concat(
-            [cached[~cached["year"].isin(years)],
-             pd.DataFrame(recs, columns=["ticker", "url", "list_date", "year"])],
-            ignore_index=True,
-        )
-    else:
-        df = pd.DataFrame(recs, columns=["ticker", "url", "list_date", "year"])
+    df = _merge_with_cache(recs)
     # Drop rows outside the configured window from the returned crawl set so it
     # keeps meaning "listings in [DATE_START, end]" even after a run with a later
     # --end. The parquet itself keeps every discovered row; load_ticker_articles

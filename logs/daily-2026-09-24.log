@@ -229,3 +229,7 @@ Mới (New): from vnstock.api.quote import Quote
 [listings] reusing 14256 cached rows; re-walking years [2020, 2021, 2022, 2023, 2024, 2025, 2026]
 [listings] FPT 2020: fetch failed on page 9; walk incomplete
 [listings] FPT 2020: 159 articles (ticker running total 159)
+[listings] FPT 2021: fetch failed on page 10; walk incomplete
+[listings] FPT 2021: 177 articles (ticker running total 336)
+[listings] FPT 2022: fetch failed on page 9; walk incomplete
+[listings] FPT 2022: 156 articles (ticker running total 492)

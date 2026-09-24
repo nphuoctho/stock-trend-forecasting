@@ -1324,3 +1324,58 @@ def test_collect_listings_with_empty_cache_and_full_coverage_returns_empty(
 
     reused = news.collect_listings(end="2023-12-31")
     assert reused.empty
+
+
+def test_collect_listings_keeps_cached_links_when_a_walk_is_incomplete(
+    monkeypatch, tmp_path
+):
+    """A failed page must not erase links the year already crawled.
+
+    The cache is rewritten after every ticker; dropping all cached rows for
+    re-walked years and writing only the new partial recs would turn one
+    transient fetch failure into permanent link loss -- including rows for
+    tickers the run never reached.
+    """
+    _listings_sandbox(monkeypatch, tmp_path)
+    from stf import config
+
+    monkeypatch.setattr(config, "TICKERS", ["FPT", "VNM"])
+
+    def full_walk(code, year, *, to_date):
+        return [
+            (f"https://vietstock.vn/{year}/{code}-a.htm", f"05/01/{year}"),
+            (f"https://vietstock.vn/{year}/{code}-b.htm", f"06/01/{year}"),
+        ], True
+
+    monkeypatch.setattr(news, "list_ticker_year", full_walk)
+    news.collect_listings(end="2023-06-30")
+    cached_before = pd.read_parquet(config.LISTINGS_PQ)
+    assert len(cached_before) == 4
+
+    # Second run asks for the rest of 2023: the mid-year watermark forces a
+    # re-walk with the cache loaded. FPT's walk dies mid-year, VNM's succeeds;
+    # the failed pair must merge with its cached slice instead of replacing it.
+    def flaky_walk(code, year, *, to_date):
+        if code == "FPT":
+            return [(f"https://vietstock.vn/{year}/{code}-c.htm", f"07/01/{year}")], False
+        return [
+            (f"https://vietstock.vn/{year}/{code}-a.htm", f"05/01/{year}"),
+            (f"https://vietstock.vn/{year}/{code}-d.htm", f"08/01/{year}"),
+        ], True
+
+    monkeypatch.setattr(news, "list_ticker_year", flaky_walk)
+    listings = news.collect_listings(end="2023-12-31")
+
+    urls = set(listings["url"])
+    # FPT keeps its previously crawled links plus the new partial one.
+    assert "https://vietstock.vn/2023/FPT-a.htm" in urls
+    assert "https://vietstock.vn/2023/FPT-b.htm" in urls
+    assert "https://vietstock.vn/2023/FPT-c.htm" in urls
+    # VNM's completed walk replaces its slice wholesale: -b is gone, -d is new.
+    assert "https://vietstock.vn/2023/VNM-a.htm" in urls
+    assert "https://vietstock.vn/2023/VNM-d.htm" in urls
+    assert "https://vietstock.vn/2023/VNM-b.htm" not in urls
+
+    # The parquet on disk reflects the same merge, not just the returned frame.
+    on_disk = pd.read_parquet(config.LISTINGS_PQ)
+    assert set(on_disk["url"]) == urls
