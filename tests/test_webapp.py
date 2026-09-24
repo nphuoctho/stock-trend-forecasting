@@ -123,3 +123,61 @@ def test_legacy_artifact_keys_are_normalized(client, tmp_path, monkeypatch):
     effect = client.get("/api/runs/legacy/information-gain").json()["effects"]["macro_f1"]
     assert effect["architecture_and_news_presence_volume_effect"] == 0.01
     assert "architecture_effect" not in effect
+
+
+def test_live_status_and_history_split_prospective_from_replayed(
+    client, tmp_path
+):
+    """The status endpoint reports job freshness; history counts only stamped rows.
+
+    A resolved row without an issuance stamp (or stamped after its target
+    session) is a replay: it stays visible but must not inflate the live
+    accuracy the dashboard advertises.
+    """
+    live = tmp_path / "outputs" / "live" / "lstm_price"
+    live.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "ticker": ["FPT"],
+            "observation_date": pd.to_datetime(["2026-09-21"]),
+            "y_pred": ["UP"],
+            "issued_at": ["2026-09-21T08:30:00+00:00"],
+        }
+    ).to_parquet(live / "latest.parquet", index=False)
+    pd.DataFrame(
+        {
+            "ticker": ["FPT", "VNM"],
+            "observation_date": pd.to_datetime(["2026-09-18", "2026-09-21"]),
+            "target_date": pd.to_datetime(["2026-09-21", "2026-09-22"]),
+            "y_pred": ["UP", "UP"],
+            "y_true": ["UP", "DOWN"],
+            "correct": [True, False],
+            # The first row was issued before its target session; the second is
+            # a replay written after the fact.
+            "prospective": [True, False],
+        }
+    ).to_parquet(live / "resolved.parquet", index=False)
+    (tmp_path / "outputs" / "live" / "last_run.json").write_text(
+        json.dumps(
+            {
+                "finished_at": "2026-09-23T08:35:00+00:00",
+                "ok": True,
+                "exit_code": 0,
+                "failed_step": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    status = client.get("/api/live/status").json()
+    assert status["last_run"]["ok"] is True
+    assert status["arms"][0]["observation_date"] == "2026-09-21"
+    assert status["arms"][0]["issued_at"] == "2026-09-21T08:30:00+00:00"
+
+    history = client.get("/api/live/history").json()["arms"][0]
+    assert history["resolved"] == 2
+    assert history["prospective_resolved"] == 1
+    assert history["replayed_resolved"] == 1
+    # Accuracy covers the prospective row only: 1/1, not 1/2.
+    assert history["accuracy"] == 1.0
+    assert [d["target_date"] for d in history["by_date"]] == ["2026-09-21"]

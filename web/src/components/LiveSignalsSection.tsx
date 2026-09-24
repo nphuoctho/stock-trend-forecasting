@@ -130,19 +130,45 @@ function HistoryChart({ arms }: { arms: LiveArmHistory[] }) {
 export default function LiveSignalsSection() {
   const latest = useQuery({ queryKey: ['live-latest'], queryFn: api.liveLatest })
   const history = useQuery({ queryKey: ['live-history'], queryFn: api.liveHistory })
+  const status = useQuery({ queryKey: ['live-status'], queryFn: api.liveStatus })
 
   if (!latest.data && !history.data) return null
 
+  const lastRun = status.data?.last_run
+  const dataThrough = status.data?.arms
+    .map((a) => a.observation_date)
+    .sort()
+    .pop()
+
+  const freshness = lastRun ? (
+    <span
+      className={cn(
+        'text-xs font-normal',
+        lastRun.ok ? 'text-muted-foreground' : 'text-destructive',
+      )}
+    >
+      {lastRun.ok
+        ? `cập nhật ${new Date(lastRun.finished_at).toLocaleString('vi-VN')}`
+        : `lần chạy gần nhất lỗi ở bước ${lastRun.failed_step}`}
+      {dataThrough && ` · dữ liệu đến ${dataThrough}`}
+    </span>
+  ) : dataThrough ? (
+    <span className="text-xs font-normal text-muted-foreground">
+      dữ liệu đến {dataThrough}
+    </span>
+  ) : null
   return (
     <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <HugeiconsIcon icon={DashboardSpeed02Icon} className="size-4 text-primary" />
           Tín hiệu phiên mới nhất
+          {freshness}
         </CardTitle>
         <CardDescription>
-          Dự đoán xu hướng phiên kế tiếp từ các mô hình đã refit trên toàn bộ dữ liệu.
-          Đây là demo pipeline end-to-end — không phải khuyến nghị giao dịch.
+          Dự đoán xu hướng phiên kế tiếp từ các mô hình đã refit trên toàn bộ dữ liệu,
+          phát hành trước giờ mở cửa và đối chiếu với kết quả thực tế. Không phải
+          khuyến nghị giao dịch.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

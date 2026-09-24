@@ -265,6 +265,32 @@ def live_history() -> dict:
         raise HTTPException(status_code=404, detail="no resolved predictions yet")
     return {"arms": arms}
 
+
+@app.get("/api/live/status")
+def live_status() -> dict:
+    """Freshness of the daily job and of each arm's latest issued prediction."""
+    status_path = _live_dir() / "last_run.json"
+    last_run = _read_json(status_path) if status_path.is_file() else None
+    arms = []
+    for name, path in _live_arm_dirs().items():
+        latest_path = path / "latest.parquet"
+        if not latest_path.is_file():
+            continue
+        frame = pd.read_parquet(latest_path)
+        obs = pd.to_datetime(frame["observation_date"]).max()
+        arms.append(
+            {
+                "arm": name,
+                "observation_date": obs.date().isoformat(),
+                "issued_at": (
+                    str(frame["issued_at"].iloc[0])
+                    if "issued_at" in frame.columns
+                    else None
+                ),
+            }
+        )
+    return {"last_run": last_run, "arms": arms}
+
 def mount_frontend() -> None:
     """Serve the built dashboard when ``web/dist`` exists."""
     if not WEB_DIST.is_dir():

@@ -161,6 +161,16 @@ export interface LiveArmHistory {
   by_date: { target_date: string; n: number; accuracy: number }[]
 }
 
+export interface LiveStatus {
+  last_run: {
+    finished_at: string
+    ok: boolean
+    exit_code: number
+    failed_step: string | null
+  } | null
+  arms: { arm: string; observation_date: string; issued_at: string | null }[]
+}
+
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path)
@@ -197,4 +207,5 @@ export const api = {
   },
   liveLatest: () => getOr404<{ arms: LiveArmLatest[] }>('/api/live/latest'),
   liveHistory: () => getOr404<{ arms: LiveArmHistory[] }>('/api/live/history'),
+  liveStatus: () => getOr404<LiveStatus>('/api/live/status'),
 }

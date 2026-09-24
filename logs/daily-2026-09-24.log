@@ -1,0 +1,231 @@
+[daily] 2026-09-24T08:53:18+07:00 fetching prices
+📦 Vnstock 4.0.8 is available
+Current: 4.0.2 (Python 3.12 (venv))
+Update: /home/nphuoctho/Documents/MySpace/Researcher/stock-trend-forecasting/.venv/bin/python -m pip install vnstock --upgrade
+Release: https://vnstocks.com/docs/tai-lieu/lich-su-phien-ban
+📦 Vnai 2.6.1 is available
+Current: 2.5.9 (Python 3.12 (venv))
+Update: /home/nphuoctho/Documents/MySpace/Researcher/stock-trend-forecasting/.venv/bin/python -m pip install vnai --upgrade
+Release: https://pypi.org/project/vnai/#history
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                                                                                 ┃
+┃                                                                                 ┃
+┃  🚀 VNSTOCK INSIDERS PROGRAM - NÂNG TẦM TRẢI NGHIỆM CỦA BẠN! 🚀                 ┃
+┃                                                                                 ┃
+┃  Nếu bạn cảm thấy khó chịu với các thông báo và quảng cáo:                      ┃
+┃                                                                                 ┃
+┃  ✨ Ẩn toàn bộ thông báo và quảng cáo phiền hà                                  ┃
+┃  🔓 Mở rộng khả năng sử dụng API tối đa                                         ┃
+┃  ⚡ Tăng tốc tải dữ liệu từ 5-8 lần                                              ┃
+┃  📈 Tăng giới hạn truy cập API lên đến 5 lần                                    ┃
+┃  🤖 Dùng AI Agent viết code hiệu quả với tài liệu Agent Guide                   ┃
+┃                                                                                 ┃
+┃  🔗 Tham gia ngay: https://vnstocks.com/insiders-program.                       ┃
+┃                                                                                 ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+[prices] FPT: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] GAS: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] HPG: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] MBB: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] MWG: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] TCB: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] VCB: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] VHM: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] VIC: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] VNM: 1759 sessions (2019-09-06 -> 2026-09-23)
+
+[prices] 10/10 tickers OK, 17590 price rows total
+[daily] 2026-09-24T08:53:33+07:00 crawling news
+[listings] reusing 14256 cached rows; re-walking years [2020, 2021, 2022, 2023, 2024, 2025, 2026]
+[listings] FPT 2020: fetch failed on page 9; walk incomplete
+[listings] FPT 2020: 159 articles (ticker running total 159)

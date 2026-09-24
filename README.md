@@ -297,9 +297,13 @@ uv run python -m stf.cli forecast-refit --arm lstm_price \
 ```
 
 `forecast-predict` scores the last `seq_len` sessions per ticker and writes
-`outputs/live/<arm>/predictions_<date>.parquet` plus `latest.parquet`;
-`forecast-resolve` joins stored predictions with realized next-session labels into
-`resolved.parquet` for live-accuracy monitoring:
+`outputs/live/<arm>/predictions_<date>.parquet` plus `latest.parquet`. Every dated
+file is stamped with `issued_at` and the checkpoint manifest hash, and a re-run
+that would change an issued file is refused — issued predictions are an audit
+trail, not a cache. `forecast-resolve` joins stored predictions with realized
+next-session labels into `resolved.parquet` and marks each row `prospective`
+only when it was provably issued before its target session; replayed or
+pre-stamping rows are kept but excluded from the live track record:
 
 ```bash
 uv run python -m stf.cli forecast-predict \
@@ -314,16 +318,19 @@ uv run python -m stf.cli forecast-resolve \
 
 `score-news --incremental` appends only articles not already present in the output
 parquet, so the daily job scores just the new crawl instead of the full archive.
-`scripts/daily-forecast.sh` chains prices → news → score-news → predict → resolve for
-every arm in `$ARMS`; schedule it after the 15:00 ICT close, e.g. cron:
+`scripts/daily-forecast.sh` chains prices → news → score-news → predict → resolve
+for all five arms (`$ARMS` overridable). Each run tees to
+`logs/daily-<date>.log` and writes `outputs/live/last_run.json` (finish time,
+exit code, failed step). Schedule it after the 15:00 ICT close, e.g. cron:
 
 ```cron
 30 15 * * 1-5  /path/to/stock-trend-forecasting/scripts/daily-forecast.sh
 ```
 
 The dashboard exposes the results at `/api/live/latest` (per-arm signals for the
-newest session) and `/api/live/history` (resolved rows, pending count, per-date
-accuracy).
+newest session), `/api/live/history` (prospective vs replayed resolved rows,
+pending count, per-date accuracy over prospective rows only), and
+`/api/live/status` (last job outcome plus each arm's data-through date).
 
 
 ## Expanding the sentiment label set
