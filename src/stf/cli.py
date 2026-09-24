@@ -1206,7 +1206,7 @@ def cmd_forecast_predict(args: argparse.Namespace) -> int:
                 "explicitly if the earlier issuance was invalid.",
                 file=sys.stderr,
             )
-            return 2
+            return 3
     else:
         predictions.to_parquet(dated_path, index=False)
     predictions.to_parquet(out_dir / "latest.parquet", index=False)

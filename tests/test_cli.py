@@ -562,7 +562,7 @@ def test_forecast_predict_stamps_issuance_and_refuses_to_rewrite(
     monkeypatch.setattr(
         serve_module, "predict_latest", lambda *_a, **_k: changed.copy()
     )
-    assert main(args) == 2
+    assert main(args) == 3
     assert "refusing to overwrite" in capsys.readouterr().err
     after = pd.read_parquet(out_dir / "predictions_2026-09-21.parquet")
     assert after["y_pred"].tolist() == ["UP"]

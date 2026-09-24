@@ -74,13 +74,14 @@ for arm in $ARMS; do
   fi
   echo "[daily] $(date -Is) predicting with $arm"
   STEP="forecast-predict $arm"
-  # Exit code 2 = dated file already exists with different content (e.g. a
+  # Exit code 3 = dated file already exists with different content (e.g. a
   # late-crawled article changed today's features). Keep the issued file and
-  # continue with the remaining arms instead of aborting the whole loop.
+  # continue with the remaining arms. Any other failure (missing sentiment
+  # file, invalid manifest, hash mismatch) still aborts the job.
   uv run python -m stf.cli forecast-predict \
     --model-dir "$model_dir" --output-dir "$live_dir" "${extra[@]}" || {
       rc=$?
-      if [ "$rc" -eq 2 ]; then
+      if [ "$rc" -eq 3 ]; then
         echo "[daily] $arm: dated prediction already issued; keeping it"
       else
         exit "$rc"
