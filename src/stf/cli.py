@@ -1214,6 +1214,27 @@ def cmd_forecast_predict(args: argparse.Namespace) -> int:
     predictions.to_parquet(out_dir / "latest.parquet", index=False)
 
     print(f"[forecast-predict] arm={arm.name} date={obs_date} tickers={len(predictions)}")
+    # The live track record only counts a row whose issuance stamp falls on the
+    # observation date itself. A job that runs the morning after the close still
+    # produces perfectly valid predictions, but every one of them is a replay and
+    # silently scores zero prospective rows. Say so at issuance, not weeks later
+    # when the history endpoint turns out to be empty.
+    from stf import config as stf_config
+
+    issued_local = (
+        pd.Timestamp(predictions["issued_at"].iloc[0])
+        .tz_convert(stf_config.TIMEZONE)
+        .date()
+        .isoformat()
+    )
+    if issued_local > obs_date:
+        print(
+            f"[forecast-predict] WARNING: issued {issued_local} for observation "
+            f"{obs_date}; this is a replay and will NOT count as a prospective "
+            "forecast. Run the job after the 15:00 ICT close of the session you "
+            "are predicting from.",
+            file=sys.stderr,
+        )
     for _, row in predictions.iterrows():
         print(
             f"  {row['ticker']:<6} {row['y_pred']:<5} "

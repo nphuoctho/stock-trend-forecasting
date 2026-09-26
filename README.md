@@ -415,8 +415,10 @@ file is stamped with `issued_at` and the checkpoint manifest hash, and a re-run
 that would change an issued file is refused — issued predictions are an audit
 trail, not a cache. `forecast-resolve` joins stored predictions with realized
 next-session labels into `resolved.parquet` and marks each row `prospective`
-only when it was provably issued before its target session; replayed or
-pre-stamping rows are kept but excluded from the live track record:
+only when it was issued **strictly before the target session's 09:00 opening
+auction**; rows issued once that session could already move are kept but excluded
+from the live track record. The stricter `issued_same_session` flag is reported
+alongside it:
 
 ```bash
 uv run python -m stf.cli forecast-predict \
@@ -434,11 +436,23 @@ parquet, so the daily job scores just the new crawl instead of the full archive.
 `scripts/daily-forecast.sh` chains prices → news → score-news → predict → resolve
 for all five arms (`$ARMS` overridable). Each run tees to
 `logs/daily-<date>.log` and writes `outputs/live/last_run.json` (finish time,
-exit code, failed step). Schedule it after the 15:00 ICT close, e.g. cron:
+exit code, failed step).
+
+**Schedule it in the morning, not after the close.** The price provider publishes
+a session's close only on the following day, so at 15:30 on day D the freshest
+close available is still D-1 and the job would be "predicting" a session that has
+already traded — every row lands as a replay and the live track record stays
+empty. Running before the opening auction uses the overnight publication of D-1
+and targets D, which has not moved yet:
 
 ```cron
-30 15 * * 1-5  /path/to/stock-trend-forecasting/scripts/daily-forecast.sh
+0 8 * * 1-5  /path/to/stock-trend-forecasting/scripts/daily-forecast.sh
 ```
+
+`forecast-predict` prints a warning whenever an issuance cannot count as
+prospective, and `forecast-resolve` reports the prospective/replayed split of
+every run, so an empty track record is visible the day it happens rather than
+weeks later.
 
 The dashboard exposes the results at `/api/live/latest` (per-arm signals for the
 newest session), `/api/live/history` (prospective vs replayed resolved rows,
