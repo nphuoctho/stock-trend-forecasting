@@ -13,59 +13,59 @@ preamble.tex                    cấu hình font/lề/spacing theo quy định t
 frontmatter/                    bìa chính, bìa phụ, hội đồng, lời cảm ơn, danh mục, tóm tắt
 chapters/                       các chương của báo cáo
 references.bib                  tài liệu tham khảo (IEEE, biber)
-build/                          các file trung gian khi biên dịch
+build/                          file trung gian (chỉ dùng khi build bằng latexmk; xelatex thủ công ghi cạnh .tex)
 BaoCaoDATN_*.pdf                PDF đầu ra, nằm cạnh các file .tex
 ```
 
 ## Biên dịch
 
-Cần XeLaTeX (font Unicode + tiếng Việt). `latexmkrc` đã cấu hình để các file
-trung gian nằm trong `build/`, còn PDF cuối cùng nằm cạnh file `.tex`.
+Cần XeLaTeX (font Unicode + tiếng Việt) và biber. Trên máy này không có `latexmk`;
+biên dịch thủ công theo trình tự `xelatex` -> `biber` -> `xelatex` -> `xelatex`
+trên `BaoCaoDATN_full.tex`, chạy từ thư mục `docs/thesis-latex/`:
 
-Chạy từ thư mục `docs/thesis-latex/`:
+```bash
+xelatex BaoCaoDATN_full.tex
+biber BaoCaoDATN_full
+xelatex BaoCaoDATN_full.tex
+xelatex BaoCaoDATN_full.tex
+```
+
+Bản báo cáo tiến độ build tương tự:
+
+```bash
+xelatex BaoCaoDATN_progress.tex
+biber BaoCaoDATN_progress
+xelatex BaoCaoDATN_progress.tex
+xelatex BaoCaoDATN_progress.tex
+```
+
+Các file trung gian (`.aux`, `.bcf`, `.bbl`, `.toc`, `.lof`, `.lot`, `.out`,
+`.run.xml`, `.blg`) nằm ngay cạnh file `.tex` trong `docs/thesis-latex/`; PDF đầu
+ra cũng nằm cạnh file nguồn.
+
+Nếu ở một máy khác có `latexmk`, `latexmkrc` vẫn được giữ để các file trung gian
+nằm trong `build/` còn PDF cuối cùng nằm cạnh file `.tex`:
 
 ```bash
 latexmk -xelatex BaoCaoDATN_full.tex
 ```
 
-Chỉ có bản báo cáo tiến độ ngoài bản đầy đủ:
-
-```bash
-latexmk -xelatex BaoCaoDATN_progress.tex
-```
-
-PDF sẽ nằm cạnh file nguồn, còn các file phụ sẽ nằm trong `build/`. Dọn toàn
-bộ output khi cần:
+Với `latexmk`, dọn toàn bộ output bằng:
 
 ```bash
 latexmk -C BaoCaoDATN_full.tex
 ```
 
-Cách thủ công (không dùng latexmk):
-
-```bash
-mkdir -p build
-xelatex -output-directory=build BaoCaoDATN_full.tex
-biber --output-directory=build build/BaoCaoDATN_full
-xelatex -output-directory=build BaoCaoDATN_full.tex
-xelatex -output-directory=build BaoCaoDATN_full.tex
-mv build/BaoCaoDATN_full.pdf .
-```
-
-Cách 3 - tectonic (tự tải package):
-
-```bash
-tectonic --outdir build BaoCaoDATN_full.tex
-mv build/BaoCaoDATN_full.pdf .
-```
-
-Cách 4 - Overleaf: upload cả thư mục, chọn compiler XeLaTeX.
+Overleaf: upload cả thư mục, chọn compiler XeLaTeX.
 
 
 ## Lưu ý
 
 - Font: nếu máy không có "Times New Roman", preamble tự fallback sang
   "Liberation Serif" (metric-compatible). Trên Overleaf có sẵn TNR.
-- Chèn sơ đồ kiến trúc thật: đặt PNG vào figures/ và sửa \includegraphics
-  trong chapters/03-phuong-phap.tex (đang để khung placeholder).
-- Các bảng kết quả (chương 4) đang là khung mẫu, điền số thực tế sau khi chạy thực nghiệm.
+- Sơ đồ kiến trúc chương 3 đã được vẽ trực tiếp bằng TikZ trong
+  `chapters/03-phuong-phap.tex` (điều kiện `\ifShowDiagram`); file
+  `figures/architecture.png` chỉ là bản xuất tham khảo, không được chèn vào báo cáo.
+- Các bảng kết quả chương 4 (`chapters/04-ket-qua.tex`) đã được điền số liệu thực
+  nghiệm; mọi con số cần truy về artifact trong `outputs/` trước khi sửa.
+

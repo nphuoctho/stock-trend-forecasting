@@ -132,6 +132,16 @@ def refit_arm(
         raise ValueError(f"Unknown arm {arm!r}; choose from {sorted(ARM_FAMILIES)}.")
     family, use_sentiment = ARM_FAMILIES[arm]
     cfg = cfg or ForecastConfig()
+    # The serving path predicts the next session's own return and nothing else: it
+    # never applies the cross-sectional demeaning or the multi-session retarget that
+    # `run_experiment` supports. Accepting such a config here would freeze an arm
+    # whose thresholds and weights answer a different question than the daily job
+    # asks, and the mismatch would be invisible in the manifest.
+    if cfg.target_mode != "raw" or cfg.horizon != 1:
+        raise ValueError(
+            "refit_arm only serves the raw next-session target; got "
+            f"target_mode={cfg.target_mode!r}, horizon={cfg.horizon}."
+        )
 
     thresholds = fit_thresholds(panel["target_return"].dropna().to_numpy())
     labeled = label_panel(panel, thresholds)
@@ -467,20 +477,35 @@ def resolve_predictions(
     merged["correct"] = np.where(
         merged["y_true"].isna(), pd.NA, merged["y_true"] == merged["y_pred"]
     )
-    # A row counts as a prospective (genuinely live) forecast only when its
-    # issuance stamp falls on the observation date itself: the protocol is
-    # "predict the next session on the evening the observation session closes".
-    # Rows issued on a later day are replays -- even if the target session has
-    # not traded yet -- and stay excluded from the live track record.
+    # A forecast is prospective when it was issued before the session it predicts
+    # could have moved, i.e. strictly before the target session's opening auction.
+    #
+    # The earlier rule required the stamp to fall on the observation date itself.
+    # That rule cannot be satisfied by this pipeline at all: the price provider
+    # publishes a session's close only on the following day, so the freshest
+    # observation available at any moment is already yesterday's. Demanding an
+    # issuance stamp no later than the observation date therefore demanded a
+    # forecast issued before the data needed to compute its features existed, and
+    # every row was silently written off as a replay.
+    #
+    # Issuing before the target opens is the standard audit test and is reachable:
+    # run the job in the morning, after the overnight publication of the previous
+    # close and before 09:00. ``issued_same_session`` keeps the stricter original
+    # flag so nothing that used to be reported is now hidden.
     if "issued_at" in merged.columns:
         from stf import config
 
         issued = pd.to_datetime(merged["issued_at"], errors="coerce", utc=True)
-        issued_local = issued.dt.tz_convert(config.TIMEZONE)
+        issued_local = issued.dt.tz_convert(config.TIMEZONE).dt.tz_localize(None)
         obs = pd.to_datetime(merged["observation_date"])
-        merged["prospective"] = (
-            issued_local.dt.normalize().dt.tz_localize(None) <= obs.dt.normalize()
+        target_open = pd.to_datetime(merged["target_date"]).dt.normalize() + pd.Timedelta(
+            config.SESSION_OPEN + ":00"
+        )
+        merged["prospective"] = (issued_local < target_open).fillna(False)
+        merged["issued_same_session"] = (
+            issued_local.dt.normalize() <= obs.dt.normalize()
         ).fillna(False)
     else:
         merged["prospective"] = False
+        merged["issued_same_session"] = False
     return merged

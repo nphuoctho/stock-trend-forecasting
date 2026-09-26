@@ -13,6 +13,17 @@ import pandas as pd
 import pytest
 
 from stf.forecasting import calendar as cal
+from stf.forecasting.backtest import (
+    _drawdown,
+    benchmark_series,
+    daily_book,
+    realized_returns,
+)
+from stf.forecasting.signal_ic import (
+    build_return_targets,
+    cross_sectional_ic,
+    information_coefficients,
+)
 from stf.forecasting.experiment import (
     LADDER,
     ForecastConfig,
@@ -25,8 +36,10 @@ from stf.forecasting.labels import (
     TREND_LABELS,
     add_target,
     apply_labels,
+    cross_sectional_excess,
     fit_thresholds,
     label_panel,
+    retarget_horizon,
 )
 from stf.forecasting.models import (
     ClassicalBaseline,
@@ -648,11 +661,13 @@ def test_date_block_bootstrap_brackets_a_real_difference():
     truth = np.tile([0, 1, 2, 0, 1], 40)
     good = truth.copy()
     bad = np.roll(truth, 1)
+    window = np.repeat([1, 2], 100)
     frame = pd.concat(
         [
             pd.DataFrame(
                 {
                     "target_date": dates,
+                    "window": window,
                     "seed": 42,
                     "arm": arm,
                     "y_true": [TREND_LABELS[i] for i in truth],
@@ -665,8 +680,10 @@ def test_date_block_bootstrap_brackets_a_real_difference():
     )
     out = _date_block_bootstrap(frame, "treated", "control", samples=500, seed=1)
     assert out["macro_f1"]["n_blocks"] == 40
+    assert out["macro_f1"]["n_window_strata"] == 2
     assert out["macro_f1"]["mean"] > 0.3
     assert out["macro_f1"]["low"] > 0.0
+    assert out["macro_f1"]["one_sided_p_le_zero"] == 0.0
     # Two arms making the same predictions must instead give a zero-width interval.
     identical = frame[frame["arm"] == "treated"]
     identical = pd.concat(
@@ -677,6 +694,59 @@ def test_date_block_bootstrap_brackets_a_real_difference():
     )
     assert same["macro_f1"]["low"] <= 0.0 <= same["macro_f1"]["high"]
     assert same["macro_f1"]["mean"] == pytest.approx(0.0)
+
+
+def test_date_block_bootstrap_centres_on_the_window_averaged_delta():
+    """The interval must bracket the estimand the report quotes, not a pooled one.
+
+    macro-F1 is non-linear in the confusion matrix, so a delta computed on one
+    pooled matrix differs from the mean of the per-window deltas. The headline
+    ``information_gain`` is the window-averaged quantity; if the bootstrap centres
+    somewhere else the published point estimate can sit outside its own interval.
+    """
+    rng = np.random.default_rng(0)
+    blocks = []
+    # Two windows with deliberately different class mixes so pooling and averaging
+    # disagree: window 1 is UP-heavy, window 2 is DOWN-heavy.
+    for window_id, weights in ((1, [0.15, 0.25, 0.60]), (2, [0.60, 0.25, 0.15])):
+        dates = pd.to_datetime(pd.bdate_range("2024-01-01", periods=30)).repeat(6)
+        truth = rng.choice(3, size=len(dates), p=weights)
+        treated = np.where(rng.random(len(dates)) < 0.55, truth, rng.choice(3, len(dates)))
+        control = np.where(rng.random(len(dates)) < 0.35, truth, rng.choice(3, len(dates)))
+        for arm, pred in (("treated", treated), ("control", control)):
+            blocks.append(
+                pd.DataFrame(
+                    {
+                        "target_date": dates,
+                        "window": window_id,
+                        "seed": 42,
+                        "arm": arm,
+                        "y_true": [TREND_LABELS[i] for i in truth],
+                        "y_pred": [TREND_LABELS[i] for i in pred],
+                    }
+                )
+            )
+    frame = pd.concat(blocks, ignore_index=True)
+
+    ids = {label: i for i, label in enumerate(TREND_LABELS)}
+
+    def window_macro_f1(block: pd.DataFrame, arm: str) -> float:
+        side = block[block["arm"] == arm]
+        return evaluate_predictions(
+            side["y_true"].map(ids).to_numpy(), side["y_pred"].map(ids).to_numpy()
+        )["macro_f1"]
+
+    expected = float(
+        np.mean(
+            [
+                window_macro_f1(block, "treated") - window_macro_f1(block, "control")
+                for _, block in frame.groupby("window", sort=True)
+            ]
+        )
+    )
+    out = _date_block_bootstrap(frame, "treated", "control", samples=800, seed=3)
+    assert out["macro_f1"]["mean"] == pytest.approx(expected, abs=1e-9)
+    assert out["macro_f1"]["low"] <= out["macro_f1"]["mean"] <= out["macro_f1"]["high"]
 
 
 def test_experiment_is_reproducible_across_repeated_runs():
@@ -954,3 +1024,440 @@ def test_tft_arm_survives_the_refit_load_round_trip(tmp_path):
     assert not np.allclose(
         first[probabilities].to_numpy(), corrupted[probabilities].to_numpy()
     )
+
+
+def test_cross_sectional_excess_removes_the_shared_market_move():
+    """The excess target must price a ticker against its own session, not the level."""
+    dates = pd.to_datetime(["2024-01-02", "2024-01-03"])
+    panel = pd.DataFrame(
+        {
+            "ticker": ["AAA", "BBB", "CCC"] * 2,
+            "target_date": list(np.repeat(dates, 3)),
+            # Session 1: a +2% market day with one laggard. Session 2: a -1% market day.
+            "target_return": [0.03, 0.02, 0.01, -0.02, -0.01, 0.00],
+        }
+    )
+    out = cross_sectional_excess(panel)
+
+    # The raw frame is untouched; the excess target sums to zero inside each session.
+    assert panel["target_return"].tolist() == [0.03, 0.02, 0.01, -0.02, -0.01, 0.00]
+    per_date = out.groupby("target_date")["target_return"].sum()
+    assert np.allclose(per_date.to_numpy(), 0.0)
+    assert out.loc[0, "target_return"] == pytest.approx(0.01)
+    assert out.loc[2, "target_return"] == pytest.approx(-0.01)
+
+    # A ticker that rose less than the market on an up day is a DOWN case now,
+    # which is exactly the relabelling the excess target is for.
+    thresholds = fit_thresholds(out["target_return"].dropna().to_numpy())
+    assert apply_labels(np.array([out.loc[2, "target_return"]]), thresholds)[0] == "DOWN"
+
+
+def test_cross_sectional_excess_drops_single_ticker_sessions():
+    """One stock is not a cross-section; its excess return must be missing, not zero."""
+    panel = pd.DataFrame(
+        {
+            "ticker": ["AAA", "BBB", "AAA"],
+            "target_date": pd.to_datetime(["2024-01-02", "2024-01-02", "2024-01-03"]),
+            "target_return": [0.02, 0.00, 0.05],
+        }
+    )
+    out = cross_sectional_excess(panel)
+    assert out.loc[0, "target_return"] == pytest.approx(0.01)
+    assert pd.isna(out.loc[2, "target_return"])
+
+
+def test_excess_target_mode_changes_the_labels_the_experiment_scores():
+    """`target_mode='excess'` must reach the labels, not just the config record."""
+    # Three tickers whose returns share a common move plus a ticker-specific wobble;
+    # without divergence the cross-section would be degenerate and prove nothing.
+    frames = []
+    for offset, ticker in enumerate(("AAA", "BBB", "CCC")):
+        prices = _prices(ticker, n=150)
+        wobble = np.cos(np.arange(len(prices)) + offset * 2.0) * (1.0 + offset)
+        frames.append(prices.assign(close=prices["close"].to_numpy() + wobble))
+    panel = assemble(pd.concat(frames, ignore_index=True))
+    base = ForecastConfig(
+        seq_len=3, n_windows=2, test_size=10, val_size=10, epochs=1, seeds=(42,)
+    )
+    excess = ForecastConfig(
+        seq_len=3,
+        n_windows=2,
+        test_size=10,
+        val_size=10,
+        epochs=1,
+        seeds=(42,),
+        target_mode="excess",
+    )
+    raw_record = run_experiment(panel, cfg=base)
+    excess_record = run_experiment(panel, cfg=excess)
+
+    assert raw_record["config"]["target_mode"] == "raw"
+    assert excess_record["config"]["target_mode"] == "excess"
+    # Terciles of an excess return straddle zero by construction, so the thresholds
+    # must move; identical thresholds would mean the mode never reached the labels.
+    assert raw_record["windows"][0]["thresholds"] != excess_record["windows"][0]["thresholds"]
+
+
+
+
+def test_retarget_horizon_looks_the_requested_number_of_sessions_ahead():
+    """The label must span h sessions, and the last h rows must lose their target."""
+    panel = pd.DataFrame(
+        {
+            "ticker": ["AAA"] * 5,
+            "observation_date": pd.to_datetime(
+                ["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05", "2024-01-08"]
+            ),
+            "close": [100.0, 110.0, 121.0, 100.0, 50.0],
+        }
+    )
+    out = retarget_horizon(panel, 2)
+    # Row 0 spans 100 -> 121 over two sessions.
+    assert out.loc[0, "target_return"] == pytest.approx(0.21)
+    assert out.loc[0, "target_date"] == pd.Timestamp("2024-01-04")
+    assert pd.isna(out.loc[3, "target_return"])
+    assert pd.isna(out.loc[4, "target_return"])
+    # h=1 must reproduce the plain next-session target.
+    assert retarget_horizon(panel, 1).loc[0, "target_return"] == pytest.approx(0.10)
+
+
+def test_retarget_horizon_never_mixes_tickers():
+    """A ticker's target must not reach across into another ticker's prices."""
+    panel = pd.DataFrame(
+        {
+            "ticker": ["AAA", "AAA", "BBB", "BBB"],
+            "observation_date": pd.to_datetime(
+                ["2024-01-02", "2024-01-03", "2024-01-02", "2024-01-03"]
+            ),
+            "close": [100.0, 110.0, 50.0, 40.0],
+        }
+    )
+    out = retarget_horizon(panel, 1).set_index(["ticker", "observation_date"])
+    assert out.loc[("AAA", pd.Timestamp("2024-01-02")), "target_return"] == pytest.approx(0.10)
+    assert out.loc[("BBB", pd.Timestamp("2024-01-02")), "target_return"] == pytest.approx(-0.20)
+    assert pd.isna(out.loc[("AAA", pd.Timestamp("2024-01-03")), "target_return"])
+
+
+def test_forecast_config_rejects_a_non_positive_horizon():
+    with pytest.raises(ValueError, match="horizon"):
+        ForecastConfig(horizon=0)
+
+
+def test_forecast_config_rejects_an_unknown_target_mode():
+    with pytest.raises(ValueError, match="target_mode"):
+        ForecastConfig(target_mode="relative")
+
+
+# --- economic evaluation --------------------------------------------------------------
+
+
+def _backtest_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Two sessions where the cross-section is known, so the payoff is hand-checkable."""
+    prices = pd.DataFrame(
+        {
+            "ticker": ["AAA", "AAA", "AAA", "BBB", "BBB", "BBB"],
+            "time": pd.to_datetime(
+                ["2024-01-02", "2024-01-03", "2024-01-04"] * 2
+            ),
+            "close": [100.0, 110.0, 99.0, 100.0, 90.0, 99.0],
+            "open": 1.0,
+            "high": 1.0,
+            "low": 1.0,
+            "volume": 1.0,
+        }
+    )
+    predictions = pd.DataFrame(
+        {
+            "ticker": ["AAA", "BBB", "AAA", "BBB"],
+            "target_date": pd.to_datetime(
+                ["2024-01-03", "2024-01-03", "2024-01-04", "2024-01-04"]
+            ),
+            "seed": 42,
+            "arm": "lstm_price",
+            "y_true": ["UP", "DOWN", "DOWN", "UP"],
+            "y_pred": ["UP", "DOWN", "DOWN", "UP"],
+        }
+    )
+    return prices, predictions
+
+
+def test_backtest_book_is_cash_neutral_and_pays_the_cross_sectional_spread():
+    """A perfect forecast must earn the long-short spread, not the market move."""
+    prices, predictions = _backtest_inputs()
+    returns = realized_returns(prices)
+    book = daily_book(predictions, returns, cost_bps=0.0)
+
+    # Session 1: AAA +10%, BBB -10% -> long AAA / short BBB earns the full 20% spread.
+    assert book.loc[0, "gross_return"] == pytest.approx(0.20)
+    # Session 2: AAA -10%, BBB +10%; the forecast flips, so it earns the spread again
+    # even though the equal-weighted basket moved 0% on both days.
+    assert book.loc[1, "gross_return"] == pytest.approx(0.20)
+    assert book["gross_exposure"].to_numpy() == pytest.approx(2.0)
+
+
+def test_backtest_charges_turnover_against_drifted_holdings():
+    """Drifted holdings and targets must be quoted on the same capital base.
+
+    With one name per leg the weights are +-1. Day 1 opens from flat: turnover 2.
+    AAA then returns +10% and BBB -10%, so the book gains 20% and NAV becomes 1.2.
+    As fractions of the NEW NAV the holdings are +1.1/1.2 and -0.9/1.2. Day 2 flips
+    to -1 AAA / +1 BBB, so turnover is
+    |-1 - 11/12| + |1 + 3/4| = 23/12 + 7/4 = 3.66667.
+    Leaving the holdings in yesterday's units would report 4.0 instead.
+    """
+    prices, predictions = _backtest_inputs()
+    returns = realized_returns(prices)
+    free = daily_book(predictions, returns, cost_bps=0.0)
+
+    assert free.loc[0, "turnover"] == pytest.approx(2.0)
+    assert free.loc[1, "turnover"] == pytest.approx(23.0 / 12.0 + 7.0 / 4.0)
+    assert (free["cost"] == 0.0).all()
+
+    charged = daily_book(predictions, returns, cost_bps=100.0)
+    assert charged.loc[0, "cost"] == pytest.approx(2.0 * 100.0 / 10_000.0)
+    assert charged["net_return"].to_numpy() == pytest.approx(
+        (charged["gross_return"] - charged["cost"]).to_numpy()
+    )
+
+
+def test_backtest_holding_a_constant_target_still_costs_money():
+    """The regression this guards: a static target is not a free position."""
+    prices = pd.DataFrame(
+        {
+            "ticker": ["AAA"] * 3 + ["BBB"] * 3,
+            "time": pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"] * 2),
+            "close": [100.0, 110.0, 121.0, 100.0, 90.0, 81.0],
+            "open": 1.0,
+            "high": 1.0,
+            "low": 1.0,
+            "volume": 1.0,
+        }
+    )
+    predictions = pd.DataFrame(
+        {
+            "ticker": ["AAA", "BBB", "AAA", "BBB"],
+            "target_date": pd.to_datetime(
+                ["2024-01-03", "2024-01-03", "2024-01-04", "2024-01-04"]
+            ),
+            "seed": 42,
+            "arm": "lstm_price",
+            "y_true": ["UP", "DOWN", "UP", "DOWN"],
+            "y_pred": ["UP", "DOWN", "UP", "DOWN"],
+        }
+    )
+    free = daily_book(predictions, realized_returns(prices), cost_bps=0.0)
+    # Same target both sessions, yet the +10%/-10% drift must be rebalanced back.
+    # The book gains 20%, so on the new NAV the holdings are +1.1/1.2 and -0.9/1.2
+    # against a +1 / -1 target: |1 - 11/12| + |-1 + 3/4| = 1/12 + 1/4 = 1/3.
+    # Differencing target weights would report 0.
+    assert free.loc[1, "turnover"] == pytest.approx(1.0 / 3.0)
+    charged = daily_book(predictions, realized_returns(prices), cost_bps=100.0)
+    assert charged.loc[1, "cost"] > 0.0
+
+
+def test_backtest_reports_the_residual_exposure_of_a_one_sided_day():
+    """A one-sided view is directional; the book must record it, not hide it."""
+    prices, predictions = _backtest_inputs()
+    one_sided = predictions.copy()
+    one_sided.loc[one_sided["target_date"] == pd.Timestamp("2024-01-03"), "y_pred"] = "UP"
+    book = daily_book(one_sided, realized_returns(prices), cost_bps=0.0)
+
+    assert book.loc[0, "gross_exposure"] == pytest.approx(0.5)
+    # Two longs at 0.25 each: the book is net long 0.5, not market-neutral.
+    assert book.loc[0, "net_exposure"] == pytest.approx(0.5)
+    assert book.loc[0, "one_sided"] == pytest.approx(1.0)
+    assert book.loc[1, "one_sided"] == pytest.approx(0.0)
+    assert book.loc[1, "net_exposure"] == pytest.approx(0.0)
+
+
+def test_backtest_drawdown_counts_the_first_session_against_initial_capital():
+    """Equity starts at 1; a first-session loss is a drawdown, not a flat start."""
+    assert _drawdown(np.array([-0.10])) == pytest.approx(-0.10)
+    assert _drawdown(np.array([-0.10, 0.05])) == pytest.approx(-0.10)
+    # Peak after a gain, then a fall: -20% from 1.10 down to 0.88.
+    assert _drawdown(np.array([0.10, -0.20])) == pytest.approx(-0.20)
+    assert _drawdown(np.array([0.10, 0.10])) == pytest.approx(0.0)
+
+
+def test_backtest_benchmarks_separate_rebalancing_from_buy_and_hold():
+    """Daily-rebalanced equal weight is not buy-and-hold; they must not be conflated."""
+    prices = pd.DataFrame(
+        {
+            "ticker": ["AAA"] * 3 + ["BBB"] * 3,
+            "time": pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"] * 2),
+            "close": [100.0, 120.0, 144.0, 100.0, 80.0, 64.0],
+            "open": 1.0,
+            "high": 1.0,
+            "low": 1.0,
+            "volume": 1.0,
+        }
+    )
+    returns = realized_returns(prices)
+    dates = set(pd.to_datetime(["2024-01-03", "2024-01-04"]))
+    bench = benchmark_series(returns, dates)
+
+    # Rebalanced resets to 50/50 each session: mean of +20% and -20% is 0 twice.
+    assert bench["equal_weight_rebalanced"] == pytest.approx([0.0, 0.0])
+    # Buy-and-hold lets the winner grow: after day 1 the weights are 0.6/0.4, so the
+    # second session returns 0.6*0.20 + 0.4*(-0.20) = +0.04.
+    assert bench["buy_and_hold"] == pytest.approx([0.0, 0.04])
+
+
+def test_backtest_rejects_predictions_that_never_meet_a_price():
+    prices, predictions = _backtest_inputs()
+    orphaned = predictions.assign(target_date=pd.Timestamp("2030-01-02"))
+    with pytest.raises(ValueError, match="realized return"):
+        daily_book(orphaned, realized_returns(prices), cost_bps=0.0)
+
+
+# --- signal information coefficient ---------------------------------------------------
+
+
+def test_ic_targets_separate_the_same_session_from_the_next_one():
+    """The whole efficiency argument dies if `next` is not actually shifted forward."""
+    prices = pd.DataFrame(
+        {
+            "ticker": ["AAA"] * 4 + ["BBB"] * 4,
+            "observation_date": pd.to_datetime(
+                ["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"] * 2
+            ),
+            "close": [100.0, 110.0, 99.0, 99.0, 100.0, 90.0, 99.0, 99.0],
+        }
+    )
+    targets = build_return_targets(prices)
+    aaa = targets[targets["ticker"] == "AAA"].reset_index(drop=True)
+
+    # 2024-01-03 rose 10%; the row for 2024-01-03 owns that as its same-session
+    # return, while the row for 2024-01-02 owns it as its next-session return.
+    assert aaa.loc[1, "same_session_return"] == pytest.approx(0.10)
+    assert aaa.loc[0, "next_session_return"] == pytest.approx(0.10)
+    assert pd.isna(aaa.loc[0, "same_session_return"])
+    assert pd.isna(aaa.loc[3, "next_session_return"])
+
+    # AAA +10% while BBB -10% on the same session: the market leg is 0, so the raw
+    # and excess returns coincide only because the cross-section is symmetric here.
+    assert aaa.loc[1, "same_session_excess_return"] == pytest.approx(0.10)
+
+
+def test_ic_excess_target_removes_a_common_move():
+    """A session where both names move together must leave zero idiosyncratic return."""
+    prices = pd.DataFrame(
+        {
+            "ticker": ["AAA", "AAA", "BBB", "BBB"],
+            "observation_date": pd.to_datetime(
+                ["2024-01-02", "2024-01-03", "2024-01-02", "2024-01-03"]
+            ),
+            "close": [100.0, 105.0, 200.0, 210.0],
+        }
+    )
+    targets = build_return_targets(prices)
+    moved = targets[targets["observation_date"] == pd.Timestamp("2024-01-03")]
+    assert moved["same_session_return"].to_numpy() == pytest.approx(0.05)
+    assert moved["same_session_excess_return"].to_numpy() == pytest.approx(0.0)
+
+
+def test_information_coefficient_recovers_a_planted_rank_relationship():
+    """A signal built to rank the next session must score a high positive IC."""
+    dates = pd.bdate_range("2024-01-02", periods=60)
+    rng = np.random.default_rng(5)
+    rows = []
+    for date in dates:
+        for ticker in ("AAA", "BBB", "CCC", "DDD"):
+            score = rng.normal()
+            rows.append(
+                {
+                    "ticker": ticker,
+                    "observation_date": date,
+                    "has_news": 1,
+                    "sent_pos_minus_neg": score,
+                }
+            )
+    panel = pd.DataFrame(rows)
+    # Plant the relationship directly in the target instead of inventing prices.
+    targets = panel[["ticker", "observation_date"]].copy()
+    targets["next_session_excess_return"] = panel["sent_pos_minus_neg"] * 0.01
+    targets["next_session_return"] = targets["next_session_excess_return"]
+    targets["same_session_return"] = rng.normal(size=len(panel)) * 0.01
+    targets["same_session_excess_return"] = targets["same_session_return"]
+
+    report = information_coefficients(panel, targets, samples=200)
+    planted = next(
+        row for row in report["rows"]
+        if row["signal"] == "sent_pos_minus_neg"
+        and row["target"] == "next_session_excess_return"
+    )
+    unrelated = next(
+        row for row in report["rows"]
+        if row["signal"] == "sent_pos_minus_neg"
+        and row["target"] == "same_session_return"
+    )
+    assert planted["ic"] == pytest.approx(1.0)
+    assert planted["low"] > 0.9
+    # The planted signal must not bleed into an independent target. The interval on
+    # that target is not asserted: one draw of unrelated noise may exclude zero.
+    assert abs(unrelated["ic"]) < 0.15
+    assert unrelated["high"] - unrelated["low"] > 0.1
+
+
+def test_cross_sectional_ic_ranks_within_a_session_not_across_sessions():
+    """Per-session ranking must not be contaminated by session-level level shifts.
+
+    Pooling every ticker-day into one correlation lets a few volatile sessions
+    dominate and can hide a signal that is perfect inside each session. The data
+    here is deliberately adversarial: the signal ranks the cross-section exactly
+    on every session, while the session means of signal and return drift in
+    opposite directions, so a pooled correlation would come out negative.
+    """
+    dates = pd.bdate_range("2024-01-02", periods=40)
+    rows, targets = [], []
+    for i, date in enumerate(dates):
+        drift = i * 0.5
+        for rank, ticker in enumerate(("AAA", "BBB", "CCC", "DDD")):
+            rows.append(
+                {
+                    "ticker": ticker,
+                    "observation_date": date,
+                    "has_news": 1,
+                    "sent_pos_minus_neg": rank + drift,
+                }
+            )
+            targets.append(
+                {
+                    "ticker": ticker,
+                    "observation_date": date,
+                    "next_session_excess_return": rank * 0.01 - drift * 0.01,
+                }
+            )
+    panel = pd.DataFrame(rows)
+    target_frame = pd.DataFrame(targets)
+
+    out = cross_sectional_ic(panel, target_frame)
+    assert out["sessions"] == len(dates)
+    assert out["mean_ic"] == pytest.approx(1.0)
+    assert out["standard_error"] == pytest.approx(0.0)
+
+
+def test_cross_sectional_ic_skips_sessions_too_thin_to_rank():
+    """A two-name session carries no rank information worth averaging."""
+    panel = pd.DataFrame(
+        {
+            "ticker": ["AAA", "BBB", "AAA", "BBB", "CCC", "DDD"],
+            "observation_date": pd.to_datetime(
+                ["2024-01-02"] * 2 + ["2024-01-03"] * 4
+            ),
+            "has_news": 1,
+            "sent_pos_minus_neg": [0.1, -0.1, 0.3, 0.1, -0.1, -0.3],
+        }
+    )
+    targets = panel[["ticker", "observation_date"]].copy()
+    targets["next_session_excess_return"] = [0.01, -0.01, 0.03, 0.01, -0.01, -0.03]
+    out = cross_sectional_ic(panel, targets)
+    assert out["sessions"] == 1
+    # One session has no between-session spread; an undefined error must read as
+    # undefined, not as a NaN masquerading as a computed statistic.
+    assert out["standard_error"] is None
+    assert out["t_statistic"] is None
+
+    only_thin = panel[panel["observation_date"] == pd.Timestamp("2024-01-02")]
+    with pytest.raises(ValueError, match="enough names"):
+        cross_sectional_ic(only_thin, targets)

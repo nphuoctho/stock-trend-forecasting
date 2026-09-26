@@ -26,6 +26,9 @@ DATE_END = "2025-12-31"
 
 # HOSE session cutoff
 SESSION_CUTOFF = "15:00"
+# HOSE opening call auction. A forecast for a session is only prospective if it
+# was issued before this time on that session's date.
+SESSION_OPEN = "09:00"
 TIMEZONE = "Asia/Ho_Chi_Minh"
 
 # Repository paths

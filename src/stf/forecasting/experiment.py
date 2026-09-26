@@ -30,7 +30,13 @@ import numpy as np
 import pandas as pd
 
 from stf.forecasting.features import FeatureScaler, price_feature_columns
-from stf.forecasting.labels import TREND_LABELS, fit_thresholds, label_panel
+from stf.forecasting.labels import (
+    TREND_LABELS,
+    cross_sectional_excess,
+    fit_thresholds,
+    label_panel,
+    retarget_horizon,
+)
 from stf.forecasting.sentiment_agg import ROLLING_SENTIMENT_COLUMNS, SENTIMENT_COLUMNS
 from stf.forecasting.split import TimeSplit, walk_forward_windows
 
@@ -78,6 +84,13 @@ class ForecastConfig:
     seeds: tuple[int, ...] = (42, 43, 44)
     bootstrap_samples: int = 2000
     bootstrap_seed: int = 7
+    # "raw" predicts the next session's own return; "excess" predicts it net of the
+    # equal-weighted cross-section of the same session, isolating the idiosyncratic
+    # move that company news can plausibly explain.
+    target_mode: str = "raw"
+    # Sessions ahead the label looks. >1 overlaps consecutive labels; see
+    # ``stf.forecasting.labels.retarget_horizon`` for what that costs.
+    horizon: int = 1
 
     def __post_init__(self) -> None:
         # The TFT arm hard-codes num_heads=4; fail at config time instead of
@@ -86,6 +99,10 @@ class ForecastConfig:
             raise ValueError(
                 f"hidden={self.hidden} must be divisible by 4 (TFT num_heads)."
             )
+        if self.target_mode not in {"raw", "excess"}:
+            raise ValueError(f"target_mode={self.target_mode!r} must be 'raw' or 'excess'.")
+        if self.horizon < 1:
+            raise ValueError(f"horizon={self.horizon} must be >= 1.")
 
     def as_dict(self) -> dict:
         data = self.__dict__.copy()
@@ -222,13 +239,21 @@ def _date_block_bootstrap(
     seed: int,
     alpha: float = 0.05,
 ) -> dict[str, dict[str, float | None]]:
-    """Bootstrap the paired metric delta by resampling whole test dates.
+    """Bootstrap the paired metric delta by resampling test dates inside each window.
 
-    Test dates are the resampling unit: every ticker sharing a date moves
-    together, which preserves the cross-sectional dependence inside a session
-    while giving ~300 blocks instead of the 5 blocks a per-window bootstrap has.
-    Seeds are averaged inside each draw so the interval reflects date sampling,
-    not initialization noise.
+    The reported point estimate is the mean over windows of the seed-averaged
+    per-window metric. macro-F1 and balanced accuracy are non-linear in the
+    confusion matrix, so collapsing every window into one pooled matrix estimates a
+    *different* quantity: the interval then brackets the pooled delta and can leave
+    the reported point estimate outside its own interval. Dates are therefore
+    resampled within their own window, the metric is recomputed per window, and the
+    windows are averaged exactly the way the point estimate is.
+
+    Whole dates are the resampling unit: every ticker sharing a date moves together,
+    which preserves the cross-sectional dependence inside a session while giving ~60
+    blocks per window instead of the single block a per-window bootstrap has. Seeds
+    are averaged inside each draw so the interval reflects date sampling, not
+    initialization noise.
     """
     wanted = predictions[predictions["arm"].isin((treated, control))]
     if wanted.empty:
@@ -239,53 +264,62 @@ def _date_block_bootstrap(
     label_ids = {label: i for i, label in enumerate(TREND_LABELS)}
     frame["_true"] = frame["y_true"].map(label_ids).to_numpy()
     frame["_pred"] = frame["y_pred"].map(label_ids).to_numpy()
-    dates = np.sort(frame["_date"].unique())
 
-    # (arm, seed) -> per-date confusion matrices, flattened for a matmul draw.
+    n_classes = len(TREND_LABELS)
     seeds = sorted(frame["seed"].unique())
-    stacks: dict[str, list[np.ndarray]] = {treated: [], control: []}
-    for arm in (treated, control):
-        for seed_value in seeds:
-            block = frame[(frame["arm"] == arm) & (frame["seed"] == seed_value)]
-            stacks[arm].append(_date_confusions(block, dates).reshape(len(dates), -1))
-
+    window_ids = sorted(frame["window"].unique())
     rng = np.random.default_rng(seed)
-    weights = rng.multinomial(len(dates), np.full(len(dates), 1.0 / len(dates)), size=samples)
-    weights = weights.astype(float)
 
-    def draw_metrics(arm: str) -> dict[str, np.ndarray]:
-        per_seed = []
-        for flat in stacks[arm]:
-            counts = (weights @ flat).reshape(samples, len(TREND_LABELS), len(TREND_LABELS))
-            per_seed.append(_metrics_from_confusion(counts))
-        return {
-            metric: np.mean([m[metric] for m in per_seed], axis=0) for metric in DELTA_METRICS
+    draws = {metric: np.zeros(samples, dtype=float) for metric in DELTA_METRICS}
+    point = {metric: 0.0 for metric in DELTA_METRICS}
+    n_blocks = 0
+
+    for window_id in window_ids:
+        window_frame = frame[frame["window"] == window_id]
+        dates = np.sort(window_frame["_date"].unique())
+        n_blocks += len(dates)
+        weights = rng.multinomial(
+            len(dates), np.full(len(dates), 1.0 / len(dates)), size=samples
+        ).astype(float)
+        full = np.ones((1, len(dates)), dtype=float)
+
+        drawn: dict[str, list[dict[str, np.ndarray]]] = {}
+        exact: dict[str, list[dict[str, np.ndarray]]] = {}
+        for arm in (treated, control):
+            drawn[arm], exact[arm] = [], []
+            for seed_value in seeds:
+                block = window_frame[
+                    (window_frame["arm"] == arm) & (window_frame["seed"] == seed_value)
+                ]
+                flat = _date_confusions(block, dates).reshape(len(dates), -1)
+                drawn[arm].append(
+                    _metrics_from_confusion(
+                        (weights @ flat).reshape(samples, n_classes, n_classes)
+                    )
+                )
+                exact[arm].append(
+                    _metrics_from_confusion((full @ flat).reshape(1, n_classes, n_classes))
+                )
+
+        for metric in DELTA_METRICS:
+            treated_draw = np.mean([m[metric] for m in drawn[treated]], axis=0)
+            control_draw = np.mean([m[metric] for m in drawn[control]], axis=0)
+            draws[metric] += (treated_draw - control_draw) / len(window_ids)
+            treated_point = float(np.mean([m[metric][0] for m in exact[treated]]))
+            control_point = float(np.mean([m[metric][0] for m in exact[control]]))
+            point[metric] += (treated_point - control_point) / len(window_ids)
+
+    return {
+        metric: {
+            "mean": point[metric],
+            "low": float(np.quantile(draws[metric], alpha / 2)),
+            "high": float(np.quantile(draws[metric], 1 - alpha / 2)),
+            "one_sided_p_le_zero": float((draws[metric] <= 0.0).mean()),
+            "n_blocks": int(n_blocks),
+            "n_window_strata": len(window_ids),
         }
-
-    treated_draws = draw_metrics(treated)
-    control_draws = draw_metrics(control)
-
-    full = np.ones((1, len(dates)), dtype=float)
-    point = {}
-    for arm in (treated, control):
-        per_seed = []
-        for flat in stacks[arm]:
-            counts = (full @ flat).reshape(1, len(TREND_LABELS), len(TREND_LABELS))
-            per_seed.append(_metrics_from_confusion(counts))
-        point[arm] = {
-            metric: float(np.mean([m[metric][0] for m in per_seed])) for metric in DELTA_METRICS
-        }
-
-    out = {}
-    for metric in DELTA_METRICS:
-        deltas = treated_draws[metric] - control_draws[metric]
-        out[metric] = {
-            "mean": point[treated][metric] - point[control][metric],
-            "low": float(np.quantile(deltas, alpha / 2)),
-            "high": float(np.quantile(deltas, 1 - alpha / 2)),
-            "n_blocks": int(len(dates)),
-        }
-    return out
+        for metric in DELTA_METRICS
+    }
 
 
 def _fit_arm(
@@ -433,6 +467,14 @@ def run_experiment(
     cfg = cfg or ForecastConfig()
     if panel.empty:
         raise ValueError("Cannot run a forecasting experiment on an empty panel.")
+    if cfg.horizon != 1:
+        # Horizon first, then the cross-section: the excess return must be measured
+        # against the same span it is compared over.
+        panel = retarget_horizon(panel, cfg.horizon)
+    if cfg.target_mode == "excess":
+        # Applied here, not in the panel builder, so the config that is hashed into
+        # the result record is the single source of truth for what was predicted.
+        panel = cross_sectional_excess(panel)
 
     price_cols = price_feature_columns()
     sent_cols = list(SENTIMENT_FEATURES)

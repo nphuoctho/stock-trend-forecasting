@@ -34,21 +34,22 @@ bài tin, thời điểm và số lượng tin, với cả tầng LSTM hai nhán
 
 \noindent Lượt hồi cứu đã có kết quả đầy đủ: LSTM chỉ giá đạt F1 vĩ mô 0,3756, LSTM hai
 nhánh 0,3869, TFT chỉ giá 0,3619 và TFT hai nhánh 0,3597. Đóng góp thông tin phân cực là
-$+0{,}0080$ theo cửa sổ và $-0{,}0020$ theo ngày, khoảng tin cậy theo ngày
-$[-0{,}0120; +0{,}0081]$ chứa 0. Vì điểm kiểm cảm xúc học từ cả nhãn sau các ngày kiểm
+$+0{,}0080$ theo cửa sổ, khoảng tin cậy 95\% theo ngày
+$[-0{,}0025; +0{,}0186]$ chứa 0. Vì điểm kiểm cảm xúc học từ cả nhãn sau các ngày kiểm
 thử, đây là chênh lệch hồi cứu, không phải bằng chứng ngoài mẫu.
 
 \noindent Lượt ngoài mẫu \textbf{đã được đo và xác minh} (\texttt{point\_in\_time: true}):
 điểm kiểm đóng băng chỉ từ 1.049 nhãn công bố trước ngày quan sát kiểm thử đầu tiên
-(21/10/2024) cho đóng góp thông tin $+0{,}0094$ F1 vĩ mô theo cửa sổ và $-0{,}0010$
-theo ngày, khoảng tin cậy theo ngày $[-0{,}0118; +0{,}0093]$ chứa 0. Điểm kiểm đối
+(21/10/2024) cho đóng góp thông tin $+0{,}0094$ F1 vĩ mô theo cửa sổ, khoảng tin cậy
+95\% theo ngày $[-0{,}0009; +0{,}0196]$ chứa 0. Điểm kiểm đối
 chứng khớp đúng số nhãn mỗi lớp nhưng lấy từ mọi mốc thời gian (hạt giống 7, thăm
-dò) cho $+0{,}0028$ theo cửa sổ --- thấp hơn điểm kiểm đóng băng trong lần rút này,
+dò) cho $+0{,}0028$ theo cửa sổ, khoảng tin cậy theo ngày $[-0{,}0074; +0{,}0133]$
+chứa 0 --- thấp hơn điểm kiểm đóng băng trong lần rút này,
 nhưng một lần rút mẫu chưa tách chắc ảnh hưởng thời điểm khỏi thành phần mẫu; mọi
 khoảng tin cậy theo ngày vẫn chứa 0, chưa đủ mạnh để kết luận có cải thiện.
 
 \noindent Hạng mục còn lại của đề cương chưa thực hiện và được chuyển sang Chương 6 là
 biến thể PhoBERT kết hợp CNN hoặc BiLSTM, phân tầng ghép cặp theo điều kiện thị
-trường, và bổ sung hạt giống cho lượt đối chứng kích thước tập huấn luyện.
+trường và bổ sung hạt giống cho lượt đối chứng kích thước tập huấn luyện.
 Hệ thống demo đã có đường dự báo hằng ngày qua dòng lệnh và bản dashboard đọc
 artifact phục vụ 5 cấu hình mô hình; giao diện trực quan đầy đủ vẫn là hướng phát triển.

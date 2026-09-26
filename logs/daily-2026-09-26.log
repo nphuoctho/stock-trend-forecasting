@@ -1,0 +1,322 @@
+[daily] 2026-09-26T16:49:34+07:00 fetching prices
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                                                                                 ┃
+┃                                                                                 ┃
+┃  🚀 VNSTOCK INSIDERS PROGRAM - NÂNG TẦM TRẢI NGHIỆM CỦA BẠN! 🚀                 ┃
+┃                                                                                 ┃
+┃  Nếu bạn cảm thấy khó chịu với các thông báo và quảng cáo:                      ┃
+┃                                                                                 ┃
+┃  ✨ Ẩn toàn bộ thông báo và quảng cáo phiền hà                                  ┃
+┃  🔓 Mở rộng khả năng sử dụng API tối đa                                         ┃
+┃  ⚡ Tăng tốc tải dữ liệu từ 5-8 lần                                              ┃
+┃  📈 Tăng giới hạn truy cập API lên đến 5 lần                                    ┃
+┃  🤖 Dùng AI Agent viết code hiệu quả với tài liệu Agent Guide                   ┃
+┃                                                                                 ┃
+┃  🔗 Tham gia ngay: https://vnstocks.com/insiders-program.                       ┃
+┃                                                                                 ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+[prices] FPT: 1761 sessions (2019-09-06 -> 2026-09-25)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] GAS: 1761 sessions (2019-09-06 -> 2026-09-25)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] HPG: 1761 sessions (2019-09-06 -> 2026-09-25)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] MBB: 1761 sessions (2019-09-06 -> 2026-09-25)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] MWG: 1761 sessions (2019-09-06 -> 2026-09-25)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] TCB: 1761 sessions (2019-09-06 -> 2026-09-25)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] VCB: 1761 sessions (2019-09-06 -> 2026-09-25)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] VHM: 1761 sessions (2019-09-06 -> 2026-09-25)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] VIC: 1761 sessions (2019-09-06 -> 2026-09-25)
+
+  ╭──────────────────────────────────────────────────────────╮
+  │  ⚠️  VNSTOCK DEPRECATION NOTICE (31/08/2025)             │
+  │                                                          │
+  │  Lớp Vnstock và các phương thức cũ (stock, fx, crypto,   │
+  │  world_index, fund...) đã chính thức bị ngừng hỗ trợ.    │
+  │                                                          │
+  │  Để hệ thống ổn định và nhận được cập nhật mới nhất,     │
+  │  vui lòng chuyển sang dùng bộ thư viện `vnstock.api`.    │
+  │                                                          │
+  │  👉 Xem hướng dẫn Migration: /vnstock-migration          │
+  ╰──────────────────────────────────────────────────────────╯
+
+Mẫu code chuyển đổi (Migration Example):
+--------------------------------------
+Cũ (Old):  stock = Vnstock().stock('ACB')
+Mới (New): from vnstock.api.quote import Quote
+          q = Quote(symbol='ACB', source='VCI')
+
+[prices] VNM: 1761 sessions (2019-09-06 -> 2026-09-25)
+
+[prices] 10/10 tickers OK, 17610 price rows total
+[daily] 2026-09-26T16:49:48+07:00 crawling news
+[listings] reusing 14270 cached rows; re-walking years [2026]
+[listings] FPT 2026: 161 articles (ticker running total 161)
+[listings] GAS 2026: 96 articles (ticker running total 96)
+[listings] HPG 2026: 109 articles (ticker running total 109)
+[listings] MBB 2026: 368 articles (ticker running total 368)
+[listings] MWG 2026: 121 articles (ticker running total 121)
+[listings] TCB 2026: 241 articles (ticker running total 241)
+[listings] VCB 2026: 149 articles (ticker running total 149)
+[listings] VHM 2026: 159 articles (ticker running total 159)
+[listings] VIC 2026: 163 articles (ticker running total 163)
+[listings] VNM 2026: 101 articles (ticker running total 101)
+[listings] done: 14292 rows, 12175 unique urls
+[news] 12175 unique urls to fetch content for
+[articles] loaded 12154 existing articles (12154 already have a body)
+
+News summary
+articles : 12175 total | 12175 with timestamp | 12175 with body
+[daily] 2026-09-26T16:54:10+07:00 scoring new articles
+[score-news] incremental: 22 new rows (14270 already scored)
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:   7%|▋         | 14/201 [00:00<00:01, 102.62it/s]Loading weights:  15%|█▍        | 30/201 [00:00<00:01, 123.23it/s]Loading weights:  21%|██▏       | 43/201 [00:00<00:01, 123.28it/s]Loading weights:  28%|██▊       | 56/201 [00:00<00:01, 120.81it/s]Loading weights:  34%|███▍      | 69/201 [00:00<00:01, 99.94it/s] Loading weights:  40%|████      | 81/201 [00:00<00:01, 97.20it/s]Loading weights:  48%|████▊     | 96/201 [00:01<00:01, 65.90it/s]Loading weights:  65%|██████▌   | 131/201 [00:01<00:00, 106.11it/s]Loading weights:  72%|███████▏  | 144/201 [00:01<00:00, 110.35it/s]Loading weights:  78%|███████▊  | 157/201 [00:01<00:00, 101.72it/s]Loading weights:  84%|████████▍ | 169/201 [00:01<00:00, 89.34it/s] Loading weights:  94%|█████████▎| 188/201 [00:01<00:00, 100.35it/s]Loading weights: 100%|██████████| 201/201 [00:01<00:00, 106.58it/s]
+[score-news] scored 14292 rows -> data/processed/news_sentiment_merged.parquet (manifest data/processed/news_sentiment_merged.manifest.json)
+[daily] 2026-09-26T16:54:26+07:00 predicting with lstm_price_sentiment
+[forecast-predict] arm=lstm_price_sentiment date=2026-09-25 tickers=10
+[forecast-predict] WARNING: issued 2026-09-26 for observation 2026-09-25; this is a replay and will NOT count as a prospective forecast. Run the job after the 15:00 ICT close of the session you are predicting from.
+  FPT    UP    UP=0.399 FLAT=0.329 DOWN=0.271 news=no
+  GAS    UP    UP=0.523 FLAT=0.182 DOWN=0.295 news=no
+  HPG    UP    UP=0.372 FLAT=0.335 DOWN=0.293 news=no
+  MBB    UP    UP=0.393 FLAT=0.356 DOWN=0.252 news=yes
+  MWG    FLAT  UP=0.282 FLAT=0.394 DOWN=0.323 news=yes
+  TCB    FLAT  UP=0.333 FLAT=0.352 DOWN=0.315 news=yes
+  VCB    UP    UP=0.366 FLAT=0.349 DOWN=0.286 news=no
+  VHM    DOWN  UP=0.390 FLAT=0.205 DOWN=0.405 news=yes
+  VIC    DOWN  UP=0.322 FLAT=0.247 DOWN=0.431 news=yes
+  VNM    FLAT  UP=0.273 FLAT=0.403 DOWN=0.324 news=yes
+[forecast-predict] -> outputs/live/lstm_price_sentiment/predictions_2026-09-25.parquet
+[forecast-resolve] rows=40 resolved=30 (prospective=0 replayed=30) pending=10 -> outputs/live/lstm_price_sentiment/resolved.parquet
+[forecast-resolve] no prospective rows yet; resolved rows are replays and do not count toward the live track record
+[daily] 2026-09-26T16:54:30+07:00 predicting with lstm_price
+[forecast-predict] arm=lstm_price date=2026-09-25 tickers=10
+[forecast-predict] WARNING: issued 2026-09-26 for observation 2026-09-25; this is a replay and will NOT count as a prospective forecast. Run the job after the 15:00 ICT close of the session you are predicting from.
+  FPT    UP    UP=0.382 FLAT=0.314 DOWN=0.304 news=no
+  GAS    UP    UP=0.466 FLAT=0.220 DOWN=0.315 news=no
+  HPG    UP    UP=0.362 FLAT=0.323 DOWN=0.315 news=no
+  MBB    UP    UP=0.353 FLAT=0.352 DOWN=0.295 news=no
+  MWG    FLAT  UP=0.310 FLAT=0.370 DOWN=0.320 news=no
+  TCB    DOWN  UP=0.336 FLAT=0.312 DOWN=0.353 news=no
+  VCB    FLAT  UP=0.324 FLAT=0.379 DOWN=0.296 news=no
+  VHM    DOWN  UP=0.385 FLAT=0.213 DOWN=0.401 news=no
+  VIC    DOWN  UP=0.356 FLAT=0.240 DOWN=0.404 news=no
+  VNM    FLAT  UP=0.327 FLAT=0.354 DOWN=0.319 news=no
+[forecast-predict] -> outputs/live/lstm_price/predictions_2026-09-25.parquet
+[forecast-resolve] rows=40 resolved=30 (prospective=0 replayed=30) pending=10 -> outputs/live/lstm_price/resolved.parquet
+[forecast-resolve] no prospective rows yet; resolved rows are replays and do not count toward the live track record
+[daily] 2026-09-26T16:54:33+07:00 predicting with logreg_price_sentiment
+[forecast-predict] arm=logreg_price_sentiment date=2026-09-25 tickers=10
+[forecast-predict] WARNING: issued 2026-09-26 for observation 2026-09-25; this is a replay and will NOT count as a prospective forecast. Run the job after the 15:00 ICT close of the session you are predicting from.
+  FPT    FLAT  UP=0.320 FLAT=0.354 DOWN=0.327 news=no
+  GAS    UP    UP=0.345 FLAT=0.320 DOWN=0.336 news=no
+  HPG    FLAT  UP=0.300 FLAT=0.396 DOWN=0.304 news=no
+  MBB    UP    UP=0.365 FLAT=0.356 DOWN=0.278 news=yes
+  MWG    FLAT  UP=0.299 FLAT=0.395 DOWN=0.306 news=yes
+  TCB    FLAT  UP=0.306 FLAT=0.368 DOWN=0.326 news=yes
+  VCB    FLAT  UP=0.289 FLAT=0.413 DOWN=0.298 news=no
+  VHM    UP    UP=0.489 FLAT=0.159 DOWN=0.352 news=yes
+  VIC    DOWN  UP=0.373 FLAT=0.229 DOWN=0.398 news=yes
+  VNM    FLAT  UP=0.310 FLAT=0.351 DOWN=0.339 news=yes
+[forecast-predict] -> outputs/live/logreg_price_sentiment/predictions_2026-09-25.parquet
+[forecast-resolve] rows=40 resolved=30 (prospective=0 replayed=30) pending=10 -> outputs/live/logreg_price_sentiment/resolved.parquet
+[forecast-resolve] no prospective rows yet; resolved rows are replays and do not count toward the live track record
+[daily] 2026-09-26T16:54:39+07:00 predicting with tft_price_sentiment
+[forecast-predict] arm=tft_price_sentiment date=2026-09-25 tickers=10
+[forecast-predict] WARNING: issued 2026-09-26 for observation 2026-09-25; this is a replay and will NOT count as a prospective forecast. Run the job after the 15:00 ICT close of the session you are predicting from.
+  FPT    UP    UP=0.365 FLAT=0.273 DOWN=0.363 news=no
+  GAS    UP    UP=0.376 FLAT=0.253 DOWN=0.371 news=no
+  HPG    DOWN  UP=0.334 FLAT=0.325 DOWN=0.341 news=no
+  MBB    UP    UP=0.364 FLAT=0.350 DOWN=0.287 news=yes
+  MWG    FLAT  UP=0.306 FLAT=0.360 DOWN=0.333 news=yes
+  TCB    DOWN  UP=0.325 FLAT=0.334 DOWN=0.342 news=yes
+  VCB    FLAT  UP=0.280 FLAT=0.417 DOWN=0.303 news=no
+  VHM    UP    UP=0.395 FLAT=0.231 DOWN=0.375 news=yes
+  VIC    DOWN  UP=0.388 FLAT=0.211 DOWN=0.401 news=yes
+  VNM    FLAT  UP=0.301 FLAT=0.365 DOWN=0.335 news=yes
+[forecast-predict] -> outputs/live/tft_price_sentiment/predictions_2026-09-25.parquet
+[forecast-resolve] rows=30 resolved=20 (prospective=0 replayed=20) pending=10 -> outputs/live/tft_price_sentiment/resolved.parquet
+[forecast-resolve] no prospective rows yet; resolved rows are replays and do not count toward the live track record
+[daily] 2026-09-26T16:54:42+07:00 predicting with tft_price
+[forecast-predict] arm=tft_price date=2026-09-25 tickers=10
+[forecast-predict] WARNING: issued 2026-09-26 for observation 2026-09-25; this is a replay and will NOT count as a prospective forecast. Run the job after the 15:00 ICT close of the session you are predicting from.
+  FPT    UP    UP=0.364 FLAT=0.297 DOWN=0.339 news=no
+  GAS    UP    UP=0.388 FLAT=0.282 DOWN=0.330 news=no
+  HPG    UP    UP=0.346 FLAT=0.343 DOWN=0.310 news=no
+  MBB    FLAT  UP=0.329 FLAT=0.342 DOWN=0.329 news=no
+  MWG    FLAT  UP=0.276 FLAT=0.391 DOWN=0.333 news=no
+  TCB    DOWN  UP=0.322 FLAT=0.319 DOWN=0.359 news=no
+  VCB    FLAT  UP=0.308 FLAT=0.399 DOWN=0.293 news=no
+  VHM    UP    UP=0.416 FLAT=0.214 DOWN=0.370 news=no
+  VIC    DOWN  UP=0.379 FLAT=0.222 DOWN=0.399 news=no
+  VNM    FLAT  UP=0.313 FLAT=0.360 DOWN=0.327 news=no
+[forecast-predict] -> outputs/live/tft_price/predictions_2026-09-25.parquet
+[forecast-resolve] rows=30 resolved=20 (prospective=0 replayed=20) pending=10 -> outputs/live/tft_price/resolved.parquet
+[forecast-resolve] no prospective rows yet; resolved rows are replays and do not count toward the live track record
+[daily] 2026-09-26T16:54:45+07:00 done

@@ -183,6 +183,43 @@ thể làm đối chứng cơ sở tham khảo, nhưng phải ghi rõ phiên b�
 và khả năng tái lập; chúng không nên thay PhoBERT trong quy trình sàn
 \cite{Liang2024_241210823v2,Siala2026_260200086v3}.
 
+\section{Các câu hỏi mở từ bốn phân tích bổ sung}
+
+Bốn phân tích bổ sung trong Chương~\ref{ch:ket-qua} (các Mục~\ref{sec:kq-ic},
+\ref{sec:kq-excess}, \ref{sec:kq-horizon} và~\ref{sec:kq-kinh-te}) đều dừng ở
+giới hạn của chính mình, và mỗi giới hạn gợi ý một hướng nghiên cứu riêng. Các
+hướng dưới đây là câu hỏi mở, chưa có số liệu trong đồ án này:
+
+\begin{itemize}[nosep]
+  \item \textbf{Cách đo cảm xúc giàu hơn một số vô hướng.} Điểm
+        \texttt{sent\_pos\_minus\_neg} nén mỗi bài tin thành một hiệu hai xác
+        suất; tương quan hạng gần 0 chỉ bác bỏ liên hệ đơn điệu của điểm số đó.
+        Có thể đo cảm xúc theo khía cạnh, cường độ, chủ thể của tin, hoặc mức
+        bất ngờ so với kỳ vọng thị trường, nhưng mỗi chiều bổ sung đòi hỏi nhãn
+        và đối chứng riêng.
+  \item \textbf{Tổng hợp theo sự kiện.} Trung bình theo ngày pha loãng tin quan
+        trọng vào các ngày có nhiều tin nhỏ. Cách tổng hợp theo sự kiện, có
+        trọng số theo độ tin cậy của bộ phân loại, là biến thể trực tiếp nhất,
+        nhưng cần định nghĩa trước cách gom tin thành sự kiện để không mở thêm
+        một lần thử không được ghi lại.
+  \item \textbf{Quan hệ phi tuyến hoặc có điều kiện.} Phản ví dụ $y = x^2$ cho
+        thấy một liên hệ phụ thuộc trạng thái có thể tồn tại dù tương quan hạng
+        bằng 0. Có thể thử tương tác giữa điểm cảm xúc với độ biến động, vị trí
+        trong phân phối lợi suất hoặc điều kiện thị trường, nhưng mỗi dạng mới
+        phải được khóa trước khi xem kết quả.
+  \item \textbf{Chẩn đoán kinh tế giao dịch được.} Phiên bản thực tế hơn phải
+        vào lệnh từ phiên mở cửa kế tiếp trở đi, trừ phí và trượt giá, và đối
+        chiếu phần biến động qua đêm vốn chiếm phần lớn biên lợi thế ở tần suất
+        ngày. Sổ lệnh cũng cần trung hòa trạng thái ròng và một mẫu dài hơn để
+        tách các mức Sharpe gần nhau.
+  \item \textbf{Tách nhân quả ngược.} Hình mẫu ``cùng phiên có, phiên sau
+        không'' cũng phát sinh nếu giá chạy trước và báo chí viết theo giọng của
+        diễn biến đó. Một thiết kế tách giá dẫn dắt giọng điệu tin khỏi tin dẫn
+        dắt giá cần nguồn tin có mốc giờ chính xác trong phiên, hoặc một nhóm
+        đối chứng không mang nội dung doanh nghiệp.
+\end{itemize}
+
+
 \section{Đóng gói và tái lập hệ thống}
 
 Một phiên bản phát triển hoàn chỉnh nên có các mô-đun độc lập cho thu thập, chuẩn hóa

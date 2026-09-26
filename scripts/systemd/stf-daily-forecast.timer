@@ -1,0 +1,17 @@
+[Unit]
+Description=Run the daily forecast before the HOSE opening auction
+
+[Timer]
+# 08:00 ICT on trading days: after the overnight publication of the previous
+# session's close and before the 09:00 opening auction. A run started later
+# targets a session that can already have moved, which `forecast-resolve`
+# excludes from the live track record.
+OnCalendar=Mon-Fri 08:00
+# Deliberately NOT persistent. Catching up a missed run at, say, 14:00 would
+# issue a prediction for a session already in progress: a replay that adds a row
+# to the audit trail and nothing to the track record.
+Persistent=false
+Unit=stf-daily-forecast.service
+
+[Install]
+WantedBy=timers.target

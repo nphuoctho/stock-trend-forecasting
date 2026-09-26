@@ -43,7 +43,7 @@ thiếu thời điểm hoặc không xác định được mã được đánh d
 bảng đặc trưng chính.
 
 Dữ liệu giá được chia theo thứ tự thời gian bằng kiểm định cuốn chiếu với năm đoạn kiểm
-thử tách biệt; không có tập kiểm tra cuối tách riêng vì cấu hình được cố định trước lần
+thử tách biệt; không có tập kiểm thử cuối tách riêng vì cấu hình được cố định trước lần
 chạy và mỗi đoạn kiểm thử chỉ được chấm một lần. Bộ chuẩn hóa, bộ điền khuyết, ngưỡng tạo
 nhãn, lựa chọn đặc trưng và các tham số của nhánh giá chỉ được học từ phần huấn luyện từng
 cửa sổ. Mô hình có cảm xúc được so sánh với mô hình chỉ dùng giá trên cùng ngày huấn luyện,
@@ -52,8 +52,8 @@ tiêu chí dừng. Đối chứng giữ nguyên kiến trúc và độ phủ tin
 xác suất cảm xúc khỏi ảnh hưởng của kiến trúc hoặc cách chia mẫu.
 
 Về dữ liệu, kho tin đã lưu 10.695 bản ghi có URL, thời điểm đăng và nội dung trong cửa sổ
-2020--2025, kết hợp với 12.624 liên kết tin tức và mã cổ phiếu thuộc 10 mã VN30, cùng 14.990 dòng dữ liệu giá
-OHLCV trong giai đoạn 2020--2025. Tập nhãn cảm xúc trong miền dữ liệu đã được rà soát
+2020--2025, cùng 12.624 liên kết tin--mã trên 10 mã VN30 và 14.990 dòng giá
+OHLCV của cùng giai đoạn. Tập nhãn cảm xúc trong miền dữ liệu đã được rà soát
 gồm 1.306 mẫu, bên cạnh tập hạt giống CafeF gồm 999 mẫu. Xác thực chéo theo tầng 5 lượt
 trên tập 1.306 mẫu đạt F1 vĩ mô 0,7298, độ chính xác 0,8125 và độ chính xác cân bằng
 0,7689; năm tập kiểm thử ngoài cộng lại có 59 mẫu NEGATIVE với độ bao phủ 0,6803.
@@ -69,23 +69,30 @@ cân bằng theo thiết kế và mức ngẫu nhiên của bài toán là 0,333
 
 Đóng góp riêng của tín hiệu cảm xúc được đo bằng một đối chứng giữ nguyên kiến
 trúc hai nhánh, cùng bài tin, thời điểm và số lượng tin, nhưng thay xác suất cảm
-xúc thật bằng phân phối tiên nghiệm trung tính. Ở lượt hồi cứu, hiệu số trực tiếp là
-$+0{,}0113$ F1 vĩ mô, trong đó hiệu ứng kiến trúc, sự hiện diện và khối lượng tin là
-$+0{,}0034$ và đóng góp thông tin theo cửa sổ là $+0{,}0080$; ước lượng theo khối ngày
-là $-0{,}0020$ với khoảng tin cậy 95\% $[-0{,}0120; +0{,}0081]$, chứa 0.
+xúc thật bằng phân phối tiên nghiệm trung tính. Ở lượt hồi cứu, hiệu số trực tiếp
+là $+0{,}0113$ F1 vĩ mô, trong đó hiệu ứng kiến trúc, sự hiện diện và khối lượng
+tin là $+0{,}0034$ và đóng góp thông tin theo cửa sổ là $+0{,}0080$; khoảng tin
+cậy 95\% theo ngày là $[-0{,}0025; +0{,}0186]$, chứa 0.
 
-Vì điểm kiểm của lượt hồi cứu học từ cả những nhãn công bố sau các ngày kiểm thử, các
-số liệu trên chỉ là chênh lệch hồi cứu. Lượt ngoài mẫu --- điểm kiểm đóng băng chỉ
-từ 1.049 nhãn công bố trước ngày quan sát kiểm thử đầu tiên, cùng một điểm kiểm đối
-chứng khớp kích thước và phân bố lớp để tách ảnh hưởng của kích thước tập huấn
-luyện --- đã được đo và xác minh. Đóng góp thông tin ngoài mẫu của LSTM hai nhánh là
-$+0{,}0094$ F1 vĩ mô theo cửa sổ và $-0{,}0010$ theo ngày, khoảng tin cậy theo ngày
-$[-0{,}0118; +0{,}0093]$ chứa 0; lượt đối chứng cùng kích thước cho $+0{,}0028$ theo
-cửa sổ --- thấp hơn điểm kiểm đóng băng trong lần rút hạt giống 7, nhưng một lần
-rút mẫu chưa tách chắc ảnh hưởng thời điểm khỏi thành phần mẫu. Mọi khoảng tin cậy
-theo ngày vẫn chứa 0 và các ước lượng điểm theo ngày đều âm, nên kết luận trong
-phạm vi đã đo vẫn là chưa có bằng chứng đủ mạnh rằng cảm xúc cải thiện dự báo.
-Kết quả không được diễn giải thành quan hệ nhân quả hay khuyến nghị đầu tư.
+Vì điểm kiểm của lượt hồi cứu học từ cả những nhãn công bố sau các ngày kiểm
+thử, các số liệu trên chỉ là chênh lệch hồi cứu. Lượt ngoài mẫu --- điểm kiểm
+đóng băng chỉ từ 1.049 nhãn công bố trước ngày quan sát kiểm thử đầu tiên, cùng
+một điểm kiểm đối chứng khớp kích thước và phân bố lớp để tách ảnh hưởng của
+kích thước tập huấn luyện --- đã được đo và xác minh. Đóng góp thông tin ngoài
+mẫu của LSTM hai nhánh là $+0{,}0094$ F1 vĩ mô theo cửa sổ, khoảng tin cậy 95\%
+theo ngày $[-0{,}0009; +0{,}0196]$ chứa 0; lượt đối chứng cùng kích thước (hạt
+giống 7) cho $+0{,}0028$ theo cửa sổ, khoảng tin cậy theo ngày $[-0{,}0074;
++0{,}0133]$ chứa 0. Cả ba ước lượng điểm đều dương và nằm trong khoảng
+$+0{,}003$ đến $+0{,}009$, nhưng mọi khoảng tin cậy đều chứa 0; các lượt đo này
+đồng thời là nhiều phép so sánh trên cùng một bộ dữ liệu nên không có cơ sở
+tuyên bố ý nghĩa thống kê. Bốn phân tích bổ sung đã được thực hiện để khảo sát
+độ vững của kết luận: tương quan hạng giữa điểm cảm xúc và lợi suất không qua
+mô hình, nhãn lợi suất vượt trội so với các mã cùng phiên, ablation chân trời
+dự báo và chẩn đoán kinh tế trong khung thăm dò không giao dịch được; cả bốn
+đều không tìm thấy một cải thiện có thể tái lập. Vì vậy, kết luận trong phạm
+vi đã đo vẫn là chưa có bằng chứng đủ mạnh rằng cảm xúc cải thiện dự báo, và
+dữ liệu cũng không loại trừ một cải thiện nhỏ. Kết quả không được diễn giải
+thành quan hệ nhân quả hay khuyến nghị đầu tư.
 
 \vspace{0.5cm}
 \noindent Từ khóa: dự báo xu hướng giá cổ phiếu, phân tích cảm xúc, PhoBERT,

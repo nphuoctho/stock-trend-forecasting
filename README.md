@@ -236,8 +236,58 @@ and both feature scalers on training rows only, selects each LSTM checkpoint on 
 window's validation macro-F1, and scores every arm once on the same test rows. Results
 are averaged over `--seeds`. The sentiment contribution is reported twice: as a paired
 per-window delta bootstrapped over the 5 windows, and as a bootstrap over the ~300 test
-**dates** (all tickers of a date resample together). Prefer the date-block interval; the
+**dates**. In the date-block interval all tickers of a date resample together and dates
+are resampled *inside their own window*, so the interval brackets the same
+window-averaged quantity the point estimate reports. Prefer the date-block interval; the
 window interval has only 5 blocks and is coarse enough to exclude zero by accident.
+
+`date_block_bootstrap` resamples dates inside their own window and averages the
+per-window metrics, so it brackets the same window-averaged quantity
+`information_gain` reports. An earlier version pooled every window into one confusion
+matrix. That pooled delta is a legitimate estimate in its own right and it came with
+its own interval, but it is a *different* estimand: macro-F1 is non-linear in the
+confusion matrix, so the pooled delta does not equal the mean of the per-window
+deltas, and the two had to be read as a pair of separate results. Reporting one
+estimand with one matching interval is simpler to state and to defend; it is not
+evidence that the pooled figure was wrong.
+
+Two limits apply to both intervals. Dates are drawn independently, so neither is a
+serial block bootstrap and neither models day-to-day dependence. And
+`one_sided_p_le_zero` is reported for convenience only: the direction was not fixed
+before the results were seen, so it cannot be used to claim significance. Treat the
+two-sided interval as the reportable quantity and correct for the number of arms and
+runs compared.
+
+### Lựa chọn nhãn: lợi suất thô hay lợi suất vượt trội
+
+`--target raw` (mặc định) gán nhãn theo lợi suất phiên kế tiếp của chính mã đó.
+`--target excess` gán nhãn theo phần lợi suất vượt trên trung bình đồng hạng của cùng
+phiên. Trên 2020--2025, mười mã nghiên cứu có tương quan lợi suất ngày trung bình theo
+cặp là 0,42 và $R^2$ trung bình 0,48 so với trung bình đồng hạng: gần một nửa biến động
+hằng ngày là nhịp chung của thị trường, thứ mà tin riêng của doanh nghiệp không giải
+thích được. Mục tiêu vượt trội loại bỏ thành phần chung nên đo đúng câu hỏi "tin của mã
+này có báo trước việc nó chạy nhanh hơn rổ hay không".
+
+Đây là đổi nhãn chứ không phải đổi đặc trưng: trung bình đồng hạng được trừ đi cũng chỉ
+biết được vào đúng ngày mục tiêu, nên không có thông tin nào xuất hiện sớm hơn trước.
+Ngưỡng tam phân vẫn khớp riêng trên phần huấn luyện của từng cửa sổ.
+
+### Chân trời dự báo
+
+`--horizon 1` (mặc định) là trường hợp khó nhất: điều mà bài tin hàm ý phải hiện ra trong
+đúng một nhịp đóng cửa sang đóng cửa. `--horizon 3` hoặc `--horizon 5` kiểm tra xem kết
+quả rỗng ở `h=1` là đặc thù của nhịp thời gian đó hay là tính chất của tín hiệu.
+
+```bash
+uv run python -m stf.cli forecast --news-sentiment data/processed/news_sentiment_pit.parquet \
+  --panel-end 2025-12-31 --horizon 5 --seeds 42 43 44 --output outputs/forecast_h5_pit_sentiment
+```
+
+Cái giá phải trả là **nhãn chồng lấn**: ở `h=5`, hai dòng liên tiếp dùng chung bốn trên năm
+phiên, nên số quan sát độc lập hữu hiệu chỉ còn khoảng `n/h`. Ước lượng điểm vẫn dùng được,
+nhưng khoảng tin cậy tính như thể các dòng độc lập sẽ **hẹp hơn mức bằng chứng cho phép**.
+Luôn ghi chân trời cạnh mọi con số lấy từ lượt chạy kiểu này, và đọc khoảng tin cậy của
+`h>1` như một chỉ báo, không phải một phép kiểm.
 
 `forecast-compare` exists because comparing the two-branch arm against the single-branch
 price model conflates the added branch with news presence and volume. The neutral control
@@ -264,6 +314,69 @@ Artifacts written to `--output`:
 The three trend classes are cut at the training window's return terciles, so the classes
 are balanced by construction and **the chance level is 0.333, not 0.5**. Report `macro_f1`,
 `balanced_accuracy` and macro OvR-AUC; accuracy alone is not interpretable here.
+
+### Tương quan hạng của tín hiệu, không qua mô hình
+
+Một phép cắt bỏ cho kết quả rỗng không phân biệt được "bộ ước lượng yếu" với "tín hiệu
+yếu". `forecast-ic` bổ sung một mảnh bằng chứng: tương quan hạng Spearman giữa điểm cảm
+xúc theo ngày và lợi suất thực hiện, **không khớp bất kỳ mô hình nào**, nên nó không bị
+lựa chọn kiến trúc làm nhiễu.
+
+```bash
+uv run python -m stf.cli forecast-ic \
+  --news-sentiment data/processed/news_sentiment_pit.parquet \
+  --output outputs/signal_ic_pit.json
+```
+
+**Nó không chứng minh điều gì.** Hệ số Spearman gần 0 chỉ bác bỏ liên hệ **đơn điệu** của
+**đúng điểm số vô hướng này**. Nó không phải cận trên của khả năng dự báo và không phải
+thước đo lượng thông tin: quan hệ $y = x^2$ với $x$ đối xứng dự báo được hoàn hảo nhưng
+tương quan hạng bằng 0. Nó cũng không nói gì về một cách tổng hợp khác, một hiệu ứng có
+điều kiện hay tương tác, một chân trời dài hơn, hay một cách đo cảm xúc tốt hơn. Đọc kết
+quả rỗng ở đây đúng như nó là: *không phát hiện được liên hệ đơn điệu cho điểm số này ở
+chân trời này*. Các phép đối chiếu chưa được đăng ký trước, nên chúng mang tính thăm dò.
+
+Báo cáo đối chiếu hai cặp. `same` so với `next`: điểm số đồng biến với chính phiên của nó
+nhưng không với phiên sau là **phù hợp với** giả thuyết tin đã phản ánh vào giá lúc đóng
+cửa --- phù hợp với, chứ không phải chứng minh: cùng một hình mẫu cũng xuất hiện khi giá
+chi phối giọng điệu bài viết (nhân quả ngược), hoặc khi điểm số đơn giản là quá nhiễu để
+còn sót lại sau một ngày pha loãng nữa. `raw` so với `excess` tách nhịp chung của thị
+trường khỏi phần riêng của mã. Khoảng tin cậy lấy mẫu lặp theo trọn phiên và coi các phiên
+là hoán vị được, nên **không** mô hình hóa phụ thuộc chuỗi.
+
+### Chẩn đoán kinh tế (không phải backtest giao dịch được)
+
+`macro_f1` không cho biết biên lợi thế lớn hay nhỏ tính bằng điểm cơ bản.
+`forecast-backtest` quy đổi dự đoán đã lưu thành một sổ mua/bán khống để đọc con số đó.
+
+```bash
+uv run python -m stf.cli forecast-backtest \
+  --run outputs/forecast_pit_sentiment \
+  --arm lstm_price_sentiment \
+  --cost-bps 20
+```
+
+> **Cảnh báo ràng buộc: kết quả này không giao dịch được.** Đặc trưng của ngày `t` gồm
+> `close_t` và mọi bài tin tới mốc 15:00 của `t`. Sổ lệnh vào lệnh tại `close_t` --- đúng
+> cái giá mà tín hiệu vừa dùng, và chỉ biết được sau khi phiên đã đóng. Đây là cận trên
+> dưới giả định khớp lệnh hoàn hảo, tức thời, không trượt giá. Một phương án giao dịch
+> được phải vào lệnh từ phiên mở cửa kế tiếp trở đi và sẽ mất phần biến động qua đêm.
+
+Sổ lệnh **không trung hòa thị trường**. Khi cả hai vế cùng có lệnh thì trọng số triệt tiêu;
+khi chỉ một vế có lệnh thì sổ mang trạng thái một chiều --- vế sống bị giảm một nửa nhưng
+rủi ro thị trường vẫn còn. `mean_abs_net_exposure` và `one_sided_fraction` đo đúng mức vi
+phạm đó; trên lượt point-in-time có 23% số phiên một chiều.
+
+Lợi suất thực hiện tính lại từ tệp giá, không suy ngược từ nhãn. Chi phí tính trên vòng
+quay so với **vị thế đã trôi giá**, không phải so với trọng số mục tiêu hôm trước: giữ
+nguyên mục tiêu vẫn phải cân bằng lại khi giá đã chạy. Báo cáo kèm hai mốc so sánh khác
+nhau: `equal_weight_rebalanced` (đặt lại tỷ trọng đều mỗi phiên) và `buy_and_hold` (mua một
+lần rồi để trôi) --- chúng là hai sản phẩm khác nhau.
+
+Đọc kết quả phải kèm ba cảnh báo. 300 phiên là quá ít để tách các mức Sharpe gần nhau:
+chạy `--arm random` và một null hoán vị nhãn trong từng phiên trước khi diễn giải. Trước
+phí và sau phí là hai kết luận khác nhau. Và một phần lợi suất gộp có thể đến từ trạng thái
+ròng một chiều, nên hãy hồi quy chuỗi lợi suất sổ lệnh lên lợi suất rổ để tách alpha.
 
 ## Phase 5: results dashboard
 
@@ -302,8 +415,10 @@ file is stamped with `issued_at` and the checkpoint manifest hash, and a re-run
 that would change an issued file is refused — issued predictions are an audit
 trail, not a cache. `forecast-resolve` joins stored predictions with realized
 next-session labels into `resolved.parquet` and marks each row `prospective`
-only when it was provably issued before its target session; replayed or
-pre-stamping rows are kept but excluded from the live track record:
+only when it was issued **strictly before the target session's 09:00 opening
+auction**; rows issued once that session could already move are kept but excluded
+from the live track record. The stricter `issued_same_session` flag is reported
+alongside it:
 
 ```bash
 uv run python -m stf.cli forecast-predict \
@@ -321,11 +436,39 @@ parquet, so the daily job scores just the new crawl instead of the full archive.
 `scripts/daily-forecast.sh` chains prices → news → score-news → predict → resolve
 for all five arms (`$ARMS` overridable). Each run tees to
 `logs/daily-<date>.log` and writes `outputs/live/last_run.json` (finish time,
-exit code, failed step). Schedule it after the 15:00 ICT close, e.g. cron:
+exit code, failed step).
+
+**Schedule it in the morning, not after the close.** The price provider publishes
+a session's close only on the following day, so at 15:30 on day D the freshest
+close available is still D-1 and the job would be "predicting" a session that has
+already traded — every row lands as a replay and the live track record stays
+empty. Running before the opening auction uses the overnight publication of D-1
+and targets D, which has not moved yet:
 
 ```cron
-30 15 * * 1-5  /path/to/stock-trend-forecasting/scripts/daily-forecast.sh
+0 8 * * 1-5  /path/to/stock-trend-forecasting/scripts/daily-forecast.sh
 ```
+
+A crontab line only fires when a cron daemon is running, which is not the default
+on every distribution. `scripts/systemd/` carries an equivalent user timer that
+needs no root and, with lingering enabled, runs while logged out:
+
+```bash
+cp scripts/systemd/stf-daily-forecast.{service,timer} ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now stf-daily-forecast.timer
+systemctl --user list-timers stf-daily-forecast.timer   # confirm the next run
+loginctl enable-linger "$USER"                          # if Linger=no
+```
+
+The timer is deliberately not `Persistent`: catching up a missed run in the
+afternoon would issue a prediction for a session already in progress, adding a
+replay to the audit trail and nothing to the track record.
+
+`forecast-predict` prints a warning whenever an issuance cannot count as
+prospective, and `forecast-resolve` reports the prospective/replayed split of
+every run, so an empty track record is visible the day it happens rather than
+weeks later.
 
 The dashboard exposes the results at `/api/live/latest` (per-arm signals for the
 newest session), `/api/live/history` (prospective vs replayed resolved rows,
