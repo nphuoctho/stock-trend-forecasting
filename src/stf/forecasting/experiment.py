@@ -30,7 +30,13 @@ import numpy as np
 import pandas as pd
 
 from stf.forecasting.features import FeatureScaler, price_feature_columns
-from stf.forecasting.labels import TREND_LABELS, fit_thresholds, label_panel
+from stf.forecasting.labels import (
+    TREND_LABELS,
+    cross_sectional_excess,
+    fit_thresholds,
+    label_panel,
+    retarget_horizon,
+)
 from stf.forecasting.sentiment_agg import ROLLING_SENTIMENT_COLUMNS, SENTIMENT_COLUMNS
 from stf.forecasting.split import TimeSplit, walk_forward_windows
 
@@ -78,6 +84,13 @@ class ForecastConfig:
     seeds: tuple[int, ...] = (42, 43, 44)
     bootstrap_samples: int = 2000
     bootstrap_seed: int = 7
+    # "raw" predicts the next session's own return; "excess" predicts it net of the
+    # equal-weighted cross-section of the same session, isolating the idiosyncratic
+    # move that company news can plausibly explain.
+    target_mode: str = "raw"
+    # Sessions ahead the label looks. >1 overlaps consecutive labels; see
+    # ``stf.forecasting.labels.retarget_horizon`` for what that costs.
+    horizon: int = 1
 
     def __post_init__(self) -> None:
         # The TFT arm hard-codes num_heads=4; fail at config time instead of
@@ -86,6 +99,10 @@ class ForecastConfig:
             raise ValueError(
                 f"hidden={self.hidden} must be divisible by 4 (TFT num_heads)."
             )
+        if self.target_mode not in {"raw", "excess"}:
+            raise ValueError(f"target_mode={self.target_mode!r} must be 'raw' or 'excess'.")
+        if self.horizon < 1:
+            raise ValueError(f"horizon={self.horizon} must be >= 1.")
 
     def as_dict(self) -> dict:
         data = self.__dict__.copy()
@@ -450,6 +467,14 @@ def run_experiment(
     cfg = cfg or ForecastConfig()
     if panel.empty:
         raise ValueError("Cannot run a forecasting experiment on an empty panel.")
+    if cfg.horizon != 1:
+        # Horizon first, then the cross-section: the excess return must be measured
+        # against the same span it is compared over.
+        panel = retarget_horizon(panel, cfg.horizon)
+    if cfg.target_mode == "excess":
+        # Applied here, not in the panel builder, so the config that is hashed into
+        # the result record is the single source of truth for what was predicted.
+        panel = cross_sectional_excess(panel)
 
     price_cols = price_feature_columns()
     sent_cols = list(SENTIMENT_FEATURES)

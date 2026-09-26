@@ -74,6 +74,67 @@ def add_target(panel: pd.DataFrame, *, return_col: str = "target_return") -> pd.
     return pd.concat(frames, ignore_index=True)
 
 
+def retarget_horizon(panel: pd.DataFrame, horizon: int) -> pd.DataFrame:
+    """Re-point the target at the close ``horizon`` sessions ahead instead of one.
+
+    A one-session horizon is the hardest case: whatever a news item implies has to
+    show up within a single close-to-close move or not at all. Widening the horizon
+    tests whether a null at ``h=1`` is specific to that timing rather than a property
+    of the signal.
+
+    The cost is overlapping labels. At ``h=5`` consecutive rows share four of their
+    five sessions, so the effective number of independent observations is roughly
+    ``n/h``: point estimates stay usable but intervals computed as if the rows were
+    independent are too narrow, and the walk-forward date blocks are the only thing
+    keeping train and test outcomes disjoint. Report the horizon next to every number
+    taken from a run like this.
+    """
+    if horizon < 1:
+        raise ValueError("horizon must be >= 1.")
+    required = {"ticker", "observation_date", "close"}
+    if not required <= set(panel.columns):
+        raise ValueError(f"panel needs columns {sorted(required)}.")
+    frames: list[pd.DataFrame] = []
+    for _, group in panel.groupby("ticker", sort=True):
+        g = group.sort_values("observation_date").copy()
+        g["target_return"] = g["close"].shift(-horizon) / g["close"] - 1.0
+        g["target_date"] = g["observation_date"].shift(-horizon)
+        frames.append(g)
+    return pd.concat(frames, ignore_index=True)
+
+
+def cross_sectional_excess(
+    panel: pd.DataFrame, *, return_col: str = "target_return"
+) -> pd.DataFrame:
+    """Replace the target with the return in excess of the same session's cross-section.
+
+    Roughly half of a VN30 constituent's daily return is the common market move:
+    over 2020--2025 the ten study tickers have a mean pairwise return correlation of
+    0.42 and a mean :math:`R^2` of 0.48 against their equal-weighted average. A
+    ticker-specific news signal can only act on what is left, so predicting the raw
+    return dilutes the effect being measured. Subtracting the equal-weighted mean of
+    the same ``target_date`` turns the task into "does this ticker beat the basket
+    tomorrow", which is the question company news can actually answer.
+
+    This is a change of label, not a feature: the subtracted mean is realized on the
+    target date together with the return itself, so nothing is known earlier than
+    before. Rows whose target date holds a single finite return are dropped to
+    ``NaN`` -- a one-stock cross-section has no meaningful excess return.
+    """
+    if return_col not in panel.columns:
+        raise ValueError(f"panel missing '{return_col}'.")
+    if "target_date" not in panel.columns:
+        raise ValueError("panel needs 'target_date' to build a cross-section.")
+    out = panel.copy()
+    returns = pd.to_numeric(out[return_col], errors="coerce")
+    groups = out["target_date"]
+    mean = returns.groupby(groups).transform("mean")
+    breadth = returns.groupby(groups).transform("count")
+    excess = returns - mean
+    out[return_col] = excess.where(breadth > 1)
+    return out
+
+
 def label_panel(
     panel: pd.DataFrame,
     thresholds: tuple[float, float],

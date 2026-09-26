@@ -977,6 +977,8 @@ def cmd_forecast(args: argparse.Namespace) -> int:
         batch_size=args.batch_size,
         patience=args.patience,
         seeds=tuple(args.seeds),
+        target_mode=args.target,
+        horizon=args.horizon,
     )
     if provenance["news_sentiment"] is not None:
         # Point-in-time verdict: the scoring checkpoint must have been trained
@@ -1784,6 +1786,26 @@ def main(argv: list[str] | None = None) -> int:
     p_forecast.add_argument("--patience", type=int, default=5)
     p_forecast.add_argument(
         "--seeds", type=int, nargs="+", default=[42, 43, 44], help="seeds averaged per window"
+    )
+    p_forecast.add_argument(
+        "--target",
+        choices=("raw", "excess"),
+        default="raw",
+        help=(
+            "'raw' labels the next session's own return; 'excess' labels it net of the "
+            "equal-weighted cross-section of the same session, so the classes measure "
+            "relative performance instead of the shared market move"
+        ),
+    )
+    p_forecast.add_argument(
+        "--horizon",
+        type=int,
+        default=1,
+        help=(
+            "sessions ahead the label looks; >1 overlaps consecutive labels, so the "
+            "effective sample shrinks by roughly this factor and the intervals narrow "
+            "more than the evidence warrants"
+        ),
     )
     p_forecast.set_defaults(func=cmd_forecast)
 

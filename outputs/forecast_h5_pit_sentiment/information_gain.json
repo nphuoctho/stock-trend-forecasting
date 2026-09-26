@@ -1,0 +1,126 @@
+{
+  "arm": "lstm_price_sentiment",
+  "price_arm": "lstm_price",
+  "config": {
+    "seq_len": 5,
+    "n_windows": 5,
+    "test_size": 60,
+    "val_size": 60,
+    "expanding": true,
+    "hidden": 32,
+    "num_layers": 1,
+    "epochs": 40,
+    "batch_size": 128,
+    "lr": 0.001,
+    "patience": 6,
+    "seeds": [
+      42,
+      43,
+      44
+    ],
+    "bootstrap_samples": 2000,
+    "bootstrap_seed": 7,
+    "target_mode": "raw",
+    "horizon": 5
+  },
+  "effects": {
+    "macro_f1": {
+      "price_only": 0.3574878265369922,
+      "two_branch_neutral_prior": 0.36654510495214726,
+      "two_branch_real_sentiment": 0.36582699098154975,
+      "architecture_and_news_presence_volume_effect": 0.009057278415155079,
+      "information_gain": -0.0007181139705975115,
+      "naive_delta": 0.008339164444557567,
+      "information_gain_per_window": [
+        0.011962697071834894,
+        -0.006385462930132257,
+        -0.018887889414047565,
+        0.01755021233894488,
+        -0.00783012691958751
+      ],
+      "information_gain_window_bootstrap": {
+        "mean": -0.0007181139705975115,
+        "low": -0.011964299119480482,
+        "high": 0.01052807117828546
+      },
+      "information_gain_date_bootstrap": {
+        "mean": -0.000718113970597511,
+        "low": -0.011984303059660776,
+        "high": 0.009860777749344227,
+        "one_sided_p_le_zero": 0.5365,
+        "n_blocks": 300,
+        "n_window_strata": 5
+      }
+    },
+    "balanced_accuracy": {
+      "price_only": 0.3779929948453369,
+      "two_branch_neutral_prior": 0.3761635832888609,
+      "two_branch_real_sentiment": 0.3716553369272713,
+      "architecture_and_news_presence_volume_effect": -0.0018294115564759794,
+      "information_gain": -0.004508246361589585,
+      "naive_delta": -0.0063376579180655646,
+      "information_gain_per_window": [
+        -0.0006663895105916695,
+        -0.005609295418297078,
+        -0.019294255479299804,
+        0.011714708056171363,
+        -0.008685999455930737
+      ],
+      "information_gain_window_bootstrap": {
+        "mean": -0.004508246361589585,
+        "low": -0.012929301865278364,
+        "high": 0.0042860495161135435
+      },
+      "information_gain_date_bootstrap": {
+        "mean": -0.004508246361589585,
+        "low": -0.015237086764855062,
+        "high": 0.005843649824643791,
+        "one_sided_p_le_zero": 0.797,
+        "n_blocks": 300,
+        "n_window_strata": 5
+      }
+    },
+    "accuracy": {
+      "price_only": 0.42266666666666663,
+      "two_branch_neutral_prior": 0.4165555555555556,
+      "two_branch_real_sentiment": 0.4053333333333333,
+      "architecture_and_news_presence_volume_effect": -0.006111111111111012,
+      "information_gain": -0.0112222222222223,
+      "naive_delta": -0.01733333333333331,
+      "information_gain_per_window": [
+        -0.0222222222222222,
+        -0.0050000000000000044,
+        -0.025555555555555554,
+        0.01055555555555554,
+        -0.013888888888888895
+      ],
+      "information_gain_window_bootstrap": {
+        "mean": -0.011222222222222222,
+        "low": -0.021444444444444443,
+        "high": 0.0008888888888888835
+      },
+      "information_gain_date_bootstrap": {
+        "mean": -0.01122222222222222,
+        "low": -0.021777777777777774,
+        "high": -0.0012222222222222025,
+        "one_sided_p_le_zero": 0.9845,
+        "n_blocks": 300,
+        "n_window_strata": 5
+      }
+    }
+  },
+  "real_run": {
+    "dir": "outputs/forecast_h5_pit_sentiment",
+    "point_in_time": true,
+    "point_in_time_reason": "verified",
+    "panel_start": "2020-01-01",
+    "panel_end": "2025-12-31"
+  },
+  "control_run": {
+    "dir": "outputs/forecast_h5_pit_control",
+    "point_in_time": true,
+    "point_in_time_reason": "verified",
+    "panel_start": "2020-01-01",
+    "panel_end": "2025-12-31"
+  }
+}
