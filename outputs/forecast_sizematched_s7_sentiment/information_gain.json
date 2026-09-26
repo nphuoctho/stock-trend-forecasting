@@ -19,7 +19,8 @@
       44
     ],
     "bootstrap_samples": 2000,
-    "bootstrap_seed": 7
+    "bootstrap_seed": 7,
+    "target_mode": "raw"
   },
   "effects": {
     "macro_f1": {
@@ -42,10 +43,12 @@
         "high": 0.012692608087762292
       },
       "information_gain_date_bootstrap": {
-        "mean": -0.0035900570259019826,
-        "low": -0.013319467358244599,
-        "high": 0.00620702172256235,
-        "n_blocks": 300
+        "mean": 0.0028388375260361867,
+        "low": -0.007370071208945484,
+        "high": 0.013325160740892045,
+        "one_sided_p_le_zero": 0.3025,
+        "n_blocks": 300,
+        "n_window_strata": 5
       }
     },
     "balanced_accuracy": {
@@ -68,10 +71,12 @@
         "high": 0.004292133029650913
       },
       "information_gain_date_bootstrap": {
-        "mean": -0.008095381872555762,
-        "low": -0.017492394143829398,
-        "high": 0.0012823928157373603,
-        "n_blocks": 300
+        "mean": -0.0021474999733145485,
+        "low": -0.011115558093515991,
+        "high": 0.007019576616622807,
+        "one_sided_p_le_zero": 0.685,
+        "n_blocks": 300,
+        "n_window_strata": 5
       }
     },
     "accuracy": {
@@ -94,11 +99,27 @@
         "high": 0.004222222222222216
       },
       "information_gain_date_bootstrap": {
-        "mean": -0.011222222222222245,
-        "low": -0.02077777777777773,
-        "high": -0.0015555555555555323,
-        "n_blocks": 300
+        "mean": -0.011222222222222224,
+        "low": -0.020891666666666676,
+        "high": -0.0017777777777778017,
+        "one_sided_p_le_zero": 0.9895,
+        "n_blocks": 300,
+        "n_window_strata": 5
       }
     }
+  },
+  "real_run": {
+    "dir": "outputs/forecast_sizematched_s7_sentiment",
+    "point_in_time": false,
+    "point_in_time_reason": "no_label_cutoff",
+    "panel_start": "2020-01-01",
+    "panel_end": "2025-12-31"
+  },
+  "control_run": {
+    "dir": "outputs/forecast_sizematched_s7_control",
+    "point_in_time": false,
+    "point_in_time_reason": "no_label_cutoff",
+    "panel_start": "2020-01-01",
+    "panel_end": "2025-12-31"
   }
 }

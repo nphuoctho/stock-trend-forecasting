@@ -648,11 +648,13 @@ def test_date_block_bootstrap_brackets_a_real_difference():
     truth = np.tile([0, 1, 2, 0, 1], 40)
     good = truth.copy()
     bad = np.roll(truth, 1)
+    window = np.repeat([1, 2], 100)
     frame = pd.concat(
         [
             pd.DataFrame(
                 {
                     "target_date": dates,
+                    "window": window,
                     "seed": 42,
                     "arm": arm,
                     "y_true": [TREND_LABELS[i] for i in truth],
@@ -665,8 +667,10 @@ def test_date_block_bootstrap_brackets_a_real_difference():
     )
     out = _date_block_bootstrap(frame, "treated", "control", samples=500, seed=1)
     assert out["macro_f1"]["n_blocks"] == 40
+    assert out["macro_f1"]["n_window_strata"] == 2
     assert out["macro_f1"]["mean"] > 0.3
     assert out["macro_f1"]["low"] > 0.0
+    assert out["macro_f1"]["one_sided_p_le_zero"] == 0.0
     # Two arms making the same predictions must instead give a zero-width interval.
     identical = frame[frame["arm"] == "treated"]
     identical = pd.concat(
@@ -677,6 +681,59 @@ def test_date_block_bootstrap_brackets_a_real_difference():
     )
     assert same["macro_f1"]["low"] <= 0.0 <= same["macro_f1"]["high"]
     assert same["macro_f1"]["mean"] == pytest.approx(0.0)
+
+
+def test_date_block_bootstrap_centres_on_the_window_averaged_delta():
+    """The interval must bracket the estimand the report quotes, not a pooled one.
+
+    macro-F1 is non-linear in the confusion matrix, so a delta computed on one
+    pooled matrix differs from the mean of the per-window deltas. The headline
+    ``information_gain`` is the window-averaged quantity; if the bootstrap centres
+    somewhere else the published point estimate can sit outside its own interval.
+    """
+    rng = np.random.default_rng(0)
+    blocks = []
+    # Two windows with deliberately different class mixes so pooling and averaging
+    # disagree: window 1 is UP-heavy, window 2 is DOWN-heavy.
+    for window_id, weights in ((1, [0.15, 0.25, 0.60]), (2, [0.60, 0.25, 0.15])):
+        dates = pd.to_datetime(pd.bdate_range("2024-01-01", periods=30)).repeat(6)
+        truth = rng.choice(3, size=len(dates), p=weights)
+        treated = np.where(rng.random(len(dates)) < 0.55, truth, rng.choice(3, len(dates)))
+        control = np.where(rng.random(len(dates)) < 0.35, truth, rng.choice(3, len(dates)))
+        for arm, pred in (("treated", treated), ("control", control)):
+            blocks.append(
+                pd.DataFrame(
+                    {
+                        "target_date": dates,
+                        "window": window_id,
+                        "seed": 42,
+                        "arm": arm,
+                        "y_true": [TREND_LABELS[i] for i in truth],
+                        "y_pred": [TREND_LABELS[i] for i in pred],
+                    }
+                )
+            )
+    frame = pd.concat(blocks, ignore_index=True)
+
+    ids = {label: i for i, label in enumerate(TREND_LABELS)}
+
+    def window_macro_f1(block: pd.DataFrame, arm: str) -> float:
+        side = block[block["arm"] == arm]
+        return evaluate_predictions(
+            side["y_true"].map(ids).to_numpy(), side["y_pred"].map(ids).to_numpy()
+        )["macro_f1"]
+
+    expected = float(
+        np.mean(
+            [
+                window_macro_f1(block, "treated") - window_macro_f1(block, "control")
+                for _, block in frame.groupby("window", sort=True)
+            ]
+        )
+    )
+    out = _date_block_bootstrap(frame, "treated", "control", samples=800, seed=3)
+    assert out["macro_f1"]["mean"] == pytest.approx(expected, abs=1e-9)
+    assert out["macro_f1"]["low"] <= out["macro_f1"]["mean"] <= out["macro_f1"]["high"]
 
 
 def test_experiment_is_reproducible_across_repeated_runs():

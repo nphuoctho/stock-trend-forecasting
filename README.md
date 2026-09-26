@@ -236,8 +236,58 @@ and both feature scalers on training rows only, selects each LSTM checkpoint on 
 window's validation macro-F1, and scores every arm once on the same test rows. Results
 are averaged over `--seeds`. The sentiment contribution is reported twice: as a paired
 per-window delta bootstrapped over the 5 windows, and as a bootstrap over the ~300 test
-**dates** (all tickers of a date resample together). Prefer the date-block interval; the
+**dates**. In the date-block interval all tickers of a date resample together and dates
+are resampled *inside their own window*, so the interval brackets the same
+window-averaged quantity the point estimate reports. Prefer the date-block interval; the
 window interval has only 5 blocks and is coarse enough to exclude zero by accident.
+
+`date_block_bootstrap` resamples dates inside their own window and averages the
+per-window metrics, so it brackets the same window-averaged quantity
+`information_gain` reports. An earlier version pooled every window into one confusion
+matrix. That pooled delta is a legitimate estimate in its own right and it came with
+its own interval, but it is a *different* estimand: macro-F1 is non-linear in the
+confusion matrix, so the pooled delta does not equal the mean of the per-window
+deltas, and the two had to be read as a pair of separate results. Reporting one
+estimand with one matching interval is simpler to state and to defend; it is not
+evidence that the pooled figure was wrong.
+
+Two limits apply to both intervals. Dates are drawn independently, so neither is a
+serial block bootstrap and neither models day-to-day dependence. And
+`one_sided_p_le_zero` is reported for convenience only: the direction was not fixed
+before the results were seen, so it cannot be used to claim significance. Treat the
+two-sided interval as the reportable quantity and correct for the number of arms and
+runs compared.
+
+### Lựa chọn nhãn: lợi suất thô hay lợi suất vượt trội
+
+`--target raw` (mặc định) gán nhãn theo lợi suất phiên kế tiếp của chính mã đó.
+`--target excess` gán nhãn theo phần lợi suất vượt trên trung bình đồng hạng của cùng
+phiên. Trên 2020--2025, mười mã nghiên cứu có tương quan lợi suất ngày trung bình theo
+cặp là 0,42 và $R^2$ trung bình 0,48 so với trung bình đồng hạng: gần một nửa biến động
+hằng ngày là nhịp chung của thị trường, thứ mà tin riêng của doanh nghiệp không giải
+thích được. Mục tiêu vượt trội loại bỏ thành phần chung nên đo đúng câu hỏi "tin của mã
+này có báo trước việc nó chạy nhanh hơn rổ hay không".
+
+Đây là đổi nhãn chứ không phải đổi đặc trưng: trung bình đồng hạng được trừ đi cũng chỉ
+biết được vào đúng ngày mục tiêu, nên không có thông tin nào xuất hiện sớm hơn trước.
+Ngưỡng tam phân vẫn khớp riêng trên phần huấn luyện của từng cửa sổ.
+
+### Chân trời dự báo
+
+`--horizon 1` (mặc định) là trường hợp khó nhất: điều mà bài tin hàm ý phải hiện ra trong
+đúng một nhịp đóng cửa sang đóng cửa. `--horizon 3` hoặc `--horizon 5` kiểm tra xem kết
+quả rỗng ở `h=1` là đặc thù của nhịp thời gian đó hay là tính chất của tín hiệu.
+
+```bash
+uv run python -m stf.cli forecast --news-sentiment data/processed/news_sentiment_pit.parquet \
+  --panel-end 2025-12-31 --horizon 5 --seeds 42 43 44 --output outputs/forecast_h5_pit_sentiment
+```
+
+Cái giá phải trả là **nhãn chồng lấn**: ở `h=5`, hai dòng liên tiếp dùng chung bốn trên năm
+phiên, nên số quan sát độc lập hữu hiệu chỉ còn khoảng `n/h`. Ước lượng điểm vẫn dùng được,
+nhưng khoảng tin cậy tính như thể các dòng độc lập sẽ **hẹp hơn mức bằng chứng cho phép**.
+Luôn ghi chân trời cạnh mọi con số lấy từ lượt chạy kiểu này, và đọc khoảng tin cậy của
+`h>1` như một chỉ báo, không phải một phép kiểm.
 
 `forecast-compare` exists because comparing the two-branch arm against the single-branch
 price model conflates the added branch with news presence and volume. The neutral control
