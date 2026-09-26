@@ -1,0 +1,12 @@
+[Unit]
+Description=Stock trend forecasting daily job (prices, news, scoring, predict, resolve)
+Documentation=file://%h/Documents/MySpace/Researcher/stock-trend-forecasting/README.md
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Documents/MySpace/Researcher/stock-trend-forecasting
+ExecStart=%h/Documents/MySpace/Researcher/stock-trend-forecasting/scripts/daily-forecast.sh
+# The crawl and the scoring pass are the slow steps; fail rather than overlap
+# with the next morning's run.
+TimeoutStartSec=3h

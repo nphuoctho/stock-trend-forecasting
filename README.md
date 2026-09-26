@@ -449,6 +449,22 @@ and targets D, which has not moved yet:
 0 8 * * 1-5  /path/to/stock-trend-forecasting/scripts/daily-forecast.sh
 ```
 
+A crontab line only fires when a cron daemon is running, which is not the default
+on every distribution. `scripts/systemd/` carries an equivalent user timer that
+needs no root and, with lingering enabled, runs while logged out:
+
+```bash
+cp scripts/systemd/stf-daily-forecast.{service,timer} ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now stf-daily-forecast.timer
+systemctl --user list-timers stf-daily-forecast.timer   # confirm the next run
+loginctl enable-linger "$USER"                          # if Linger=no
+```
+
+The timer is deliberately not `Persistent`: catching up a missed run in the
+afternoon would issue a prediction for a session already in progress, adding a
+replay to the audit trail and nothing to the track record.
+
 `forecast-predict` prints a warning whenever an issuance cannot count as
 prospective, and `forecast-resolve` reports the prospective/replayed split of
 every run, so an empty track record is visible the day it happens rather than
