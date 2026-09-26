@@ -15,6 +15,18 @@ through pandoc against a generated reference document, then fixes numbering,
 captions and cross-references. Everything it writes lands in `build/` and is
 gitignored; the committed `.docx` is the reviewed output.
 
+## After opening in Word/LibreOffice
+
+- The table of contents is a live Word field: select all (Ctrl+A) and press
+  F9 (or right-click → *Update Field*) to populate titles and page numbers.
+- The committee page still contains the blank fields from the LaTeX source;
+  fill in the decision number, date and member names before printing.
+- Page numbering restarts at 1 on the abstract; covers and front matter are
+  unnumbered, matching the LaTeX build.
+- Differences vs the PDF: figure/table lists are static (no page numbers),
+  the IEEE bibliography is in citation order, and the two TikZ diagrams are
+  embedded as PNG images.
+
 ## Why `python-docx` is not a project dependency
 
 The tooling needs `python-docx`, but it is deliberately absent from

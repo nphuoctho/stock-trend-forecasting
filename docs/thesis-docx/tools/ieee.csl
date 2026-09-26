@@ -335,6 +335,12 @@
   </citation>
   <!-- Bibliography -->
   <bibliography entry-spacing="0" second-field-align="flush">
+    <!-- thesis regulation: alphabetical by author, then year, then title -->
+    <sort>
+      <key macro="author"/>
+      <key variable="issued"/>
+      <key variable="title"/>
+    </sort>
     <layout>
       <!-- Citation Number -->
       <text variable="citation-number" prefix="[" suffix="]"/>

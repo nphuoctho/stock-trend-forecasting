@@ -180,6 +180,29 @@ for p in cover(False) + cover(True):
 
 children = list(body)
 
+# reorder: move committee + acknowledgements right after the covers
+# (the lua filter prepended TOC/LOF/LOT at doc start, before them)
+i_mucluc = idx_of_text("MỤC LỤC")
+i_committee = idx_of_text("THÔNG TIN HỘI ĐỒNG")
+i_abbrev = idx_of_text("DANH MỤC TỪ VIẾT TẮT")
+moved = children[i_committee:i_abbrev]   # hội đồng + lời cảm ơn
+for c in moved:
+    body.remove(c)
+anchor = children[i_mucluc]              # insert before MỤC LỤC
+for c in moved:
+    anchor.addprevious(c)
+children = list(body)
+
+# acknowledgements sign-off -> right align
+for c in children:
+    if c.tag == qn("w:p") and "Sinh viên thực hiện" in para_text(c):
+        ppr = c.find(qn("w:pPr"))
+        if ppr is None:
+            ppr = el("w:pPr"); c.insert(0, ppr)
+        ppr.append(el("w:jc", val="right"))
+
+# section 1 = covers only: break before MỤC LỤC (border + no footer)
+# section 1 = covers only: break before committee page (border + no footer)
 i_committee = idx_of_text("THÔNG TIN HỘI ĐỒNG")
 children[i_committee].addprevious(sect_break_par(sec1))
 children = list(body)
@@ -194,9 +217,8 @@ children = list(body)
 # main section: page numbering restart at 1 + PAGE footer
 main_sect = body.find(qn("w:sectPr"))
 add_footer_ref(main_sect, rid_page)
-pgnt = el("w:pgNumType", start="1")
-# pgNumType after pgMar/pgBorders order-wise; appending is accepted by Word
-main_sect.append(pgnt)
+# pgNumType after pgMar/pgBorders order-wise; appending is accepted
+main_sect.append(el("w:pgNumType", start="1"))
 
 # ------------------------------------------------------------- 2. numbering
 CH_TITLES = [
@@ -293,10 +315,14 @@ for c in children:
     elif txt == "DANH_MUC_BANG_PLACEHOLDER":
         tab_ph = c
 
-def list_p(kind, num, cap):
+# map display number -> bookmark name for PAGEREF (labels from .aux order)
+def list_p(kind, num, cap, bookmark):
     p = OxmlElement("w:p")
     ppr = el("w:pPr")
     ppr.append(el("w:spacing", after="60", line="360", lineRule="auto"))
+    ppr.append(el("w:tabs"))
+    tabs = ppr.find(qn("w:tabs"))
+    tabs.append(el("w:tab", val="right", leader="dot", pos="9126"))
     p.append(ppr)
     r1 = OxmlElement("w:r"); r1.append(el("w:rPr"))
     r1.find(qn("w:rPr")).append(el("w:b"))
@@ -305,25 +331,53 @@ def list_p(kind, num, cap):
     r2 = OxmlElement("w:r")
     t2 = el("w:t"); t2.text = cap; t2.set(qn("xml:space"), "preserve")
     r2.append(t2); p.append(r2)
+    # tab + PAGEREF field
+    rt = OxmlElement("w:r"); rt.append(OxmlElement("w:tab")); p.append(rt)
+    rb = OxmlElement("w:r"); rb.append(el("w:fldChar", fldCharType="begin"))
+    p.append(rb)
+    ri = OxmlElement("w:r"); it = el("w:instrText")
+    it.set(qn("xml:space"), "preserve")
+    it.text = f' PAGEREF {bookmark} \\h '
+    ri.append(it); p.append(ri)
+    rs = OxmlElement("w:r"); rs.append(el("w:fldChar", fldCharType="separate"))
+    p.append(rs)
+    rd = OxmlElement("w:r"); td = el("w:t"); td.text = "?"
+    rd.append(td); p.append(rd)
+    re_ = OxmlElement("w:r"); re_.append(el("w:fldChar", fldCharType="end"))
+    p.append(re_)
     return p
+
+# label -> displayed number, in caption-document order
+CAP_BOOK = {}
+for key in LABELS:
+    if key.startswith("fig:"):
+        CAP_BOOK[LABELS[key]] = ("Hình", key)
+    elif key.startswith("tab:"):
+        CAP_BOOK[LABELS[key]] = ("Bảng", key)
+
+def cap_bookmark(kind, num):
+    kind_map = {"Hình": "fig", "Bảng": "tab"}
+    for lbl, v in LABELS.items():
+        if v == num and lbl.startswith(kind_map[kind] + ":"):
+            return lbl
+    return None
 
 if fig_ph is not None:
     for num, cap in fig_list:
-        fig_ph.addnext(list_p("Hình", num, cap))
+        bm = cap_bookmark("Hình", num) or ""
+        fig_ph.addnext(list_p("Hình", num, cap, bm))
         fig_ph = fig_ph.getnext()
-    # remove original placeholder? it now precedes entries; remove it
 for c in list(body.iter(qn("w:p"))):
     if para_text(c).strip() in ("DANH_MUC_HINH_PLACEHOLDER",
                                 "DANH_MUC_BANG_PLACEHOLDER"):
         body.remove(c)
 if tab_ph is not None:
-    anchor = None
-    # find insertion point again (after DANH MỤC BẢNG BIỂU heading)
     children = list(body)
     i = idx_of_text("DANH MỤC BẢNG BIỂU")
     anchor = children[i]
     for num, cap in tab_list:
-        anchor.addnext(list_p("Bảng", num, cap))
+        bm = cap_bookmark("Bảng", num) or ""
+        anchor.addnext(list_p("Bảng", num, cap, bm))
         anchor = anchor.getnext()
 
 # ------------------------------------------------------------- 4. refs move
