@@ -1,0 +1,90 @@
+{
+  "rows": [
+    {
+      "signal": "sent_pos_minus_neg",
+      "target": "same_session_return",
+      "n": 6950,
+      "ic": 0.012981429977448864,
+      "low": -0.015828175105801364,
+      "high": 0.04056449452982988,
+      "one_sided_p_le_zero": 0.1925
+    },
+    {
+      "signal": "sent_pos_minus_neg",
+      "target": "same_session_excess_return",
+      "n": 6950,
+      "ic": 0.023263902432439965,
+      "low": 0.00041325104190322016,
+      "high": 0.04650422197851529,
+      "one_sided_p_le_zero": 0.0245
+    },
+    {
+      "signal": "sent_pos_minus_neg",
+      "target": "next_session_return",
+      "n": 6948,
+      "ic": 0.011000767206580674,
+      "low": -0.01641142766218088,
+      "high": 0.03987608920353996,
+      "one_sided_p_le_zero": 0.2175
+    },
+    {
+      "signal": "sent_pos_minus_neg",
+      "target": "next_session_excess_return",
+      "n": 6948,
+      "ic": 0.003034018877228006,
+      "low": -0.020684798591109842,
+      "high": 0.02694457014547076,
+      "one_sided_p_le_zero": 0.4075
+    },
+    {
+      "signal": "sent_pos_minus_neg_ewm",
+      "target": "same_session_return",
+      "n": 6950,
+      "ic": 0.01613433683236137,
+      "low": -0.01350302145370803,
+      "high": 0.04541725376502214,
+      "one_sided_p_le_zero": 0.145
+    },
+    {
+      "signal": "sent_pos_minus_neg_ewm",
+      "target": "same_session_excess_return",
+      "n": 6950,
+      "ic": 0.01580894624702518,
+      "low": -0.008520385632136458,
+      "high": 0.038685176663829146,
+      "one_sided_p_le_zero": 0.0935
+    },
+    {
+      "signal": "sent_pos_minus_neg_ewm",
+      "target": "next_session_return",
+      "n": 6948,
+      "ic": 0.0081512279129675,
+      "low": -0.021576544074000142,
+      "high": 0.03541463939241807,
+      "one_sided_p_le_zero": 0.288
+    },
+    {
+      "signal": "sent_pos_minus_neg_ewm",
+      "target": "next_session_excess_return",
+      "n": 6948,
+      "ic": 0.0038388182717899234,
+      "low": -0.02080674327605226,
+      "high": 0.02842892477915928,
+      "one_sided_p_le_zero": 0.3885
+    }
+  ],
+  "sessions": 1483,
+  "news_only": true,
+  "bootstrap_samples": 2000,
+  "bootstrap_seed": 7,
+  "cross_sectional": {
+    "signal": "sent_pos_minus_neg",
+    "target": "next_session_excess_return",
+    "sessions": 1002,
+    "mean_ic": 0.006166382357928981,
+    "standard_error": 0.015936583971098667,
+    "t_statistic": 0.38693250505326904
+  },
+  "news_sentiment": "data/processed/news_sentiment_pit.parquet",
+  "panel_end": "2025-12-31"
+}
