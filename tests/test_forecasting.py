@@ -13,6 +13,13 @@ import pandas as pd
 import pytest
 
 from stf.forecasting import calendar as cal
+from stf.forecasting.backtest import (
+    _drawdown,
+    benchmark_series,
+    daily_book,
+    realized_returns,
+)
+from stf.forecasting.signal_ic import build_return_targets, information_coefficients
 from stf.forecasting.experiment import (
     LADDER,
     ForecastConfig,

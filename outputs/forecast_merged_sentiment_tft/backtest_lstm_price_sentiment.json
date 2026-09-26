@@ -1,0 +1,93 @@
+{
+  "arm": "lstm_price_sentiment",
+  "cost_bps": 20.0,
+  "execution": "idealized close-to-close; entry price is the signal's own close",
+  "market_neutral": false,
+  "net": {
+    "sessions": 300,
+    "mean_daily_return": -0.0001515705073354455,
+    "daily_volatility": 0.012959409322292765,
+    "annualized_return": -0.03747829537723446,
+    "annualized_sharpe": -0.18566488264784545,
+    "cumulative_return": -0.06801533837184215,
+    "hit_rate": 0.4266666666666667,
+    "max_drawdown": -0.205737416147454
+  },
+  "gross": {
+    "sessions": 300,
+    "mean_daily_return": 0.0034586393787406043,
+    "daily_volatility": 0.012930307032617995,
+    "annualized_return": 1.3870859501088075,
+    "annualized_sharpe": 4.246163520039711,
+    "cumulative_return": 1.748711381835606,
+    "hit_rate": 0.5633333333333334,
+    "max_drawdown": -0.09511449644257208
+  },
+  "equal_weight_rebalanced": {
+    "sessions": 300,
+    "mean_daily_return": 0.0015816874456186475,
+    "daily_volatility": 0.012865906764972014,
+    "annualized_return": 0.48924659279086247,
+    "annualized_sharpe": 1.9515538435268813,
+    "cumulative_return": 0.5672541552165784,
+    "hit_rate": 0.56,
+    "max_drawdown": -0.1619529208681515
+  },
+  "buy_and_hold": {
+    "sessions": 300,
+    "mean_daily_return": 0.0024238092198537475,
+    "daily_volatility": 0.01473625462906035,
+    "annualized_return": 0.8405434589009697,
+    "annualized_sharpe": 2.611028344428412,
+    "cumulative_return": 1.0013041716362276,
+    "hit_rate": 0.58,
+    "max_drawdown": -0.15337693133193475
+  },
+  "mean_turnover": 1.8051049430380248,
+  "mean_gross_exposure": 1.5877777777777777,
+  "mean_abs_net_exposure": 0.11222222222222224,
+  "one_sided_fraction": 0.26555555555555554,
+  "mean_positions": 5.1177777777777775,
+  "breakeven_cost_bps": 19.160323016564625,
+  "gross_vs_market": {
+    "alpha_daily": 0.0031432890220246426,
+    "alpha_t_statistic": 4.256565046858805,
+    "beta": 0.19937589919519014,
+    "residual_annualized_sharpe": 3.93726331228001
+  },
+  "net_bootstrap": {
+    "mean_daily_return": {
+      "low": -0.0015519671397957512,
+      "high": 0.0013668690441572039,
+      "fraction_of_draws_le_zero": 0.538
+    },
+    "annualized_sharpe": {
+      "low": -2.0184385725040364,
+      "high": 1.5969586842604209
+    }
+  },
+  "gross_bootstrap": {
+    "mean_daily_return": {
+      "low": 0.002070537230956357,
+      "high": 0.0049610889091369825,
+      "fraction_of_draws_le_zero": 0.0
+    },
+    "annualized_sharpe": {
+      "low": 2.587867057596437,
+      "high": 5.965393554223909
+    }
+  },
+  "permutation_null_gross_sharpe": {
+    "draws": 200,
+    "mean_sharpe": -0.09683504181530891,
+    "sd_sharpe": 0.9659203970812817,
+    "low": -2.127077156996008,
+    "high": 1.6619591410498278
+  },
+  "run": {
+    "dir": "outputs/forecast_merged_sentiment_tft",
+    "target_mode": "raw",
+    "point_in_time": false,
+    "prices_hash": "6002e121afd061f025114c669f5e857f7c43a653781013661fcbc72b644de692"
+  }
+}

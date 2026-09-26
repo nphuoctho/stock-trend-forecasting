@@ -1514,6 +1514,125 @@ def cmd_forecast_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_forecast_backtest(args: argparse.Namespace) -> int:
+    """Score a stored arm as an idealized close-to-close long/short diagnostic."""
+    from stf.forecasting.backtest import backtest_arm
+
+    run_dir = Path(args.run)
+    predictions = pd.read_csv(run_dir / "forecast_predictions.csv")
+    report = backtest_arm(
+        predictions,
+        _load_prices(),
+        arm=args.arm,
+        cost_bps=args.cost_bps,
+        permutations=args.permutations,
+    )
+    # A backtest that cannot be tied to the run it scored is an anecdote.
+    results_path = run_dir / "forecast_results.json"
+    if results_path.exists():
+        record = json.loads(results_path.read_text(encoding="utf-8"))
+        news_prov = (record.get("provenance") or {}).get("news_sentiment") or {}
+        report["run"] = {
+            "dir": str(run_dir),
+            "target_mode": (record.get("config") or {}).get("target_mode"),
+            "point_in_time": news_prov.get("point_in_time"),
+            "prices_hash": (record.get("provenance") or {}).get("prices_hash"),
+        }
+
+    output = Path(args.output) if args.output else run_dir / f"backtest_{args.arm}.json"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+
+    net, gross = report["net"], report["gross"]
+    rebalanced, hold = report["equal_weight_rebalanced"], report["buy_and_hold"]
+    boot = report["net_bootstrap"]["mean_daily_return"]
+    print(f"[forecast-backtest] {args.arm} @ {args.cost_bps:.0f} bps, {net['sessions']} sessions")
+    print(f"  NOT TRADABLE: {report['execution']}")
+    print(
+        f"  gross  ann.return {gross['annualized_return']:+.2%}  "
+        f"Sharpe {gross['annualized_sharpe']:+.2f}"
+    )
+    print(
+        f"  net    ann.return {net['annualized_return']:+.2%}  "
+        f"Sharpe {net['annualized_sharpe']:+.2f}  "
+        f"hit {net['hit_rate']:.3f}  maxDD {net['max_drawdown']:.2%}"
+    )
+    print(
+        f"         mean daily {net['mean_daily_return']:+.5f} "
+        f"CI [{boot['low']:+.5f}, {boot['high']:+.5f}] "
+        f"draws<=0 {boot['fraction_of_draws_le_zero']:.3f}"
+    )
+    print(
+        f"  exposure  gross {report['mean_gross_exposure']:.2f}  "
+        f"|net| {report['mean_abs_net_exposure']:.3f}  "
+        f"one-sided sessions {report['one_sided_fraction']:.1%}  "
+        f"turnover {report['mean_turnover']:.2f}"
+    )
+    print(
+        f"  bench  equal-weight rebalanced {rebalanced['annualized_return']:+.2%} "
+        f"(Sharpe {rebalanced['annualized_sharpe']:+.2f})  "
+        f"buy-and-hold {hold['annualized_return']:+.2%} "
+        f"(Sharpe {hold['annualized_sharpe']:+.2f})"
+    )
+    reg = report["gross_vs_market"]
+    print(
+        f"  alpha  gross vs basket {reg['alpha_daily']:+.5f}/day "
+        f"(t {reg['alpha_t_statistic']:+.2f}, beta {reg['beta']:+.3f})  "
+        f"break-even cost {report['breakeven_cost_bps']:.1f} bps"
+    )
+    null = report.get("permutation_null_gross_sharpe")
+    if null:
+        print(
+            f"  null   shuffled labels, {null['draws']} draws: mean Sharpe "
+            f"{null['mean_sharpe']:+.2f} sd {null['sd_sharpe']:.2f} "
+            f"95% [{null['low']:+.2f}, {null['high']:+.2f}]"
+        )
+    print(f"[forecast-backtest] -> {output}")
+    return 0
+
+
+def cmd_forecast_ic(args: argparse.Namespace) -> int:
+    """Measure what the sentiment score knows before any model is fitted."""
+    from stf.forecasting import assemble
+    from stf.forecasting.signal_ic import (
+        build_return_targets,
+        cross_sectional_ic,
+        information_coefficients,
+    )
+
+    news = pd.read_parquet(args.news_sentiment)
+    prices = _load_prices()
+    panel = assemble(prices, news)
+    panel = panel[panel["observation_date"] <= pd.Timestamp(args.panel_end)]
+    targets = build_return_targets(
+        panel[["ticker", "observation_date", "close"]].drop_duplicates()
+    )
+
+    report = information_coefficients(panel, targets, samples=args.bootstrap_samples)
+    report["cross_sectional"] = cross_sectional_ic(panel, targets)
+    report["news_sentiment"] = str(args.news_sentiment)
+    report["panel_end"] = str(args.panel_end)
+
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+
+    print(f"[forecast-ic] {report['sessions']} sessions, news rows only")
+    print(f"  {'signal':24s} {'target':28s} {'n':>6s} {'IC':>8s} {'95% CI':>20s} {'p(<=0)':>7s}")
+    for row in report["rows"]:
+        print(
+            f"  {row['signal']:24s} {row['target']:28s} {row['n']:6d} {row['ic']:+8.4f} "
+            f"[{row['low']:+.4f},{row['high']:+.4f}] {row['one_sided_p_le_zero']:7.3f}"
+        )
+    cs = report["cross_sectional"]
+    print(
+        f"  cross-sectional daily IC vs {cs['target']}: {cs['mean_ic']:+.4f} "
+        f"(se {cs['standard_error']:.4f}, t {cs['t_statistic']:+.2f}, {cs['sessions']} sessions)"
+    )
+    print(f"[forecast-ic] -> {output}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="stf", description="Stock Trend Forecasting CLI"
@@ -1880,6 +1999,37 @@ def main(argv: list[str] | None = None) -> int:
     p_cmp.add_argument("--price-arm", default="lstm_price")
     p_cmp.add_argument("--output", default="outputs/forecast/information_gain.json")
     p_cmp.set_defaults(func=cmd_forecast_compare)
+
+    p_bt = sub.add_parser(
+        "forecast-backtest",
+        help="price one arm's stored predictions as a cash-neutral long/short book",
+    )
+    p_bt.add_argument("--run", required=True, help="run directory holding forecast_predictions.csv")
+    p_bt.add_argument("--arm", default="lstm_price_sentiment")
+    p_bt.add_argument(
+        "--cost-bps",
+        type=float,
+        default=20.0,
+        help="cost charged per unit of turnover; 20 bps is a HOSE-realistic floor",
+    )
+    p_bt.add_argument("--output", default=None, help="defaults to <run>/backtest_<arm>.json")
+    p_bt.add_argument(
+        "--permutations",
+        type=int,
+        default=200,
+        help="label shuffles inside each session for the null Sharpe; 0 disables",
+    )
+    p_bt.set_defaults(func=cmd_forecast_backtest)
+
+    p_ic = sub.add_parser(
+        "forecast-ic",
+        help="rank correlation of the sentiment score with realized returns, model-free",
+    )
+    p_ic.add_argument("--news-sentiment", required=True, help="parquet written by score-news")
+    p_ic.add_argument("--panel-end", default="2025-12-31", help="last observation date to include")
+    p_ic.add_argument("--bootstrap-samples", type=int, default=2000)
+    p_ic.add_argument("--output", default="outputs/signal_ic.json")
+    p_ic.set_defaults(func=cmd_forecast_ic)
 
     p_score = sub.add_parser(
         "score-news", help="score crawled ticker articles with a trained checkpoint"

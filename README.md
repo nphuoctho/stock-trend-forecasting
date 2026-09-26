@@ -315,6 +315,69 @@ The three trend classes are cut at the training window's return terciles, so the
 are balanced by construction and **the chance level is 0.333, not 0.5**. Report `macro_f1`,
 `balanced_accuracy` and macro OvR-AUC; accuracy alone is not interpretable here.
 
+### Tương quan hạng của tín hiệu, không qua mô hình
+
+Một phép cắt bỏ cho kết quả rỗng không phân biệt được "bộ ước lượng yếu" với "tín hiệu
+yếu". `forecast-ic` bổ sung một mảnh bằng chứng: tương quan hạng Spearman giữa điểm cảm
+xúc theo ngày và lợi suất thực hiện, **không khớp bất kỳ mô hình nào**, nên nó không bị
+lựa chọn kiến trúc làm nhiễu.
+
+```bash
+uv run python -m stf.cli forecast-ic \
+  --news-sentiment data/processed/news_sentiment_pit.parquet \
+  --output outputs/signal_ic_pit.json
+```
+
+**Nó không chứng minh điều gì.** Hệ số Spearman gần 0 chỉ bác bỏ liên hệ **đơn điệu** của
+**đúng điểm số vô hướng này**. Nó không phải cận trên của khả năng dự báo và không phải
+thước đo lượng thông tin: quan hệ $y = x^2$ với $x$ đối xứng dự báo được hoàn hảo nhưng
+tương quan hạng bằng 0. Nó cũng không nói gì về một cách tổng hợp khác, một hiệu ứng có
+điều kiện hay tương tác, một chân trời dài hơn, hay một cách đo cảm xúc tốt hơn. Đọc kết
+quả rỗng ở đây đúng như nó là: *không phát hiện được liên hệ đơn điệu cho điểm số này ở
+chân trời này*. Các phép đối chiếu chưa được đăng ký trước, nên chúng mang tính thăm dò.
+
+Báo cáo đối chiếu hai cặp. `same` so với `next`: điểm số đồng biến với chính phiên của nó
+nhưng không với phiên sau là **phù hợp với** giả thuyết tin đã phản ánh vào giá lúc đóng
+cửa --- phù hợp với, chứ không phải chứng minh: cùng một hình mẫu cũng xuất hiện khi giá
+chi phối giọng điệu bài viết (nhân quả ngược), hoặc khi điểm số đơn giản là quá nhiễu để
+còn sót lại sau một ngày pha loãng nữa. `raw` so với `excess` tách nhịp chung của thị
+trường khỏi phần riêng của mã. Khoảng tin cậy lấy mẫu lặp theo trọn phiên và coi các phiên
+là hoán vị được, nên **không** mô hình hóa phụ thuộc chuỗi.
+
+### Chẩn đoán kinh tế (không phải backtest giao dịch được)
+
+`macro_f1` không cho biết biên lợi thế lớn hay nhỏ tính bằng điểm cơ bản.
+`forecast-backtest` quy đổi dự đoán đã lưu thành một sổ mua/bán khống để đọc con số đó.
+
+```bash
+uv run python -m stf.cli forecast-backtest \
+  --run outputs/forecast_pit_sentiment \
+  --arm lstm_price_sentiment \
+  --cost-bps 20
+```
+
+> **Cảnh báo ràng buộc: kết quả này không giao dịch được.** Đặc trưng của ngày `t` gồm
+> `close_t` và mọi bài tin tới mốc 15:00 của `t`. Sổ lệnh vào lệnh tại `close_t` --- đúng
+> cái giá mà tín hiệu vừa dùng, và chỉ biết được sau khi phiên đã đóng. Đây là cận trên
+> dưới giả định khớp lệnh hoàn hảo, tức thời, không trượt giá. Một phương án giao dịch
+> được phải vào lệnh từ phiên mở cửa kế tiếp trở đi và sẽ mất phần biến động qua đêm.
+
+Sổ lệnh **không trung hòa thị trường**. Khi cả hai vế cùng có lệnh thì trọng số triệt tiêu;
+khi chỉ một vế có lệnh thì sổ mang trạng thái một chiều --- vế sống bị giảm một nửa nhưng
+rủi ro thị trường vẫn còn. `mean_abs_net_exposure` và `one_sided_fraction` đo đúng mức vi
+phạm đó; trên lượt point-in-time có 23% số phiên một chiều.
+
+Lợi suất thực hiện tính lại từ tệp giá, không suy ngược từ nhãn. Chi phí tính trên vòng
+quay so với **vị thế đã trôi giá**, không phải so với trọng số mục tiêu hôm trước: giữ
+nguyên mục tiêu vẫn phải cân bằng lại khi giá đã chạy. Báo cáo kèm hai mốc so sánh khác
+nhau: `equal_weight_rebalanced` (đặt lại tỷ trọng đều mỗi phiên) và `buy_and_hold` (mua một
+lần rồi để trôi) --- chúng là hai sản phẩm khác nhau.
+
+Đọc kết quả phải kèm ba cảnh báo. 300 phiên là quá ít để tách các mức Sharpe gần nhau:
+chạy `--arm random` và một null hoán vị nhãn trong từng phiên trước khi diễn giải. Trước
+phí và sau phí là hai kết luận khác nhau. Và một phần lợi suất gộp có thể đến từ trạng thái
+ròng một chiều, nên hãy hồi quy chuỗi lợi suất sổ lệnh lên lợi suất rổ để tách alpha.
+
 ## Phase 5: results dashboard
 
 `webapp` serves a read-only dashboard over the run directories under `outputs/`
