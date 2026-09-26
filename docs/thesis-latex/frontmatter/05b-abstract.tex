@@ -1,0 +1,118 @@
+% Thesis abstract in English (follows the Vietnamese abstract)
+\begin{otherlanguage}{english}
+\chapter*{ABSTRACT}
+\addcontentsline{toc}{chapter}{Abstract}
+
+This thesis studies the problem of forecasting stock price movement trends on the
+Vietnamese stock market by combining Vietnamese financial news with price
+time-series data. The motivation stems from the fact that stock prices reflect
+not only trading history but also react to information about business results,
+investment plans, changes in corporate governance, policies, legal risks, and
+unusual events. The scope is limited to the HOSE exchange and a group of VN30
+constituents. The objective is to determine the direction of the next trading
+session across three classes -- up, sideways, and down -- rather than to forecast
+the absolute price value directly.
+
+The system is organized into two branches. The first branch uses PhoBERT, a
+pre-trained Transformer model for Vietnamese, to classify financial news into
+three classes: positive, neutral, and negative \cite{Nguyen2020_200300744v3}.
+Labels are interpreted as the expected impact of the content on the related firm
+or stock rather than the general tone of the text. After inference, the system
+retains the probabilities of all three classes instead of only the
+highest-probability label. These probabilities are aggregated by ticker and
+trading day together with the article count, class proportions, dispersion, and
+a flag indicating whether news is present.
+
+The second branch uses adjusted OHLCV data together with causal features
+comprising return, log return, the ratio of closing price to moving average,
+volume change, and volatility. The two branches are aligned by ticker and date
+after applying point-in-time rules. News is converted to the Vietnam time zone;
+articles published after the information cut-off, on weekends, or on holidays are
+mapped to the next trading session. This rule ensures that the timestamp of each
+article is consistent with the session that uses it; the point-in-time limitation
+of the retrospective sentiment checkpoint is stated explicitly in the results
+chapter.
+
+Regarding architecture, the models are arranged in tiers to separate the question
+about data from the question about complexity. The first tier consists of a model
+that always predicts the most frequent class and a model that samples from the
+class distribution. The baseline tier comprises a price-only LSTM and a
+two-branch LSTM combining price with sentiment. The temporal fusion transformer
+is only an extension option when data, resources, and baseline results permit.
+
+Methodologically, the thesis builds a pipeline covering literature survey, data
+collection and cleaning, duplicate removal, provenance logging, news-to-ticker
+mapping, session alignment, sentiment model fine-tuning, feature engineering,
+training, and evaluation. The news dataset includes the title, the content when
+collectable, the source, the URL, the publication timestamp, and the related
+tickers. Articles mentioning multiple tickers are stored under a many-to-many
+relation; records missing a timestamp or without an identifiable ticker are
+flagged and are not entered directly into the main feature table.
+
+Price data are split chronologically by walk-forward validation with five
+disjoint test folds; there is no separate final test set because the
+configuration is fixed before the run and each test fold is scored only once. The
+scaler, imputer, label thresholds, feature selection, and price-branch parameters
+are learned only from the training portion of each window. The
+sentiment-augmented model is compared with the price-only model on the same
+training, validation, and test days, the same preprocessing, the same random seed
+or seed set, and the same stopping criterion. The control condition keeps the
+architecture and the news coverage unchanged in order to isolate the
+retrospective gap due to sentiment probabilities from the effect of architecture
+or sample splitting.
+
+Regarding data, the news repository holds 10,695 records with URL, publication
+timestamp, and content within the 2020--2025 window, combined with 12,624
+news--ticker links across 10 VN30 tickers and 14,990 OHLCV price rows for the
+2020--2025 period. The curated in-domain sentiment label set comprises 1,306
+samples, alongside a CafeF seed set of 999 samples. Stratified five-fold
+cross-validation on the 1,306 samples attains macro F1 0.7298, accuracy 0.8125,
+and balanced accuracy 0.7689; the five out-of-fold test portions together contain
+59 NEGATIVE samples with a coverage of 0.6803.
+
+After the configuration was frozen, a deployment checkpoint was fine-tuned on all
+1,306 labels for five fixed epochs and re-scored on 14,256 news--ticker links, of
+which 12,624 fall inside the 2020--2025 window and 12,613 anchor to a session
+inside the window. The forecasting table comprises 14,990 ticker--session rows,
+of which 6,948 rows have news. On the forecasting task, the price-only LSTM
+attains macro F1 0.3756, balanced accuracy 0.3915, and one-vs-rest AUC-ROC
+0.5714; this macro F1 is above the random level 0.3289 and the majority-class
+level 0.1453. The minimal TFT tier attains 0.3619, below the LSTM. Because the
+three-class labels are cut at tertiles, the classes are nearly balanced by design
+and the random level of the task is 0.333.
+
+The standalone contribution of the sentiment signal is measured by a control that
+keeps the two-branch architecture, the same articles, timestamps, and article
+counts, but replaces the true sentiment probabilities with a neutral prior. In
+the retrospective run with the checkpoint fine-tuned on all 1,306 labels, the
+direct difference is $+0.0113$ macro F1, of which the effect of architecture,
+news presence, and news volume is $+0.0034$ and the window-level information
+contribution is $+0.0080$; the 95\% day-level confidence interval $[-0.0025;
++0.0186]$ contains 0.
+
+Because the retrospective checkpoint learns from labels published after the test
+days, the figures above are retrospective differences only. The out-of-sample run
+--- a frozen checkpoint trained only on the 1,049 labels published before the
+first test observation date, together with a size- and class-matched control
+checkpoint to isolate the effect of training-set size --- has been measured and
+verified. The out-of-sample information contribution of the two-branch LSTM is
+$+0.0094$ macro F1 at window level, with a day-level confidence interval
+$[-0.0009; +0.0196]$ containing 0; the size-matched control (seed 7) yields
+$+0.0028$ at window level, with a day-level confidence interval $[-0.0074;
++0.0133]$ containing 0. All three point estimates are positive and lie between
+$+0.003$ and $+0.009$, yet every confidence interval contains 0; moreover, these
+runs constitute multiple comparisons on the same dataset, so there is no basis to
+claim statistical significance. Four supplementary analyses were carried out to
+probe the robustness of this finding: rank correlation between sentiment scores
+and returns without a model, a label set built on excess return relative to
+same-session peers, a forecast-horizon ablation, and an economic diagnostic under
+an exploratory, non-tradable framing. None of the four finds a reproducible
+improvement. The conclusion within the measured scope remains that there is not
+yet sufficiently strong evidence that sentiment improves forecasting; the data
+also do not rule out a small improvement. The results must not be interpreted as
+a causal relationship or as investment advice.
+
+\vspace{0.5cm}
+\noindent Keywords: stock price trend forecasting, sentiment analysis, PhoBERT,
+Transformer, time series, HOSE, VN30.
+\end{otherlanguage}

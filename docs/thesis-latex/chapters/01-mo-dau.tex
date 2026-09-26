@@ -6,7 +6,7 @@
 
 \subsection{Tính cấp thiết về mặt thực tiễn}
 
-Thị trường chứng khoán là một hệ thống có mức độ biến động cao. Giá cổ phiếu được hình
+Thị trường chứng khoán là một hệ thống có độ biến động cao. Giá cổ phiếu được hình
 thành từ sự tương tác giữa tình hình hoạt động của doanh nghiệp, điều kiện kinh tế vĩ
 mô, diễn biến của ngành, dòng tiền trên thị trường và kỳ vọng của nhà đầu tư. Bên cạnh
 dữ liệu giao dịch, tin tức tài chính là nguồn thông tin có khả năng tác động trực tiếp
@@ -22,10 +22,10 @@ chuỗi thời gian \cite{Chen2019_191005078v1,Chen2021_210708721v1}.
 Xuất phát từ bối cảnh đó, đề tài được lựa chọn vì các lý do sau.
 
 Thứ nhất, lượng thông tin tài chính được công bố mỗi ngày ngày càng lớn và phân tán
-trên nhiều nguồn khác nhau. Đối với phạm vi của đồ án, các nguồn tin có thể khác nhau
-về cách trình bày, thời điểm đăng tải và mức độ chi tiết. Vì vậy, một quy trình tự động
-thu thập, làm sạch, gắn tin với mã cổ phiếu, kiểm tra thời điểm và tổng hợp nội dung
-được sử dụng để bảo đảm tính nhất quán của dữ liệu và hỗ trợ phân tích ở quy mô lớn.
+trên nhiều nguồn khác nhau. Trong phạm vi của đồ án, các nguồn tin có thể khác nhau
+về cách trình bày, thời điểm đăng tải và mức độ chi tiết. Vì vậy, cần một quy trình
+tự động thu thập, làm sạch, gắn tin với mã cổ phiếu, kiểm tra thời điểm và tổng hợp
+nội dung để bảo đảm tính nhất quán của dữ liệu và hỗ trợ phân tích ở quy mô lớn.
 
 
 Thứ hai, dữ liệu giá lịch sử chỉ phản ánh kết quả giao dịch đã xảy ra, nhưng không thể
@@ -39,7 +39,7 @@ kiện liên quan đến doanh nghiệp và thị trường. Tuy nhiên, giá tr
 xem là một giả thuyết cần kiểm chứng bằng thực nghiệm, không phải một kết luận được đặt
 trước \cite{Jiang2023_230602136v3,Siala2026_260200086v3}.
 
-Đối với Việt Nam, dữ liệu tin tức tài chính được xử lý bằng tiếng Việt. Ngôn ngữ này
+Đối với Việt Nam, tin tức tài chính cần được xử lý bằng tiếng Việt. Ngôn ngữ này
 có những đặc điểm cần được xem xét, chẳng hạn từ ghép, quy tắc tách từ, dấu thanh, tên
 doanh nghiệp, mã cổ phiếu và cách biểu đạt số liệu. Cùng một doanh nghiệp có thể được
 gọi bằng tên đầy đủ, tên viết tắt hoặc mã giao dịch; một bài viết cũng có thể đề cập
@@ -51,8 +51,7 @@ PhoBERT được xây dựng như một mô hình ngôn ngữ tiền huấn luy�
 hợp để làm mô hình nền cho bước phân loại văn bản trong đề tài \cite{Nguyen2020_200300744v3}.
 Ở miền tiếng Anh, FinBERT cho thấy việc thích nghi BERT với ngữ liệu tài chính có thể
 tạo ra biểu diễn hữu ích cho phân tích cảm xúc \cite{Yang2020_200608097v2}. Hai hướng
-này gợi ý cách thiết kế của đồ án: chọn mô hình nền theo ngôn ngữ của dữ liệu, tinh chỉnh
-trên ngữ liệu tài chính phù hợp, sau đó đánh giá riêng chất lượng tầng cảm xúc trước khi
+này gợi ý hướng thiết kế cho đồ án: chọn mô hình nền theo ngôn ngữ của dữ liệu, tinh chỉnh
 sử dụng đầu ra cho dự báo. Việc chọn PhoBERT không có nghĩa là mô hình sẽ tự động hiểu
 đúng mọi thuật ngữ tài chính. Các trường hợp tên riêng, số liệu, câu phủ định và bài có
 nhiều sự kiện vẫn cần được kiểm tra bằng dữ liệu gán nhãn và phân tích lỗi.
@@ -63,15 +62,15 @@ quyết định nhằm kiểm soát phạm vi thu thập, đồng bộ và đán
 khẳng định rằng mẫu nghiên cứu đại diện cho toàn bộ thị trường. Danh sách mã và ngày bắt
 đầu sử dụng phải được ghi trong bản kê.
 
-Phạm vi này không đại diện cho toàn bộ thị trường Việt Nam. Đặc điểm ngành, thanh khoản,
+Đặc điểm ngành, thanh khoản,
 mức độ phản ứng với tin và mật độ bài viết của từng mã có thể khác nhau. Thành phần rổ
 VN30 cũng có thể thay đổi theo thời gian, còn một số doanh nghiệp có nhiều tin hơn hẳn
 các doanh nghiệp khác. Vì vậy, kết quả chỉ được diễn giải như bằng chứng thực nghiệm
 trong phạm vi mẫu, giai đoạn và nguồn dữ liệu đã chọn.
 
 Dữ liệu giá phản ánh kết quả giao dịch qua giá mở cửa, giá cao nhất, giá thấp nhất, giá
-đóng cửa, khối lượng và lợi suất. Tin tức lại mô tả sự kiện hoặc kỳ vọng có thể xuất
-hiện trước khi phản ứng đó thể hiện đầy đủ trên giá. Hai nguồn dữ liệu vì thế có khả
+đóng cửa, khối lượng và lợi suất. Tin tức mô tả sự kiện hoặc kỳ vọng, thường xuất
+hiện trước khi phản ứng tương ứng thể hiện đầy đủ trên giá. Hai nguồn dữ liệu vì thế có khả
 năng bổ sung cho nhau, nhưng khác nhau về dạng biểu diễn, tần suất, độ dài và thời điểm
 xuất hiện. Một ngày có thể có nhiều bài viết, một ngày khác không có bài nào, trong khi
 giá vẫn được ghi nhận ở cả hai ngày. Tin có thể xuất hiện trước giờ mở cửa, trong phiên,
@@ -98,9 +97,8 @@ liệu tiếng Việt tài chính có thể chưa đủ lớn để kiểm soát
 
 Một mức cải thiện trên dữ liệu nước ngoài không thể tự động chuyển thành hiệu quả trên
 HOSE. Ngôn ngữ, cấu trúc thị trường, nguồn tin, thời gian giao dịch, quy tắc gắn nhãn
-và cách chia dữ liệu đều có thể làm thay đổi kết quả. Vì vậy, đồ án đặt phép so sánh
 giữa mô hình chỉ dùng giá và mô hình có thêm cảm xúc ở vị trí trung tâm, với cùng cửa sổ
-thời gian, cách tiền xử lý, hạt giống hoặc tập hạt giống, ngân sách huấn luyện và tập kiểm tra.
+thời gian, cách tiền xử lý, hạt giống hoặc tập hạt giống, ngân sách huấn luyện và tập kiểm thử.
 
 Khó khăn của bài toán không chỉ nằm ở việc lựa chọn một mô hình có nhiều tham số hơn.
 Có ít nhất bốn vấn đề phương pháp cần được xử lý đồng thời.
@@ -119,20 +117,23 @@ cũng như độ phủ của thông tin. Ngày có nhiều tin trung tính phả
 ngày hoàn toàn không có tin, vì hai tình huống này mang mức độ quan sát khác nhau.
 
 Thứ ba, dữ liệu tài chính thường mất cân bằng và phân phối có thể thay đổi theo thời
-gian. Một mô hình có thể đạt độ chính xác tương đối cao chỉ nhờ dự đoán lớp phổ biến, nhưng
-vẫn bỏ sót các phiên giảm hoặc đi ngang. Bài toán ba lớp cũng nhạy với cách chọn ngưỡng
-cho vùng đi ngang. Vì vậy, đồ án dùng F1 vĩ mô và độ chính xác cân bằng cùng với độ chính xác dương tính,
-độ bao phủ, F1 theo từng lớp, ma trận nhầm lẫn và AUC-ROC một-chống-còn-lại khi đầu ra có xác suất.
+gian. Một mô hình có thể đạt độ chính xác tương đối cao chỉ nhờ dự đoán lớp phổ biến
+nhất, nhưng vẫn bỏ sót các phiên giảm hoặc đi ngang. Bài toán ba lớp cũng nhạy với cách chọn ngưỡng
+cho vùng đi ngang. Vì vậy, đồ án dùng F1 vĩ mô và độ chính xác cân bằng, kèm độ chính xác dương tính,
+độ bao phủ và F1 theo từng lớp, ma trận nhầm lẫn và AUC-ROC một-chống-còn-lại khi đầu ra có xác suất.
 
 Thứ tư, phép đánh giá phải tôn trọng thứ tự thời gian. Chuẩn hóa, điền khuyết, chọn
 đặc trưng, chọn ngưỡng nhãn hoặc tinh chỉnh mô hình bằng dữ liệu tương lai đều làm giảm
 giá trị của kết quả ngoài mẫu. Mô hình cũng có thể ghi nhớ bản sao của cùng một bài nếu
-loại trùng chỉ được thực hiện sau khi chia tập. Các nghiên cứu về dự báo chuyển động
+loại trùng chỉ được thực hiện sau khi chia tập. Các nghiên cứu về dự báo biến động giá
 cổ phiếu cho thấy benchmark, dữ liệu và giao thức đánh giá quan trọng không kém việc
 thay đổi kiến trúc \cite{Feng2018_181009936v2,Chen2021_210708721v1}.
 
 
 \subsection{Tính cấp thiết về mặt lý luận}
+
+Về mặt lý luận, ba lý do còn lại xuất phát từ tiến bộ của các mô hình ngôn ngữ và
+mô hình chuỗi thời gian.
 
 Thứ ba, sự phát triển của các mô hình ngôn ngữ tiền huấn luyện tạo điều kiện thuận lợi
 cho việc xử lý văn bản theo ngữ cảnh. BERT đặt nền tảng cho việc học biểu diễn hai chiều
@@ -155,7 +156,7 @@ biến động, chỉ báo kỹ thuật và thông tin tin tức có thể cùng
 phiên giao dịch kế tiếp. Việc đặt mô hình chuỗi thời gian cạnh mô hình văn bản cũng
 cho phép tách câu hỏi về chất lượng dữ liệu khỏi câu hỏi về độ phức tạp của kiến trúc.
 
-Thứ năm, các tài liệu đã được xác minh cho thấy những hướng kết hợp tin tức với dữ liệu
+Thứ năm, các công trình đã khảo sát cho thấy những hướng kết hợp tin tức với dữ liệu
 giá thường khác nhau về ngôn ngữ, quy mô dữ liệu, số lượng mã cổ phiếu, nhiệm vụ dự báo
 và giao thức đánh giá \cite{Halder2022_221107392v1,Gu2024_240716150v1,
 Chen2021_210708721v1,Omranpour2024_241210540v1}. Vì vậy, việc so sánh trực tiếp các
@@ -192,24 +193,24 @@ mà là hình thành một quy trình có thể kiểm tra từ dữ liệu đ�
 Để trả lời các câu hỏi nghiên cứu, đồ án đặt ra bốn mục tiêu cụ thể có thể kiểm chứng:
 
 \begin{enumerate}[nosep]
-  \item Thứ nhất, xây dựng quy trình thu thập, làm sạch, loại bỏ trùng lặp,
+  \item Xây dựng quy trình thu thập, làm sạch, loại bỏ trùng lặp,
     chuẩn hóa và đồng bộ tin tức tài chính tiếng Việt với dữ liệu giá cổ phiếu theo ngày
     giao dịch; xây dựng hoặc hoàn thiện bộ dữ liệu có nhãn cảm xúc gồm ba lớp tích cực,
     trung tính và tiêu cực với tiêu chí gán nhãn rõ ràng; tinh chỉnh PhoBERT, so sánh tầng phân loại
     tuyến tính với ít nhất một kiến trúc kết hợp như PhoBERT với CNN hoặc PhoBERT với
     BiLSTM, rồi đánh giá khả năng phân biệt ba lớp trên cùng dữ liệu.
-  \item Thứ hai, xây dựng tập đặc trưng cảm xúc theo từng mã cổ phiếu và ngày
+  \item Xây dựng tập đặc trưng cảm xúc theo từng mã cổ phiếu và ngày
     giao dịch từ phân phối xác suất dự đoán thay vì chỉ sử dụng nhãn có xác suất cao nhất;
     xây dựng mô hình dự báo xu hướng phiên kế tiếp bằng các mô hình chỉ sử dụng giá, LSTM
     và Transformer hoặc Bộ biến đổi hợp nhất theo thời gian khi đủ điều kiện; thiết kế cơ chế hợp
     nhất hai nhóm đặc trưng và so sánh mô hình kết hợp với đối chứng lớp phổ biến, đối chứng ngẫu nhiên cùng các mô
     hình chỉ sử dụng dữ liệu giá và chỉ báo kỹ thuật.
-  \item Thứ ba, thiết lập quy trình đánh giá theo thứ tự thời gian bằng cuốn chiếu theo thời gian
-    xác thực, kiểm soát rò rỉ trong chuẩn hóa, xử lý giá trị thiếu, xác định ngưỡng nhãn,
-    lựa chọn đặc trưng và điều chỉnh tham số, rồi phân tích xem tín hiệu cảm xúc có ổn định
-    khác nhau giữa các giai đoạn thị trường, ngày có nhiều tin và ngày ít tin, hoặc ngày gắn
-    với sự kiện hay không.
-  \item Thứ tư, xây dựng hệ thống thử nghiệm có khả năng tái lập để trực quan hóa
+  \item Thiết lập quy trình đánh giá theo thứ tự thời gian bằng cuốn chiếu theo thời
+    gian, kiểm soát rò rỉ trong chuẩn hóa, xử lý giá trị thiếu, xác định ngưỡng nhãn,
+    lựa chọn đặc trưng và điều chỉnh tham số, rồi phân tích xem tín hiệu cảm xúc có biểu
+    hiện khác nhau giữa các giai đoạn thị trường, ngày có nhiều tin và ngày ít tin, hoặc
+    ngày gắn với sự kiện hay không.
+  \item Xây dựng hệ thống thử nghiệm có khả năng tái lập để trực quan hóa
     kết quả và sử dụng cơ chế lựa chọn biến, chú ý hoặc các phương pháp giải thích phù
     hợp nhằm nhận diện vai trò cũng như giới hạn của đặc trưng cảm xúc trong quyết định dự
     báo.
@@ -256,19 +257,13 @@ thấp nhất, giá đóng cửa, giá điều chỉnh khi có dữ liệu phù 
 lợi suất và các chỉ báo kỹ thuật được tính theo ngày. Các biến này mô tả trạng thái đã
 quan sát được tại thời điểm dự báo, còn giá của phiên kế tiếp chỉ được dùng để tạo nhãn.
 
-Thứ ba, đối với mô hình, đề tài nghiên cứu PhoBERT và một biến thể kết hợp cho nhiệm vụ
-phân tích cảm xúc; LSTM, Transformer hoặc Bộ biến đổi hợp nhất theo thời gian cho nhiệm vụ dự
-báo chuỗi thời gian; cùng kiến trúc hợp nhất đặc trưng phục vụ phân loại xu hướng giá.
-FinBERT được dùng làm điểm đối chiếu khái niệm trong dòng nghiên cứu NLP tài chính
-quốc tế, không thay thế mô hình nền tiếng Việt của đề tài
+Thứ ba, đối với mô hình, đề tài nghiên cứu PhoBERT và các biến thể tầng phân loại cho
+nhiệm vụ phân tích cảm xúc; nhóm mô hình chuỗi thời gian gồm mô hình cổ điển, LSTM và
+Bộ biến đổi hợp nhất theo thời gian; cùng kiến trúc hợp nhất đặc trưng phục vụ phân loại
+xu hướng giá. PhoBERT được chọn vì được tiền huấn luyện cho tiếng Việt; FinBERT chỉ
+được dùng làm điểm đối chiếu khái niệm để đặt lựa chọn này trong dòng nghiên cứu NLP
+tài chính quốc tế, không thay thế mô hình nền tiếng Việt của đề tài
 \cite{Nguyen2020_200300744v3,Yang2020_200608097v2}.
-
-Về mô hình, đối tượng nghiên cứu gồm mô hình nền NLP tiếng Việt PhoBERT và các biến thể
-tầng phân loại cho nhiệm vụ phân loại cảm xúc, cùng nhóm mô hình chuỗi thời gian gồm mô hình cổ
-điển, LSTM và Bộ biến đổi hợp nhất theo thời gian. PhoBERT được chọn vì được tiền huấn luyện
-cho tiếng Việt. FinBERT được dùng làm điểm đối chiếu khái niệm để đặt lựa chọn này
-trong dòng nghiên cứu NLP tài chính quốc tế \cite{Nguyen2020_200300744v3,
-Yang2020_200608097v2}.
 
 \subsection{Phạm vi nghiên cứu}
 
@@ -313,7 +308,7 @@ các bản ghi này phải được đánh dấu, loại khỏi phân tích chí
 
 \subsubsection{Phạm vi bài toán và giới hạn}
 
-Bài toán dự báo được xây dựng dưới dạng phân loại ba lớp:
+Bài toán dự báo được phát biểu dưới dạng phân loại ba lớp:
 
 \begin{itemize}[nosep]
   \item UP: lợi suất của phiên kế tiếp lớn hơn ngưỡng tăng;
@@ -325,7 +320,7 @@ Ngưỡng được ước lượng trong tập huấn luyện của từng cửa
 bộ giai đoạn. Quy ước này ngăn phân phối lợi suất tương lai ảnh hưởng đến nhãn của quá
 khứ. Đề tài không dự báo giá tuyệt đối, không nghiên cứu giao dịch trong ngày, sổ lệnh,
 giao dịch tần suất cao, sản phẩm phái sinh hoặc khuyến nghị đầu tư. Việc đánh giá lợi
-nhuận tích lũy, Sharpe ratio, mức sụt giảm tối đa và chi phí giao dịch không thuộc phạm
+nhuận tích lũy, tỷ số Sharpe, mức sụt giảm tối đa và chi phí giao dịch không thuộc phạm
 vi bắt buộc. Các nội dung này chỉ được thực hiện như phần mở rộng khi dữ liệu và tiến
 độ cho phép.
 
@@ -338,7 +333,7 @@ xác suất cảm xúc từ tin tức tài chính tiếng Việt, còn nhánh ch
 giá và các chỉ báo kỹ thuật; hai nhóm đặc trưng được căn chỉnh theo mã cổ phiếu, ngày giao
 dịch và mốc cắt trước khi đưa vào mô hình dự báo. Các cấu hình được so sánh từ đối chứng cơ sở và
 mô hình chỉ giá đến LSTM hai nhánh, còn Bộ biến đổi hợp nhất theo thời gian được xem là phần mở
-rộng. Hiệu năng được đánh giá bằng cuốn chiếu theo thời gian trên dữ liệu theo thời gian, với các phép
+rộng. Hiệu năng được đánh giá bằng cuốn chiếu theo thời gian, với mọi phép
 biến đổi và ngưỡng nhãn chỉ được học từ phần huấn luyện của từng cửa sổ.
 
 \section{Đóng góp của nghiên cứu}
@@ -367,7 +362,7 @@ giữa các phần chia, khoảng tin cậy, phân bố lớp, phạm vi mã và
 \subsection{Ý nghĩa thực tiễn}
 
 Về kỹ thuật, đồ án xây dựng một quy trình có thể tái lập, gồm thu thập dữ liệu, kiểm tra
-chất lượng, lưu nguồn gốc, loại trùng lặp, xử lý theo thời điểm, trích xuất xác suất cảm
+chất lượng, ghi lưu nguồn gốc, loại trùng lặp, xử lý theo thời điểm, trích xuất xác suất cảm
 xúc, tổng hợp theo mã và ngày, huấn luyện, đánh giá cuốn chiếu theo thời gian và lưu cấu hình. Quy
 trình này cũng tạo ra một nền tảng để thay đổi mô hình nền hoặc cơ chế hợp nhất mà vẫn giữ
 được phép so sánh với mức sàn đã khóa.
@@ -376,13 +371,13 @@ Trong phạm vi được xác định, các đóng góp dự kiến gồm:
 
 \begin{enumerate}[nosep]
   \item Một quy trình thực nghiệm tiếng Việt nối tin tức với dữ liệu giá theo mã và
-    thời điểm, có kiểm tra loại trùng, nguồn gốc và khả năng truy xuất và mốc cắt.
+    thời điểm, có kiểm tra loại trùng, nguồn gốc, khả năng truy xuất và mốc cắt.
   \item Một quy trình dùng PhoBERT để tạo phân phối xác suất cảm xúc thay vì chỉ giữ
     nhãn có xác suất cao nhất, sau đó tổng hợp tín hiệu theo mã và ngày.
-  \item Một kiến trúc sàn gồm LSTM hai nhánh và hợp nhất bằng phép nối, đặt cạnh đối chứng cơ sở
+  \item Một kiến trúc sàn gồm LSTM hai nhánh và hợp nhất bằng phép nối, đặt cạnh cấu hình
     chỉ giá để đo phần đóng góp biên của cảm xúc.
   \item Một giao thức cuốn chiếu theo thời gian có tiền xử lý chỉ trên tập huấn luyện, năm
-    đoạn kiểm thử tách biệt, F1 vĩ mô và khoảng tin cậy theo lấy mẫu lặp, giúp tách hiệu
+    đoạn kiểm thử tách biệt, F1 vĩ mô và khoảng tin cậy bằng lấy mẫu lặp, giúp tách hiệu
     năng mô hình khỏi lỗi rò rỉ dữ liệu.
 \end{enumerate}
 

@@ -486,39 +486,47 @@ $+0{,}0034$, nên hiệu số trực tiếp $+0{,}0113$ gộp cả hai thành ph
 tách chúng thay vì báo cáo một con số duy nhất. Tuy nhiên, dấu dương của ước lượng điểm
 chưa đủ để suy ra cải thiện có thể tái lập.
 
-Bảng~\ref{tab:kq-ablation-ci} báo cáo khoảng tin cậy theo hai cách lấy mẫu lặp. Cách thứ
-nhất lấy mẫu lặp trên năm cửa sổ; cách thứ hai lấy mẫu lặp trên 300 \textit{ngày} kiểm thử,
-trong đó mọi mã của cùng một ngày được lấy cùng nhau để giữ tương quan chéo trong phiên.
-Khoảng theo ngày được ưu tiên vì chỉ có năm khối cửa sổ.
+Bảng~\ref{tab:kq-ablation-ci} báo cáo khoảng tin cậy theo hai cách lấy mẫu lặp quanh
+\textit{cùng một} ước lượng điểm: trung bình của năm hiệu số tính riêng trong từng cửa sổ.
+Cách thứ nhất lấy mẫu lặp trên năm cửa sổ. Cách thứ hai lấy mẫu lặp trên 300 \textit{ngày}
+kiểm thử, trong đó mọi mã của cùng một ngày được lấy cùng nhau để giữ tương quan chéo
+trong phiên, và các ngày được lấy lại \textit{bên trong cửa sổ của chính nó} rồi mới trung
+bình qua năm cửa sổ. Khoảng theo ngày được ưu tiên vì chỉ có năm khối cửa sổ.
 
 \begin{table}[H]
   \centering
-  \caption{Đóng góp thông tin của cảm xúc theo hai cách lấy mẫu lặp.}
+  \caption{Đóng góp thông tin của cảm xúc: một ước lượng điểm, hai cách lấy mẫu lặp.}
   \label{tab:kq-ablation-ci}
-  \begin{tabular}{l c c c c}
+  \begin{tabular}{l c c c}
     \toprule
-    & \multicolumn{2}{c}{Theo cửa sổ (5 khối)} & \multicolumn{2}{c}{Theo ngày (300 khối)} \\
-    \cmidrule(lr){2-3} \cmidrule(lr){4-5}
-    Chỉ số & Hiệu số & Khoảng tin cậy 95\% & Hiệu số & Khoảng tin cậy 95\% \\
+    Chỉ số & Hiệu số & Khoảng 95\% theo cửa sổ & Khoảng 95\% theo ngày \\
     \midrule
-    F1 vĩ mô & $+0{,}0080$ & $[-0{,}0000; +0{,}0160]$ & $-0{,}0020$ & $[-0{,}0120; +0{,}0081]$ \\
-    Độ chính xác cân bằng & $+0{,}0017$ & $[-0{,}0031; +0{,}0070]$ & $-0{,}0071$ & $[-0{,}0165; +0{,}0025]$ \\
-    Độ chính xác & $-0{,}0104$ & $[-0{,}0307; +0{,}0050]$ & $-0{,}0104$ & $[-0{,}0200; -0{,}0007]$ \\
+    F1 vĩ mô & $+0{,}0080$ & $[-0{,}0000; +0{,}0160]$ & $[-0{,}0025; +0{,}0186]$ \\
+    Độ chính xác cân bằng & $+0{,}0017$ & $[-0{,}0031; +0{,}0070]$ & $[-0{,}0072; +0{,}0108]$ \\
+    Độ chính xác & $-0{,}0104$ & $[-0{,}0307; +0{,}0050]$ & $[-0{,}0206; -0{,}0010]$ \\
     \bottomrule
   \end{tabular}
 \noindent\textit{Nguồn: \texttt{outputs/forecast\_merged\_sentiment\_tft/information\_gain.json}.}
 \end{table}
 
-Hai cột hiệu số là hai đại lượng khác nhau và được báo cáo kèm khoảng tin cậy tương ứng của
-chính nó. Hiệu số theo cửa sổ là trung bình của năm hiệu số tính riêng trong từng cửa sổ;
-hiệu số theo ngày là hiệu số tính trên toàn bộ dự đoán gộp của mọi ngày kiểm thử. Hai cách
-gộp cho hai con số không bằng nhau vì các cửa sổ có phân bố lớp khác nhau, nên không được
-đặt khoảng tin cậy của cách này cạnh hiệu số của cách kia.
+Một phiên bản trước của thí nghiệm gộp cả năm cửa sổ vào một ma trận nhầm lẫn duy nhất rồi
+lấy khoảng tin cậy quanh hiệu số gộp đó. Ước lượng gộp là một ước lượng hợp lệ và đã được
+báo cáo kèm khoảng của chính nó, nhưng nó là \textit{một đại lượng khác}: F1 vĩ mô phi
+tuyến theo ma trận nhầm lẫn nên hiệu số gộp không bằng trung bình các hiệu số theo cửa sổ,
+buộc người đọc phải theo dõi hai kết quả song song. Bảng hiện tại chọn một đại lượng và
+gắn cho nó hai khoảng; đây là thay đổi về cách trình bày, \textbf{không} phải bằng chứng
+rằng con số gộp trước đó sai.
 
-Khoảng tin cậy theo ngày, là căn cứ chính, chứa 0 ở F1 vĩ mô và độ chính xác cân bằng.
-Riêng độ chính xác có khoảng $[-0{,}0200; -0{,}0007]$ nằm hoàn toàn dưới 0, nhưng khoảng
-theo cửa sổ của cùng chỉ số đó vẫn chứa 0; hai cách lấy mẫu lặp giả định hai cấu trúc phụ
-thuộc khác nhau nên không tạo thành một kiểm định thống nhất. Theo đúng quy tắc đã đặt ở
+Hai giới hạn áp cho cả hai khoảng. Các ngày được rút độc lập nên không cách nào là lấy mẫu
+lặp theo khối chuỗi, và cả hai đều không mô hình hóa phụ thuộc giữa các phiên liên tiếp.
+Tệp kết quả còn ghi một giá trị $p$ một phía, nhưng chiều của giả thuyết \textbf{không}
+được cố định trước khi nhìn kết quả, nên nó chỉ có giá trị tham khảo và không được dùng để
+tuyên bố ý nghĩa thống kê.
+
+Khoảng theo ngày của F1 vĩ mô và độ chính xác cân bằng đều chứa 0. Riêng độ chính xác có
+khoảng $[-0{,}0206; -0{,}0010]$ nằm hoàn toàn dưới 0, nhưng khoảng theo cửa sổ của cùng chỉ
+số đó vẫn chứa 0; hai cách lấy mẫu lặp giả định hai cấu trúc phụ thuộc khác nhau nên không
+tạo thành một kiểm định thống nhất. Theo đúng quy tắc đã đặt ở
 Chương~\ref{ch:phuong-phap}, kết luận phù hợp là \textbf{chưa có bằng chứng đủ mạnh về
 cải thiện}, không phải ``cảm xúc làm mô hình tệ hơn'' hay ``cảm xúc chắc chắn có ích''.
 
@@ -564,26 +572,261 @@ của kích thước tập khỏi ảnh hưởng của một lần rút không m
     \toprule
     Điểm kiểm & Hiệu số & KTC 95\% theo cửa sổ & KTC 95\% theo ngày \\
     \midrule
-    Đầy đủ 1.306 nhãn (hồi cứu) & $+0{,}0080$ & $[-0{,}0000; +0{,}0160]$ & $[-0{,}0120; +0{,}0081]$ \\
-    Đóng băng 1.049 (ngoài mẫu) & $+0{,}0094$ & $[-0{,}0022; +0{,}0243]$ & $[-0{,}0118; +0{,}0093]$ \\
-    Đối chứng 1.049 (hạt giống 7) & $+0{,}0028$ & $[-0{,}0070; +0{,}0127]$ & $[-0{,}0133; +0{,}0062]$ \\
+    Đầy đủ 1.306 nhãn (hồi cứu) & $+0{,}0080$ & $[-0{,}0000; +0{,}0160]$ & $[-0{,}0025; +0{,}0186]$ \\
+    Đóng băng 1.049 (ngoài mẫu) & $+0{,}0094$ & $[-0{,}0022; +0{,}0243]$ & $[-0{,}0009; +0{,}0196]$ \\
+    Đối chứng 1.049 (hạt giống 7) & $+0{,}0028$ & $[-0{,}0070; +0{,}0127]$ & $[-0{,}0074; +0{,}0133]$ \\
     \bottomrule
   \end{tabular}
 \noindent\textit{Nguồn: \texttt{information\_gain.json} trong \path{outputs/forecast_merged_sentiment_tft}, \path{outputs/forecast_pit_sentiment} và \path{outputs/forecast_sizematched_s7_sentiment}.}
 \end{table}
 
-Ba ước lượng điểm theo cửa sổ đều dương và nằm trong khoảng $+0{,}003$ đến $+0{,}009$
-F1 vĩ mô. Trong lần rút hạt giống 7, điểm kiểm đóng băng theo thời gian cho ước
-lượng cao hơn điểm kiểm đối chứng cùng kích thước ($+0{,}0094$ so với $+0{,}0028$);
-đây là kết quả thăm dò từ một lần rút mẫu duy nhất, chưa tách chắc được ảnh hưởng
-của thời điểm huấn luyện khỏi thành phần mẫu được rút. Căn cứ chính vẫn là khoảng
-tin cậy theo ngày: mọi khoảng đều chứa 0 và các ước lượng điểm theo ngày đều âm
-($-0{,}0020$, $-0{,}0010$, $-0{,}0036$). Kết luận giữ nguyên: \textbf{chưa có bằng
-chứng đủ mạnh về cải thiện}.
+Ba ước lượng điểm đều dương và nằm trong khoảng $+0{,}003$ đến $+0{,}009$ F1 vĩ mô. Trong
+lần rút hạt giống 7, điểm kiểm đóng băng theo thời gian cho ước lượng cao hơn điểm kiểm
+đối chứng cùng kích thước ($+0{,}0094$ so với $+0{,}0028$); đây là kết quả thăm dò từ một
+lần rút mẫu duy nhất, chưa tách chắc được ảnh hưởng của thời điểm huấn luyện khỏi thành
+phần mẫu được rút.
+
+Cả ba khoảng theo ngày đều chứa 0. Khoảng của lượt đóng băng gần như chạm 0 ở cận dưới
+($-0{,}0009$), nhưng ba lượt này là ba trong số các phép so sánh đã thực hiện trên cùng bộ
+dữ liệu --- tính cả hai kiến trúc là sáu --- nên sau hiệu chỉnh đa so sánh không còn cơ sở
+nào để tuyên bố ý nghĩa thống kê. Kết luận giữ nguyên: \textbf{chưa có bằng chứng đủ mạnh
+về cải thiện}, và dữ liệu hiện tại cũng không loại trừ một cải thiện nhỏ.
 
 Với TFT, đóng góp thông tin là $-0{,}0057$ (hồi cứu), $-0{,}0105$ (đóng băng) và
-$-0{,}0020$ (đối chứng): không có lợi ích quan sát được ở bất kỳ bộ sinh nào, phù
-hợp với việc TFT chỉ giá đã thấp hơn LSTM chỉ giá trên quy mô dữ liệu này.
+$-0{,}0020$ (đối chứng), với khoảng theo ngày lần lượt $[-0{,}0161; +0{,}0047]$,
+$[-0{,}0209; +0{,}0013]$ và $[-0{,}0116; +0{,}0083]$: không có lợi ích quan sát được ở bất
+kỳ bộ sinh nào, nhưng cũng không có suy giảm nào vượt ngưỡng nhiễu. Điều này phù hợp với
+việc TFT chỉ giá đã thấp hơn LSTM chỉ giá trên quy mô dữ liệu này.
+
+\subsection{Tương quan hạng của tín hiệu, không qua mô hình}
+\label{sec:kq-ic}
+
+Một phép cắt bỏ cho kết quả rỗng không phân biệt được hai khả năng: bộ ước lượng chưa khai
+thác được tín hiệu, hay bản thân tín hiệu yếu. Mục này bổ sung một mảnh bằng chứng độc lập
+với kiến trúc: tương quan hạng Spearman giữa điểm cảm xúc theo ngày và lợi suất thực hiện,
+\textbf{không khớp bất kỳ mô hình nào}. Lệnh \texttt{forecast-ic} tính trên 6.950 dòng
+mã--ngày có tin thuộc 1.483 phiên, dùng điểm kiểm đóng băng; khoảng tin cậy lấy mẫu lặp
+theo trọn phiên với 2.000 lần rút.
+
+\begin{table}[H]
+  \centering
+  \caption{Tương quan hạng Spearman giữa \texttt{sent\_pos\_minus\_neg} và lợi suất thực hiện, điểm kiểm đóng băng.}
+  \label{tab:kq-ic}
+  \begin{tabular}{l c c}
+    \toprule
+    Lợi suất đối chiếu & Tương quan hạng & Khoảng tin cậy 95\% \\
+    \midrule
+    Cùng phiên, lợi suất thô & $+0{,}0130$ & $[-0{,}0158; +0{,}0406]$ \\
+    Cùng phiên, lợi suất vượt trội & $+0{,}0233$ & $[+0{,}0004; +0{,}0465]$ \\
+    Phiên kế tiếp, lợi suất thô & $+0{,}0110$ & $[-0{,}0164; +0{,}0399]$ \\
+    Phiên kế tiếp, lợi suất vượt trội & $+0{,}0030$ & $[-0{,}0207; +0{,}0269]$ \\
+    \bottomrule
+  \end{tabular}
+\noindent\textit{Nguồn: \path{outputs/signal_ic_pit.json}; $n = 6.950$ và $6.948$ dòng.}
+\end{table}
+
+Tương quan hạng cắt ngang theo ngày --- xếp hạng trong từng phiên rồi lấy trung bình, cách
+một tín hiệu định lượng thực sự được dùng --- là $+0{,}0062$ với sai số chuẩn $0{,}0159$
+trên 1.002 phiên ($t = +0{,}39$). Với điểm kiểm hồi cứu, con số tương ứng là $-0{,}0047$
+($t = -0{,}29$), tức đổi dấu giữa hai bộ sinh: độ lớn của nó nằm trọn trong nhiễu.
+
+\paragraph{Mục này không chứng minh điều gì.}
+Cần phát biểu giới hạn trước khi diễn giải. Hệ số Spearman gần 0 chỉ bác bỏ liên hệ
+\textbf{đơn điệu} giữa \textbf{đúng điểm số vô hướng này} và lợi suất. Nó không phải cận
+trên của khả năng dự báo và không phải thước đo lượng thông tin. Phản ví dụ chuẩn: với
+$x$ phân phối đối xứng quanh 0 và $y = x^2$, biến $y$ được xác định hoàn toàn bởi $x$
+nhưng tương quan hạng giữa chúng bằng 0. Tương tự, kết quả ở đây không nói gì về:
+
+\begin{itemize}[nosep]
+  \item một quan hệ phi tuyến, có điều kiện hoặc có tương tác với đặc trưng giá;
+  \item một \emph{cách đo cảm xúc} khác --- theo khía cạnh, cường độ, chủ thể, hay mức bất
+        ngờ so với kỳ vọng thị trường --- thay cho hiệu hai xác suất;
+  \item một \emph{cách tổng hợp} khác, chẳng hạn theo sự kiện thay vì theo ngày, hoặc có
+        trọng số theo độ tin cậy của bộ phân loại;
+  \item một chân trời dài hơn (xem Mục~\ref{sec:kq-horizon}).
+\end{itemize}
+
+Đọc bảng đúng như nó là: \emph{không phát hiện được liên hệ đơn điệu giữa điểm số này và
+lợi suất vượt trội của phiên kế tiếp}. Các phép đối chiếu trong bảng chưa được đăng ký
+trước và có tám ô, nên toàn bộ mục này mang tính \textbf{thăm dò}.
+
+Về hình mẫu ``cùng phiên có, phiên sau không'': nó \emph{phù hợp với} giả thuyết tin đã
+được phản ánh vào giá trước lúc đóng cửa, nhưng phù hợp không phải là chứng minh. Ít nhất
+hai cơ chế khác tạo ra cùng hình mẫu. Thứ nhất là \textbf{nhân quả ngược}: giá chạy trước,
+báo chí viết theo giọng của diễn biến đó, nên tương quan cùng phiên phát sinh mà không cần
+tin dẫn dắt giá. Thứ hai là \textbf{nhiễu}: điểm số vốn đã yếu, và thêm một ngày pha loãng
+đủ để đưa nó xuống dưới ngưỡng phát hiện. Đồ án không có thiết kế để tách ba cơ chế này,
+nên không tuyên bố về tính hiệu quả của thị trường.
+
+\subsection{Nhãn lợi suất vượt trội}
+\label{sec:kq-excess}
+
+Nhãn mặc định của đồ án là lợi suất phiên kế tiếp của chính mã đó. Trên mười mã VN30 trong
+cửa sổ nghiên cứu, một phần đáng kể biến động hằng ngày là nhịp chung: tương quan lợi suất
+ngày trung bình theo cặp là $0{,}418$ và hệ số xác định trung bình so với trung bình đồng
+hạng là $0{,}480$. Phần chung đó không phải thứ tin riêng của một doanh nghiệp giải thích
+được. Mục này chạy lại toàn bộ thang mô hình với nhãn thay thế: lợi suất trừ đi trung bình
+đồng hạng của cùng ngày mục tiêu, tức phần mã đó chạy nhanh hay chậm hơn rổ.
+
+Đây là đổi \emph{nhãn}, không đổi đặc trưng. Trung bình đồng hạng được trừ đi chỉ biết
+được vào đúng ngày mục tiêu, cùng lúc với lợi suất, nên không có thông tin nào xuất hiện
+sớm hơn trước. Ngưỡng tam phân vẫn khớp riêng trên phần huấn luyện của từng cửa sổ, và
+toàn bộ cửa sổ, hạt giống, dòng kiểm thử giữ nguyên.
+
+\begin{table}[H]
+  \centering
+  \caption{F1 vĩ mô theo hai cách gán nhãn, cùng điểm kiểm đóng băng và cùng cửa sổ kiểm thử.}
+  \label{tab:kq-excess}
+  \begin{tabular}{l c c}
+    \toprule
+    Nhánh & Nhãn lợi suất thô & Nhãn lợi suất vượt trội \\
+    \midrule
+    Lớp phổ biến nhất & 0,1453 & 0,1627 \\
+    Ngẫu nhiên theo phân bố lớp & 0,3289 & 0,3240 \\
+    Hồi quy logistic, chỉ giá & 0,3551 & 0,3403 \\
+    Hồi quy logistic, giá và cảm xúc & 0,3666 & 0,3396 \\
+    LSTM chỉ giá & 0,3756 & 0,3399 \\
+    LSTM giá và cảm xúc & 0,3883 & 0,3434 \\
+    TFT chỉ giá & 0,3619 & 0,3379 \\
+    TFT giá và cảm xúc & 0,3549 & 0,3263 \\
+    \bottomrule
+  \end{tabular}
+\noindent\textit{Nguồn: \path{outputs/forecast_pit_sentiment} và \path{outputs/forecast_excess_pit_sentiment}.}
+\end{table}
+
+Quan sát trực tiếp: với nhãn lợi suất vượt trội, mọi nhánh học được đều cho F1 vĩ mô
+\emph{thấp hơn} so với nhãn lợi suất thô, và khoảng cách giữa các nhánh cũng thu hẹp lại.
+Bài toán xếp hạng tương đối trong phiên khó hơn bài toán dự báo chiều biến động thô trên
+chính dữ liệu này.
+
+Bảng không được đọc như một phép phân rã. Hiệu số F1 vĩ mô giữa hai cột là hiệu số giữa
+\textbf{hai bài toán gán nhãn khác nhau, huấn luyện riêng}, không phải phân rã phương sai
+cũng không phải phân rã nhân quả; và mức ngẫu nhiên của F1 vĩ mô không đúng bằng $1/3$ khi
+tập kiểm thử lệch lớp, nên không được quy hai cột về một tỷ lệ phần trăm.
+
+Đóng góp thông tin phân cực trên nhãn vượt trội, đo bằng cùng đối chứng trung tính ghép
+cặp, là $-0{,}0005$ với khoảng theo ngày $[-0{,}0091; +0{,}0080]$ ở lượt đóng băng và
+$+0{,}0031$ với khoảng $[-0{,}0065; +0{,}0124]$ ở lượt hồi cứu. Cả hai đều chứa 0. Với
+TFT, lượt đóng băng cho $-0{,}0126$ với khoảng $[-0{,}0234; -0{,}0010]$; đây là một ô
+trong nhiều phép so sánh đã thực hiện trên cùng bộ dữ liệu, nên không được đọc như một
+kết quả có ý nghĩa thống kê đứng riêng.
+
+Cuối cùng, mục này và Mục~\ref{sec:kq-ic} \textbf{dùng chung một bộ dữ liệu}. Chúng không
+phải hai lần lặp lại độc lập và không củng cố lẫn nhau theo nghĩa thống kê; chúng chỉ là
+hai cách nhìn khác nhau vào cùng một mẫu.
+
+\subsection{Ablation chân trời dự báo}
+\label{sec:kq-horizon}
+
+Chân trời một phiên là trường hợp khó nhất: điều mà một bài tin hàm ý phải hiện ra trong
+đúng một nhịp đóng cửa sang đóng cửa, nếu không thì không hiện ra ở đâu cả. Mục này kiểm
+tra xem kết quả rỗng ở $h = 1$ có phải đặc thù của nhịp thời gian đó hay không, bằng cách
+chạy lại toàn bộ thang mô hình và cả đối chứng trung tính ghép cặp ở $h = 3$ và $h = 5$,
+giữ nguyên điểm kiểm đóng băng, cửa sổ cuốn chiếu, hạt giống và mọi siêu tham số.
+
+\begin{table}[H]
+  \centering
+  \caption{F1 vĩ mô và đóng góp thông tin phân cực theo chân trời dự báo, điểm kiểm đóng băng.}
+  \label{tab:kq-horizon}
+  \begin{tabular}{c c c c c c}
+    \toprule
+    Chân trời & Logistic chỉ giá & LSTM chỉ giá & LSTM giá--cảm xúc & Đóng góp & KTC 95\% theo ngày \\
+    \midrule
+    $h = 1$ & 0,3551 & 0,3756 & 0,3883 & $+0{,}0094$ & $[-0{,}0009; +0{,}0196]$ \\
+    $h = 3$ & 0,3570 & 0,3668 & 0,3903 & $+0{,}0134$ & $[+0{,}0020; +0{,}0249]$ \\
+    $h = 5$ & 0,3374 & 0,3575 & 0,3658 & $-0{,}0007$ & $[-0{,}0120; +0{,}0099]$ \\
+    \bottomrule
+  \end{tabular}
+\noindent\textit{Nguồn: \path{outputs/forecast_pit_sentiment}, \path{outputs/forecast_h3_pit_sentiment}, \path{outputs/forecast_h5_pit_sentiment}.}
+\end{table}
+
+\paragraph{Cảnh báo nhãn chồng lấn.}
+Khoảng tin cậy ở $h > 1$ \textbf{không} được đọc như khoảng ở $h = 1$. Khi chân trời là
+$h$ phiên, hai dòng liên tiếp của cùng một mã dùng chung $h - 1$ phiên, nên các nhãn chồng
+lấn và số quan sát độc lập hữu hiệu chỉ còn khoảng $n/h$. Thủ tục lấy mẫu lặp vẫn coi mỗi
+ngày kiểm thử là một khối độc lập, vì vậy ở $h = 3$ và $h = 5$ nó \emph{hẹp hơn mức bằng
+chứng cho phép}. Khoảng $[+0{,}0020; +0{,}0249]$ ở $h = 3$ vì thế \textbf{không} được coi
+là bằng chứng về một hiệu ứng khác 0.
+
+Sự chồng lấn không tạo rò rỉ giữa huấn luyện và kiểm thử: phép chia cuốn chiếu vẫn chia
+theo ngày mục tiêu, nên kết quả của một dòng huấn luyện luôn xảy ra trước mọi ngày mục
+tiêu trong tập kiểm thử. Vấn đề là ở phương sai, không phải ở tính nhân quả.
+
+Đọc bảng với cảnh báo trên, hình mẫu là: đóng góp ước lượng được $+0{,}0094$, $+0{,}0134$
+rồi $-0{,}0007$ khi chân trời mở rộng --- \textbf{không đơn điệu}, và biên độ dao động
+nằm trong cùng khoảng nhiễu đã thấy ở các lượt khác. Mặt khác, mô hình chỉ giá suy giảm
+đều theo chân trời (0,3756 xuống 0,3575), đúng như kỳ vọng khi mục tiêu xa dần. Kết luận:
+\textbf{không xác lập được sự phụ thuộc của đóng góp cảm xúc vào chân trời dự báo}, và
+kết quả rỗng ở $h = 1$ không phải là hệ quả riêng của việc chọn một phiên.
+
+\subsection{Chẩn đoán kinh tế}
+\label{sec:kq-kinh-te}
+
+\begin{tcolorbox}[colback=red!5!white, colframe=red!60!black, title=\textbf{Kết quả trong mục này không giao dịch được}]
+Đặc trưng của ngày $t$ gồm giá đóng cửa $\text{close}_t$ và mọi bài tin công bố tới mốc
+cắt 15:00 của ngày $t$. Sổ lệnh mô phỏng ở đây vào lệnh tại \emph{chính} $\text{close}_t$
+--- cái giá mà tín hiệu vừa tiêu thụ và chỉ biết được sau khi phiên đã đóng. Không nhà đầu
+tư nào khớp được ở mức giá đó.
+
+Vì vậy mọi con số bên dưới là \textbf{cận trên dưới giả định khớp lệnh hoàn hảo, tức thời,
+không trượt giá}, không phải lợi nhuận đạt được. Một phương án giao dịch được phải vào
+lệnh từ phiên mở cửa kế tiếp trở đi và sẽ mất phần biến động qua đêm, vốn thường chiếm
+phần lớn biên lợi thế ở tần suất ngày. Mục này trả lời câu hỏi ``F1 vĩ mô $0{,}38$ lớn hay
+nhỏ tính bằng điểm cơ bản'', \textbf{không} trả lời ``chiến lược này có sinh lời không''.
+\end{tcolorbox}
+
+Thiết lập: mỗi phiên, mua đều các mã được dự báo \texttt{UP}, bán khống đều các mã
+\texttt{DOWN}, tái cân bằng hằng ngày trên 300 phiên kiểm thử của lượt đóng băng. Lợi suất
+thực hiện được tính lại từ tệp giá chứ không suy ngược từ nhãn, nên một dòng gán nhãn sai
+hiện ra thành khoản lỗ. Chi phí tính trên vòng quay thực tế so với vị thế đã trôi giá và
+đã quy về cùng cơ sở vốn, ở mức 20 điểm cơ bản cho mỗi đơn vị vòng quay.
+
+Sổ lệnh này \textbf{không trung hòa thị trường}. Khi cả hai vế cùng có lệnh thì trọng số
+triệt tiêu, nhưng $23{,}2\%$ số phiên chỉ có một vế; ở những phiên đó vế còn sống bị giảm
+một nửa nhưng rủi ro thị trường vẫn còn, với trạng thái ròng tuyệt đối trung bình $0{,}101$.
+
+\begin{table}[H]
+  \centering
+  \caption{Chẩn đoán kinh tế của các nhánh trên 300 phiên kiểm thử, điểm kiểm đóng băng, phí 20 điểm cơ bản.}
+  \label{tab:kq-backtest}
+  \begin{tabular}{l c c c c}
+    \toprule
+    Nhánh & Sharpe trước phí & Sharpe sau phí & Phí hòa vốn & $\alpha$ so với rổ ($t$) \\
+    \midrule
+    LSTM chỉ giá & $+2{,}49$ & $-1{,}05$ & 14,1 bps & $+0{,}00202$ $(+2{,}38)$ \\
+    LSTM giá--cảm xúc & $+3{,}44$ & $-1{,}12$ & 15,1 bps & $+0{,}00252$ $(+3{,}39)$ \\
+    TFT chỉ giá & $+1{,}93$ & $-2{,}01$ & 9,8 bps & $+0{,}00129$ $(+1{,}71)$ \\
+    TFT giá--cảm xúc & $+3{,}13$ & $-0{,}79$ & 16,0 bps & $+0{,}00211$ $(+2{,}92)$ \\
+    Ngẫu nhiên theo phân bố lớp & $-2{,}00$ & $-12{,}51$ & --- & $-0{,}00101$ $(-2{,}03)$ \\
+    \midrule
+    Rổ đều, tái cân bằng hằng ngày & $+1{,}95$ & --- & --- & --- \\
+    Rổ đều, mua và nắm giữ & $+2{,}61$ & --- & --- & --- \\
+    \bottomrule
+  \end{tabular}
+\noindent\textit{Nguồn: \path{outputs/forecast_pit_sentiment/backtest_*.json}. $\alpha$ là hệ số chặn khi hồi quy lợi suất trước phí của sổ lệnh lên lợi suất rổ đều.}
+\end{table}
+
+\paragraph{Mức nhiễu tham chiếu.}
+Nhánh ngẫu nhiên đạt Sharpe $-2{,}00$, tức 300 phiên \emph{không} đủ để tách các mức Sharpe
+gần nhau. Mức tham chiếu đúng là phân phối null hoán vị: giữ nguyên ngày, rổ mã và toàn bộ
+cách hạch toán, chỉ xáo trộn nhãn dự báo trong từng phiên, 200 lần rút. Với nhánh LSTM
+giá--cảm xúc, null có trung bình Sharpe $+0{,}01$, độ lệch chuẩn $0{,}88$ và khoảng 95\%
+$[-1{,}77; +1{,}70]$. Hai điều rút ra: null tập trung quanh 0 nên cách hạch toán không
+thiên lệch; và Sharpe trước phí $+3{,}44$ nằm ngoài khoảng đó.
+
+\paragraph{Ba kết quả.}
+Thứ nhất, biên lợi thế phân loại \emph{trước phí} là thật và không chỉ là trạng thái ròng
+một chiều: sau khi hồi quy lên rổ, hệ số chặn vẫn dương với $t = +3{,}39$ trong khi
+$\beta = +0{,}186$. Thứ hai, biên đó \emph{bị phí nuốt trọn}: ngưỡng hòa vốn khoảng 15 điểm
+cơ bản cho mỗi đơn vị vòng quay, trong khi phí môi giới cộng thuế bán thực tế ở HOSE cao
+hơn đáng kể, nên Sharpe sau phí âm ở mọi nhánh. Thứ ba, so với mốc thụ động, mua và nắm
+giữ rổ đều đạt Sharpe $+2{,}61$ --- nghĩa là ngay cả con số trước phí cũng không vượt xa
+một chiến lược không cần mô hình nào.
+
+Với nhãn lợi suất vượt trội (Mục~\ref{sec:kq-excess}), Sharpe trước phí của nhánh LSTM
+giá--cảm xúc chỉ còn $+0{,}42$ và hệ số chặn so với rổ là $+0{,}00012$ với $t = +0{,}15$.
+Quan sát này nhất quán với việc thang mô hình đạt điểm thấp hơn trên nhãn vượt trội, nhưng
+nó đến từ cùng một mẫu dữ liệu nên không phải một xác nhận độc lập.
 
 
 \subsection{Giới hạn của kiểm tra theo điều kiện thị trường}
@@ -627,12 +870,15 @@ bằng chứng chất lượng phân loại tốt hơn của cấu hình có tr�
 phải bằng chứng rằng tín hiệu cảm xúc đã cải thiện dự báo giá.
 
 \textbf{Câu hỏi thứ hai} --- xác suất cảm xúc có cải thiện dự báo hay không, và mức bao
-nhiêu. Ở lượt hồi cứu, so với đối chứng trung tính ghép cặp, ước lượng theo cửa sổ của
-đóng góp thông tin phân cực là $+0{,}0080$ F1 vĩ mô, nhưng ước lượng theo ngày --- căn cứ
-chính --- là $-0{,}0020$ với khoảng tin cậy $[-0{,}0120; +0{,}0081]$ chứa 0. Lượt ngoài
-mẫu với điểm kiểm đóng băng (Mục~\ref{sec:kq-point-in-time}) đã được đo: đóng góp
-thông tin là $+0{,}0094$ theo cửa sổ và $-0{,}0010$ theo ngày, khoảng tin cậy theo
-ngày $[-0{,}0118; +0{,}0093]$ vẫn chứa 0. Kết luận:
+nhiêu. Ở lượt hồi cứu, so với đối chứng trung tính ghép cặp, đóng góp thông tin phân cực
+là $+0{,}0080$ F1 vĩ mô với khoảng tin cậy theo ngày $[-0{,}0025; +0{,}0186]$ chứa 0. Lượt
+ngoài mẫu với điểm kiểm đóng băng (Mục~\ref{sec:kq-point-in-time}) cho $+0{,}0094$ với
+khoảng $[-0{,}0009; +0{,}0196]$, và đối chứng cùng kích thước cho $+0{,}0028$ với khoảng
+$[-0{,}0074; +0{,}0133]$. Ba ước lượng điểm đều dương nhưng mọi khoảng tin cậy đều chứa 0,
+và ba lượt này nằm trong số nhiều phép so sánh trên cùng bộ dữ liệu nên không có cơ sở
+tuyên bố ý nghĩa thống kê. Bốn phân tích bổ sung
+(Mục~\ref{sec:kq-ic}, \ref{sec:kq-excess}, \ref{sec:kq-horizon}, \ref{sec:kq-kinh-te})
+cũng không tìm thấy cải thiện có thể tái lập. Kết luận:
 \textbf{chưa có bằng chứng rằng đặc trưng cảm xúc cải thiện dự báo xu hướng phiên kế
 tiếp}. Dữ liệu hiện tại không loại trừ cả cải thiện nhỏ lẫn suy giảm nhỏ.
 

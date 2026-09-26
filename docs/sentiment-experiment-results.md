@@ -1,14 +1,23 @@
 # Bản ghi thực nghiệm phân loại cảm xúc
 
-> **Trạng thái:** Xác thực chéo theo tầng trên 1.306 nhãn, điểm kiểm tinh chỉnh cuối,
-> chấm lại kho tin và phép đối chứng dự báo ghép cặp đã hoàn thành. Lượt dự báo này là
-> **hồi cứu**: điểm kiểm được học từ toàn bộ tập nhãn, trong đó có bài sau các ngày kiểm
-> thử dự báo. Các phần về 306 mẫu bên dưới chỉ là bản ghi lịch sử của đường cơ sở và ablation.
+> **Trạng thái:** Xác thực chéo theo tầng trên 1.306 nhãn đã hoàn thành. Ba điểm kiểm
+> triển khai đã được tinh chỉnh (`merged-refit` 1.306 nhãn hồi cứu; `point-in-time`
+> 1.049 nhãn đóng băng trước ngày kiểm thử đầu tiên; `size-matched-s7` 1.049 nhãn
+> đối chứng cùng kích thước, hạt giống 7), kho tin đã được chấm lại và các phép đối
+> chứng dự báo ghép cặp đã chạy xong. Lượt dự báo được báo cáo chính thức là
+> `forecast_merged_sentiment_tft` (gồm cả nhánh LSTM lẫn TFT); lượt
+> `forecast_merged_sentiment` cũ hơn chỉ còn giá trị lịch sử. Các phần về 306 mẫu
+> bên dưới chỉ là bản ghi lịch sử của đường cơ sở và ablation.
 >
 > **Nguồn số liệu hiện tại:** [`../outputs/sentiment-cv-merged/cv_results.json`](../outputs/sentiment-cv-merged/cv_results.json),
-> `outputs/merged-refit.zip`, `outputs/forecast_merged_sentiment/forecast_results.json`,
-> `outputs/forecast_merged_control/forecast_results.json` và
-> `outputs/forecast_merged_sentiment/information_gain.json`.
+> `outputs/merged-refit.zip`, `outputs/point-in-time.zip`, `outputs/size-matched-s7.zip`,
+> `outputs/forecast_merged_sentiment_tft/{forecast_results,information_gain,information_gain_tft}.json`,
+> `outputs/forecast_pit_sentiment/{forecast_results,information_gain,information_gain_tft}.json`,
+> `outputs/forecast_sizematched_s7_sentiment/{forecast_results,information_gain}.json`,
+> `outputs/forecast_excess_{merged,pit}_sentiment/{forecast_results,information_gain}.json`,
+> `outputs/forecast_{h3,h5}_pit_sentiment/{forecast_results,information_gain}.json`,
+> `outputs/forecast_pit_sentiment/backtest_*.json`,
+> `outputs/signal_ic_{pit,merged}.json`.
 
 ## Kết quả hiện tại: xác thực chéo theo tầng trên 1.306 nhãn
 
@@ -32,41 +41,138 @@ Lần chạy dùng `title_context + head_tail`, 5 epoch, kích thước lô 16, 
 Xác thực chéo chỉ đánh giá bộ phân loại; nó không tự chứng minh tín hiệu cảm xúc cải thiện
 dự báo giá. Cấu hình này được khóa trước khi tinh chỉnh checkpoint triển khai.
 
-## Tinh chỉnh cuối, chấm lại tin và dự báo ghép cặp hồi cứu
+## Tinh chỉnh điểm kiểm triển khai, chấm lại tin và dự báo ghép cặp
 
-Điểm kiểm `full_data_refit` được tinh chỉnh trên toàn bộ 1.306 nhãn với cấu hình đã khóa,
-5 epoch cố định, trọng số nghịch đảo tần suất và hạt giống 42. Manifest xác nhận mã băm
-nguồn `18d896d8c6b0e9badc91828030e205f2c523704bf38ed4fcde8a52a895eb0b56`, 194/771/341
-mẫu ba lớp và môi trường `torch 2.10.0+cu128`, `transformers 5.15.1`. Đây là lượt huấn
-luyện triển khai hậu xác thực chéo, không sinh chỉ số kiểm thử mới.
+Ba điểm kiểm `full_data_refit` được tinh chỉnh với cùng cấu hình đã khóa (5 epoch cố
+định, trọng số nghịch đảo tần suất, hạt giống 42):
 
-Điểm kiểm đã chấm lại 12.624 liên kết tin--mã bằng `title_context`, `head_tail` và
-`context-chars 400`. Có 12.613 liên kết được neo theo mốc 15:00, 11 liên kết không neo
-được bị loại, và 6.950 trên 14.990 dòng mã--phiên có tin. Nhánh cảm xúc và đối chứng đều
-dùng đúng cùng parquet đã chấm; đối chứng chỉ thay xác suất mỗi bài thành
-`(NEGATIVE=0, NEUTRAL=1, POSITIVE=0)`, nên giữ nguyên thời điểm, số lượng tin và cờ có tin.
+| Điểm kiểm | Số nhãn huấn luyện | Phân bố lớp | Vai trò |
+| --- | ---: | --- | --- |
+| `models/sentiment/merged-refit/` | 1.306 | 194 NEGATIVE / 771 NEUTRAL / 341 POSITIVE | Hồi cứu: học từ toàn bộ tập nhãn |
+| `models/sentiment/point-in-time/` | 1.049 | 167 NEGATIVE / 616 NEUTRAL / 266 POSITIVE | Ngoài mẫu: `label_cutoff` 2024-10-21 (phiên kiểm thử đầu tiên là 2024-10-22) |
+| `models/sentiment/size-matched-s7/` | 1.049 | 167 NEGATIVE / 616 NEUTRAL / 266 POSITIVE | Đối chứng: mẫu ngẫu nhiên khớp lớp cùng kích thước, hạt giống 7, không giới hạn thời điểm |
 
-Các artifact forecast hiện có có trước lược đồ sidecar phiên bản 2. Vì vậy chúng không
-được diễn giải là đã kiểm tra mã băm parquet/điểm kiểm bởi sidecar; không tạo backfill
-tổng hợp. Một lượt tái chạy từ checkpoint và parquet xác định mới có thể mang bảo đảm đó.
+Nguồn: `models/sentiment/{merged-refit,point-in-time,size-matched-s7}/manifest.json`
+(`training_size`, `class_distribution`, `provenance.label_cutoff`,
+`provenance.subset.sample_seed`). Manifest của `merged-refit` xác nhận mã băm nguồn
+`18d896d8c6b0e9badc91828030e205f2c523704bf38ed4fcde8a52a895eb0b56` và môi trường
+`torch 2.10.0+cu128`, `transformers 5.15.1`; hai điểm kiểm còn lại dùng
+`torch 2.13.0+cu130`, `transformers 5.15.1`.
 
-| Chỉ số LSTM | Chỉ giá | Hai nhánh trung tính | Hai nhánh cảm xúc thật | Đóng góp thông tin |
-| --- | ---: | ---: | ---: | ---: |
-| F1 vĩ mô | 0.3797 | 0.3841 | 0.3907 | +0.0066 |
-| Độ chính xác cân bằng | 0.3915 | 0.3954 | 0.3981 | +0.0027 |
-| Độ chính xác | 0.4300 | 0.4320 | 0.4296 | -0.0024 |
+Các điểm kiểm đã chấm lại kho tin bằng `title_context`, `head_tail` và
+`context-chars 400`, neo theo mốc 15:00. Trong cửa sổ 2020–2025 có 12.624 liên kết
+tin--mã được ánh xạ, còn 11 liên kết neo sau mốc cuối cửa sổ bị loại
+(`alignment_report_in_window` của `outputs/forecast_pit_sentiment/forecast_results.json`).
+Độ phủ tin trên bảng mã--phiên là 6.948/14.990 dòng = 46,35%
+(`news_coverage` trong cùng tệp). Nhánh cảm xúc và đối chứng đều dùng đúng cùng
+parquet đã chấm; đối chứng chỉ thay xác suất mỗi bài thành
+`(NEGATIVE=0, NEUTRAL=1, POSITIVE=0)`, nên giữ nguyên thời điểm, số lượng tin và
+cờ có tin.
 
-Ước lượng đóng góp F1 vĩ mô theo năm cửa sổ là $+0{,}0066$ với khoảng 95\%
-`[+0.0011, +0.0128]`; nhưng khoảng lấy mẫu theo 300 ngày là
-`[-0.0087, +0.0116]`. Khoảng theo ngày là căn cứ chính vì các mã cùng ngày được lấy mẫu
-cùng nhau; nó chứa 0, như hai chỉ số còn lại.
+### Hiệu năng của lượt được báo cáo chính thức
 
-**Giới hạn thời điểm:** `labeled_merged.csv` có bài năm 2025, trong khi cửa sổ kiểm thử
-đầu tiên bắt đầu ngày 2024-10-22. Vì vậy điểm kiểm đã học từ văn bản và nhãn tương lai so
-với một phần ngày đánh giá. Phép đối chứng ghép cặp vẫn là đo lường hồi cứu nhất quán giữa
-xác suất thật và prior trung tính, nhưng không là bằng chứng dự báo ngoài mẫu. Cần tinh
-chỉnh lại từng cửa sổ chỉ bằng nhãn quá khứ, hoặc dùng điểm kiểm đóng băng được huấn luyện
-trước ngày kiểm thử đầu tiên, rồi chấm lại và chạy lại phép so sánh.
+Lượt `forecast_merged_sentiment_tft` đánh giá cuốn chiếu năm cửa sổ (train/val/test =
+expanding, test 60 phiên mỗi cửa sổ, ba hạt giống 42–44, nên mỗi ô là trung bình
+15 lần chạy). Bảng dưới là trung bình F1 vĩ mô / độ chính xác cân bằng / độ chính
+xác, đọc từ `outputs/forecast_merged_sentiment_tft/forecast_results.json`
+(khoá `summary`) và `outputs/forecast_merged_control_tft/forecast_results.json`
+cho cột đối chứng trung tính:
+
+| Nhánh | Chỉ giá | Hai nhánh trung tính | Hai nhánh cảm xúc thật |
+| --- | ---: | ---: | ---: |
+| LSTM — F1 vĩ mô | 0.3756 | 0.3790 | 0.3869 |
+| LSTM — độ chính xác cân bằng | 0.3915 | 0.3936 | 0.3953 |
+| LSTM — độ chính xác | 0.4341 | 0.4349 | 0.4244 |
+| TFT — F1 vĩ mô | 0.3619 | 0.3654 | 0.3597 |
+| TFT — độ chính xác cân bằng | 0.3776 | 0.3778 | 0.3733 |
+| TFT — độ chính xác | 0.4123 | 0.4104 | 0.3936 |
+
+Các mốc tham chiếu trong cùng lượt: lớp phổ biến nhất F1 vĩ mô 0.1453; dự đoán
+ngẫu nhiên 0.3289 (mức ngẫu nhiên ba lớp là 0.3333 theo `chance_level`); hồi quy
+logistic chỉ giá 0.3551 và hồi quy logistic giá--cảm xúc 0.3667. Ở lượt point-in-time
+(`outputs/forecast_pit_sentiment/forecast_results.json`), nhánh LSTM giá--cảm xúc đạt
+F1 vĩ mô 0.3883; các nhánh chỉ giá giữ nguyên vì chúng không phụ thuộc điểm kiểm
+cảm xúc.
+
+### Đóng góp thông tin tại ba điểm kiểm cảm xúc
+
+Đóng góp thông tin được định nghĩa là hiệu số F1 vĩ mô giữa nhánh cảm xúc thật và
+nhánh hai nhánh trung tính (cùng kiến trúc, cùng cờ có tin và khối lượng tin).
+Ước lượng điểm là trung bình năm hiệu số theo cửa sổ; khoảng tin cậy 95% theo ngày
+lấy mẫu lặp bên trong từng cửa sổ (300 khối, phân tầng theo cửa sổ). Nguồn: khoá
+`effects.macro_f1` của `information_gain.json` trong từng thư mục lượt:
+
+| Điểm kiểm cảm xúc | Lượt | Đóng góp | KTC 95% theo ngày |
+| --- | --- | ---: | --- |
+| `merged-refit` 1.306 nhãn (hồi cứu) | `forecast_merged_sentiment_tft` | +0.0080 | [-0.0025; +0.0186] |
+| `point-in-time` 1.049 nhãn (ngoài mẫu) | `forecast_pit_sentiment` | +0.0094 | [-0.0009; +0.0196] |
+| `size-matched-s7` 1.049 nhãn (đối chứng) | `forecast_sizematched_s7_sentiment` | +0.0028 | [-0.0074; +0.0133] |
+
+Cả ba khoảng đều chứa 0. Hiệu ứng kiến trúc hai nhánh cộng hiện diện/khối lượng tin
+(trung tính trừ chỉ giá) là +0.0034, chung cho ba lượt vì cùng parquet đặc trưng và
+cùng nhánh chỉ giá. Hiệu số trực tiếp (cảm xúc trừ chỉ giá) ở lượt hồi cứu là
++0.0113; giá trị này trộn lẫn hiệu ứng kiến trúc nên không được báo cáo như đóng
+góp thông tin.
+
+Với nhánh TFT, đóng góp thông tin tương ứng là -0.0057 [-0.0161; +0.0047] ở lượt
+hồi cứu và -0.0105 [-0.0209; +0.0013] ở lượt point-in-time
+(`information_gain_tft.json` của `forecast_merged_sentiment_tft` và
+`forecast_pit_sentiment`).
+
+### Phân tích bổ sung
+
+**Tương quan hạng Spearman của điểm cảm xúc (không qua mô hình, khung thăm dò).**
+Nguồn: `outputs/signal_ic_pit.json` và `outputs/signal_ic_merged.json`. Trên tập
+điểm kiểm point-in-time, tương quan hạng của `sent_pos_minus_neg` với lợi suất
+vượt trội cùng phiên là +0.0233 [+0.0004; +0.0465], còn với lợi suất vượt trội
+phiên kế tiếp là +0.0030 [-0.0207; +0.0269]. IC ở lượt hồi cứu có cùng hướng nhưng
+cả hai khoảng đều chứa 0 (+0.0206 [-0.0015; +0.0432] và +0.0049 [-0.0185; +0.0281]).
+IC gần 0 ở phiên kế tiếp không phải trần thông tin: một phép đo đơn điệu theo hạng
+có thể bằng 0 ngay cả khi tín hiệu dự báo được (ví dụ quan hệ phi tuyến dạng
+`y = x^2` có tương quan hạng bằng 0 nhưng dự báo được hoàn hảo), nên phần này chỉ
+mang tính thăm dò.
+
+**Nhãn lợi suất vượt trội.** Nguồn:
+`outputs/forecast_excess_{merged,pit}_sentiment/{forecast_results,information_gain}.json`.
+Khi nhãn là lợi suất trừ trung bình đồng hạng cùng phiên (`target_mode: excess`),
+mọi nhánh cho F1 vĩ mô thấp hơn so với nhãn thô: LSTM chỉ giá 0.3399 so với 0.3756.
+Đóng góp thông tin là -0.0005 [-0.0091; +0.0080] ở lượt point-in-time và
++0.0031 [-0.0065; +0.0124] ở lượt hồi cứu; cả hai khoảng chứa 0.
+
+**Ablation chân trời.** Nguồn:
+`outputs/forecast_{h3,h5}_pit_sentiment/{forecast_results,information_gain}.json`
+(cùng điểm kiểm point-in-time, `horizon` 3 và 5; h = 1 là lượt `forecast_pit_sentiment`).
+Đóng góp thông tin F1 vĩ mô lần lượt là +0.0094; +0.0134 [+0.0020; +0.0249] và
+-0.0007 [-0.0120; +0.0099] cho h = 1, 3, 5 — không đơn điệu. Ở h > 1 các nhãn chồng
+lấn nên khoảng lấy mẫu lặp theo ngày hẹp hơn mức bằng chứng cho phép; không kết
+luận có hiệu ứng.
+
+**Chẩn đoán kinh tế.** Nguồn: `outputs/forecast_pit_sentiment/backtest_*.json`.
+Chiến lược vào lệnh tại chính giá đóng cửa mà tín hiệu vừa dùng nên chỉ là chẩn
+đoán lý tưởng hoá, không giao dịch được. Nhánh LSTM giá--cảm xúc có Sharpe trước
+phí +3.44, sau phí 20 điểm cơ bản -1.12, phí hòa vốn 15.1 điểm cơ bản, alpha so
+với rổ +0.0025 (t = +3.39); null hoán vị của Sharpe trước phí có trung bình +0.01
+và độ lệch chuẩn 0.88. Mua-và-nắm-giữ rổ đều đạt Sharpe +2.61; 23,2% số phiên
+danh mục chỉ có một chiều. Nhánh LSTM chỉ giá tương ứng: Sharpe trước phí +2.49,
+sau phí -1.05, phí hòa vốn 14.1 điểm cơ bản.
+
+**Giới hạn thời điểm:** `labeled_merged.csv` có bài năm 2025, trong khi cửa sổ kiểm
+thử đầu tiên bắt đầu ngày 2024-10-22. Vì vậy điểm kiểm `merged-refit` đã học từ văn
+bản và nhãn tương lai so với một phần ngày đánh giá, và lượt hồi cứu chỉ là đo
+lường nhất quán giữa xác suất thật và prior trung tính, không phải bằng chứng dự
+báo ngoài mẫu. Bằng chứng ngoài mẫu là lượt `forecast_pit_sentiment` (điểm kiểm
+đóng băng theo `label_cutoff` 2024-10-21) đi kèm đối chứng cùng kích thước
+`forecast_sizematched_s7_sentiment` để tách ảnh hưởng của việc giảm tập huấn luyện.
+
+### Lượt hồi cứu cũ (giữ làm bản ghi lịch sử)
+
+Lượt `forecast_merged_sentiment`/`forecast_merged_control` (chỉ có nhánh LSTM, tiền
+TFT) đã được thay bằng `forecast_merged_sentiment_tft`/`forecast_merged_control_tft`.
+Số liệu cũ của nó — LSTM chỉ giá 0.3797, trung tính 0.3841, cảm xúc thật 0.3907,
+đóng góp +0.0066 — và nhận xét về 6.950 dòng có tin chỉ còn giá trị lịch sử; không
+được dùng trong báo cáo. Các artifact forecast của lượt này có trước lược đồ
+sidecar phiên bản 2 nên không được diễn giải là đã kiểm tra mã băm
+parquet/điểm kiểm bởi sidecar.
 
 ## Thực nghiệm lịch sử trên 306 mẫu
 
@@ -334,19 +440,31 @@ suy luận trên nội dung đầy đủ, đầu vào sẽ dài hơn hẳn miề
 - Các kết luận của artifact 306 mẫu chỉ có giá trị lịch sử; chúng đã được thay bằng lượt
   chấm lại và đối chứng hồi cứu ở đầu tài liệu.
 
-### 7.4. Hạng mục còn lại để đánh giá ngoài mẫu
+### 7.4. Hạng mục đánh giá ngoài mẫu đã hoàn thành
 
-Việc mở rộng nhãn trong miền dữ liệu, tinh chỉnh lại điểm kiểm triển khai, chấm lại kho
-tin và chạy đối chứng đã hoàn thành. Hạng mục còn lại là đánh giá không rò rỉ thời điểm:
-tinh chỉnh lại trong từng cửa sổ chỉ bằng nhãn quá khứ, hoặc đóng băng một điểm kiểm trước
-ngày kiểm thử đầu tiên; sau đó chấm lại kho tin và chạy lại dự báo cùng đối chứng.
+Hạng mục "đánh giá không rò rỉ thời điểm" đã được thực hiện theo phương án đóng
+băng điểm kiểm: `point-in-time` được tinh chỉnh chỉ trên 1.049 nhãn trước phiên
+kiểm thử đầu tiên (`label_cutoff` 2024-10-21), kho tin được chấm lại vào
+`data/processed/news_sentiment_pit.parquet`, và lượt `forecast_pit_sentiment` được
+chạy cùng đối chứng cùng kích thước `forecast_sizematched_s7_sentiment`. Kết quả
+nằm ở bảng ba điểm kiểm ở đầu tài liệu: khoảng tin cậy theo ngày của cả hai lượt
+đều chứa 0, nên chưa có bằng chứng đủ mạnh về đóng góp dương của phân cực cảm xúc.
 
 ## 8. Tệp cần lưu trữ
 
 Để tái kiểm tra kết quả hiện tại, giữ:
 
 - `outputs/sentiment-cv-merged/cv_results.json` và `cv_results.csv`;
-- archive Kaggle chứa năm thư mục `fold-*/best/`;
+- archive Kaggle chứa năm thư mục `fold-*/best/` cho tập 1.306 nhãn
+  (`outputs/merged__title_context__head_tail__inverse_frequency__e5.zip`);
+- ba điểm kiểm triển khai `models/sentiment/{merged-refit,point-in-time,size-matched-s7}/`
+  (archive `outputs/merged-refit.zip`, `outputs/point-in-time.zip`,
+  `outputs/size-matched-s7.zip`) kèm `manifest.json` của mỗi điểm kiểm;
+- các parquet cảm xúc đã chấm `data/processed/news_sentiment_{merged,pit,sizematched_s7}.parquet`
+  và manifest đi kèm;
+- các thư mục lượt `outputs/forecast_*_{sentiment,control}*` cùng
+  `forecast_results.json`, `information_gain*.json`, `backtest_*.json`;
+- `outputs/signal_ic_{pit,merged}.json`;
 - bản notebook đã chạy;
 - mã nguồn ở nhánh có cơ chế lưu checkpoint an toàn;
 - tệp nhãn gốc hoặc mã băm của tệp nhãn.

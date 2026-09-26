@@ -54,8 +54,8 @@ tiên nghiệm trung tính. Kết quả:
 \begin{itemize}[nosep]
   \item hiệu số trực tiếp: $+0{,}0113$ F1 vĩ mô;
   \item trong đó hiệu ứng kiến trúc, sự hiện diện và khối lượng tin: $+0{,}0034$;
-  \item đóng góp thông tin phân cực: $+0{,}0080$ theo cửa sổ; ước lượng theo ngày là
-        $-0{,}0020$, khoảng tin cậy 95\% $[-0{,}0120; +0{,}0081]$.
+  \item đóng góp thông tin phân cực: $+0{,}0080$ theo cửa sổ; khoảng tin cậy 95\%
+        theo ngày $[-0{,}0025; +0{,}0186]$.
 \end{itemize}
 
 Khoảng tin cậy theo ngày chứa 0 ở F1 vĩ mô và độ chính xác cân bằng; riêng độ chính xác
@@ -69,23 +69,61 @@ ngày quan sát kiểm thử đầu tiên (21/10/2024), cùng một điểm ki�
 số nhãn mỗi lớp đó nhưng từ mọi mốc thời gian. Lệnh \texttt{forecast} xác minh mã
 băm bản kê điểm kiểm và cả hai artifact đều ghi \texttt{point\_in\_time: true} với
 lý do \texttt{verified}. Đóng góp thông tin phân cực của LSTM hai nhánh là
-$+0{,}0094$ F1 vĩ mô theo cửa sổ (khoảng tin cậy $[-0{,}0022; +0{,}0243]$) và
-$-0{,}0010$ theo ngày ($[-0{,}0118; +0{,}0093]$); lượt đối chứng cùng kích thước cho
-$+0{,}0028$ theo cửa sổ. Trong lần rút hạt giống 7, điểm kiểm đóng băng cho ước
+$+0{,}0094$ F1 vĩ mô theo cửa sổ, với khoảng tin cậy 95\% theo cửa sổ
+$[-0{,}0022; +0{,}0243]$ và theo ngày $[-0{,}0009; +0{,}0196]$; lượt đối chứng
+cùng kích thước cho $+0{,}0028$ theo cửa sổ, khoảng tin cậy theo ngày
+$[-0{,}0074; +0{,}0133]$. Trong lần rút hạt giống 7, điểm kiểm đóng băng cho ước
 lượng cao hơn đối chứng, nhưng đây là kết quả thăm dò từ một lần rút mẫu duy nhất,
 chưa tách chắc ảnh hưởng thời điểm khỏi thành phần mẫu; mọi khoảng tin cậy theo
 ngày vẫn chứa 0.
 
-Kết luận hiện có, tính cả lượt ngoài mẫu: trên bộ dữ liệu và thiết lập này,
-\textbf{chưa có bằng chứng đủ mạnh rằng cảm xúc tin tài chính tiếng Việt cải thiện
-dự báo xu hướng phiên kế tiếp}. Với TFT, đóng góp thông tin không dương ở bất kỳ
-bộ sinh nào.
+Kết luận hiện có, tính cả lượt ngoài mẫu và các phân tích bổ sung bên dưới: trên
+bộ dữ liệu và thiết lập này, \textbf{chưa có bằng chứng đủ mạnh rằng cảm xúc tin
+tài chính tiếng Việt cải thiện dự báo xu hướng phiên kế tiếp}. Với TFT, đóng góp
+thông tin không dương ở bất kỳ bộ sinh nào.
+
+Ba phân tích bổ sung hướng trực tiếp vào giá trị thông tin --- tương quan hạng
+của tín hiệu không qua mô hình (Mục~\ref{sec:kq-ic}), nhãn lợi suất vượt trội
+(Mục~\ref{sec:kq-excess}) và ablation chân trời dự báo
+(Mục~\ref{sec:kq-horizon}) --- đều không tìm thấy cải thiện có thể tái lập; phân
+tích thứ tư là chẩn đoán kinh tế (Mục~\ref{sec:kq-kinh-te}) phục vụ câu hỏi
+giá trị giao dịch. Mỗi phép có giới hạn riêng cần giữ đúng khi diễn giải. Tương quan
+hạng chỉ bác bỏ liên hệ đơn điệu của một điểm số vô hướng cụ thể ở chân trời một
+phiên, không phải cận trên của khả năng dự báo và không loại trừ quan hệ phi
+tuyến, có điều kiện, một cách đo cảm xúc khác hay một cách tổng hợp khác; phép
+đối chiếu này mang tính thăm dò, chưa được đăng ký trước. Nhãn lợi suất vượt
+trội chỉ cho thấy mọi nhánh đều đạt F1 vĩ mô thấp hơn --- một quan sát về độ khó
+của bài toán gán nhãn thay thế, không phải phân rã phương sai hay nhân quả, và
+vì dùng chung bộ dữ liệu với các phân tích còn lại nên không phải một xác nhận
+độc lập. Ablation chân trời cho hình mẫu không đơn điệu, và ở $h > 1$ các nhãn
+chồng lấn nên khoảng tin cậy hẹp hơn mức bằng chứng cho phép, nên không xác lập
+được sự phụ thuộc của đóng góp cảm xúc vào chân trời. Chẩn đoán kinh tế chỉ là
+cận trên dưới giả định khớp lệnh hoàn hảo: sổ lệnh vào lệnh tại chính giá đóng
+cửa mà tín hiệu vừa sử dụng nên không giao dịch được, $23{,}2\%$ số phiên chỉ có
+lệnh một chiều nên sổ lệnh không trung hòa thị trường, và 300 phiên kiểm thử
+không đủ để tách các mức Sharpe gần nhau.
 
 Mục tiêu thứ sáu là hệ thống demo hoàn chỉnh. Mục tiêu này \textbf{đã hoàn thành một phần}:
 đường dự báo hằng ngày (thu giá, thu tin, chấm cảm xúc, dự báo, đối soát kết quả thực tế)
 chạy qua dòng lệnh và có bản dashboard đọc artifact, phục vụ tín hiệu mới nhất của năm cấu
 hình mô hình cùng lịch sử độ chính xác đã đối soát. Giao diện trực quan đầy đủ cho người
 dùng cuối vẫn là hướng phát triển.
+
+Cần nói rõ giới hạn của phần vận hành này: \textbf{sổ theo dõi trực tuyến hiện chưa có dòng
+dự báo hợp lệ nào}. Một dòng chỉ được tính vào sổ khi nó được phát hành trước phiên khớp
+lệnh mở cửa của phiên mục tiêu; toàn bộ các dòng đã đối soát đến nay đều được đóng dấu sau
+thời điểm đó nên bị xếp là chạy lại và bị loại khỏi thống kê. Nguyên nhân không phải lỗi
+vận hành đơn lẻ mà là ràng buộc của nguồn dữ liệu: nhà cung cấp giá chỉ công bố giá đóng
+cửa của một phiên vào ngày hôm sau, nên quan sát mới nhất tại mọi thời điểm luôn là phiên
+liền trước. Lịch chạy sau giờ đóng cửa vì thế luôn tạo ra các dòng chạy lại. Lịch khả thi
+duy nhất là chạy vào buổi sáng, sau khi giá của phiên liền trước đã được công bố qua đêm và
+trước phiên khớp lệnh mở cửa lúc 09:00; hệ thống hiện cảnh báo ngay tại thời điểm phát hành
+khi một lần chạy không thể được tính là dự báo trước.
+
+Hệ quả cho việc đọc kết quả: phần vận hành chứng minh đường xử lý chạy được đầu--cuối và cơ
+chế đóng dấu phát hành hoạt động đúng, \textbf{không} cung cấp bất kỳ bằng chứng hiệu năng
+trực tuyến nào. Mọi con số hiệu năng trong đồ án đều đến từ đánh giá cuốn chiếu ngoài mẫu ở
+Chương~\ref{ch:ket-qua}, không đến từ vận hành thực tế.
 
 Câu hỏi thứ ba của đề cương --- điều kiện nào cảm xúc phát huy tác dụng --- chưa được trả
 lời bằng ước lượng ghép cặp phân tầng. Đối chứng mới đã kiểm soát sự hiện diện và khối
@@ -157,24 +195,27 @@ hình có cảm xúc, và TFT được chạy như tầng mở rộng sau khi c�
 Đồ án \textbf{đã đưa ra kết quả định lượng cho lượt hồi cứu}. Mô hình dự báo dùng đặc
 trưng giá có điểm cao hơn hai mốc đối chứng bắt buộc; do chưa có kiểm định ghép cặp với
 các mốc này, kết quả chỉ mô tả mức điểm quan sát được. Với đối chứng giữ nguyên kiến
-trúc, thời điểm và số lượng tin, đóng góp thông tin phân cực là $+0{,}0080$ F1 vĩ mô
-theo cửa sổ và $-0{,}0020$ theo ngày, khoảng tin cậy theo ngày $[-0{,}0120; +0{,}0081]$
-chứa 0.
+trúc, thời điểm và số lượng tin, đóng góp thông tin phân cực là $+0{,}0080$ F1
+vĩ mô theo cửa sổ, với khoảng tin cậy theo ngày $[-0{,}0025; +0{,}0186]$ chứa 0.
 
 Tầng TFT được chạy trên đúng giao thức đó và đạt $0{,}3619$ F1 vĩ mô khi chỉ dùng giá,
 thấp hơn $0{,}3756$ của LSTM. Thêm dung lượng và cơ chế chọn biến không đổi được kết
 luận trên quy mô dữ liệu này.
 
-Lượt ngoài mẫu đã được đo và xác minh (\texttt{point\_in\_time: true}): điểm kiểm
-đóng băng trước ngày kiểm thử đầu tiên cho đóng góp thông tin $+0{,}0094$ F1 vĩ mô
-theo cửa sổ và $-0{,}0010$ theo ngày, khoảng tin cậy theo ngày $[-0{,}0118;
-+0{,}0093]$ chứa 0. Điểm kiểm đối chứng khớp kích thước và phân bố lớp (hạt giống
-7, thăm dò) cho $+0{,}0028$ theo cửa sổ --- thấp hơn điểm kiểm đóng băng trong lần
-rút này, nhưng một lần rút mẫu chưa tách chắc ảnh hưởng thời điểm khỏi thành phần mẫu.
+Lượt ngoài mẫu đã được đo và xác minh (\texttt{point\_in\_time: true}): điểm
+kiểm đóng băng trước ngày kiểm thử đầu tiên cho đóng góp thông tin $+0{,}0094$
+F1 vĩ mô theo cửa sổ, với khoảng tin cậy theo ngày $[-0{,}0009; +0{,}0196]$ chứa
+0. Điểm kiểm đối chứng khớp kích thước và phân bố lớp (hạt giống 7, thăm dò)
+cho $+0{,}0028$ theo cửa sổ, khoảng tin cậy theo ngày $[-0{,}0074; +0{,}0133]$
+cũng chứa 0 --- ước lượng điểm thấp hơn điểm kiểm đóng băng trong lần rút này,
+nhưng một lần rút mẫu chưa tách chắc ảnh hưởng thời điểm khỏi thành phần mẫu.
 
 Kết luận trong phạm vi đã đo là: trên 10 mã HOSE giai đoạn 2020--2025 với nguồn tin
 Vietstock và chân trời một phiên, \textbf{chưa có bằng chứng đủ mạnh rằng cảm xúc
-tin tài chính tiếng Việt cải thiện dự báo xu hướng phiên kế tiếp}. Giá trị của đồ án nằm ở chỗ
+tin tài chính tiếng Việt cải thiện dự báo xu hướng phiên kế tiếp}. Bốn phân tích
+bổ sung ở các Mục~\ref{sec:kq-ic}, \ref{sec:kq-excess}, \ref{sec:kq-horizon}
+và~\ref{sec:kq-kinh-te} không nới lỏng phát biểu này, khi giữ đúng các giới hạn
+riêng đã nêu của từng phép. Giá trị của đồ án nằm ở chỗ
 phát biểu này được rút ra từ một quy trình đo có đối chứng ghép cặp giữ nguyên kiến
 trúc và độ phủ tin, có kiểm chứng point-in-time bằng mã băm, và ghi rõ ranh giới
 giữa điều đã đo với điều chưa đo --- thay vì một ước lượng điểm dương báo cáo mà

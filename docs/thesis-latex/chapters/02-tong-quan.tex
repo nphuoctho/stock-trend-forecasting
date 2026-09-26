@@ -36,8 +36,8 @@ thể hiện rõ hướng tác động.
 \subsection{Từ mô hình ngôn ngữ tổng quát đến mô hình miền tài chính}
 
 BERT đặt nền tảng cho hướng tiền huấn luyện một mô hình ngôn ngữ trên lượng văn bản
-lớn trước khi tinh chỉnh cho một nhiệm vụ cụ thể \cite{Devlin2019_bert}. Nhờ cơ chế Transformer và self-
-chú ý, mô hình có thể tạo biểu diễn phụ thuộc vào ngữ cảnh thay vì gán một ý nghĩa
+lớn trước khi tinh chỉnh cho một nhiệm vụ cụ thể \cite{Devlin2019_bert}. Nhờ cơ chế Transformer và tự chú ý,
+mô hình có thể tạo biểu diễn phụ thuộc vào ngữ cảnh thay vì gán một ý nghĩa
 cố định cho từng từ. Khi được tinh chỉnh trên dữ liệu có nhãn, biểu diễn này có thể
 phục vụ phân loại văn bản, nhận dạng thực thể hoặc trích xuất thông tin. Tuy nhiên,
 mô hình ngôn ngữ tổng quát thường được huấn luyện trên nhiều loại văn bản khác nhau,
@@ -124,7 +124,7 @@ sắc thái không thể hiện trong một điểm cảm xúc duy nhất.
 Kết quả được báo cáo của Chen cho thấy biểu diễn ngữ cảnh có thể hỗ trợ dự báo chuyển
 động và công trình còn xem xét giá trị qua mô phỏng giao dịch. Đây là điểm quan trọng
 về mặt phương pháp vì hiệu năng phân loại không phải lúc nào cũng đồng nghĩa với giá
-trị kinh tế. Dù vậy, bộ dữ liệu và môi trường tiếng Anh rất khác với dữ liệu tiếng Việt.
+trị kinh tế. Dù vậy, bộ dữ liệu và môi trường tiếng Anh khác đáng kể so với dữ liệu tiếng Việt.
 Mô phỏng giao dịch còn phụ thuộc vào giả định về thời điểm khớp lệnh, phí giao dịch và
 thanh khoản, nên không được chuyển trực tiếp thành tiêu chí bắt buộc trong mức sàn của
 đề tài. Đối với phạm vi hiện tại, bài này chủ yếu gợi ý cách giữ thông tin ngữ cảnh và
@@ -144,12 +144,12 @@ hướng mở rộng sau khi quy trình cảm xúc cơ bản đã được kiể
 
 Jiang và Zeng (2023) xem xét việc sử dụng FinBERT cho phân tích cảm xúc tài chính
 và áp dụng đầu ra vào dự báo chuyển động cổ phiếu \cite{Jiang2023_230602136v3}.
-Công trình đại diện cho cách tiếp cận từ đầu đến cuối gọn: văn bản tài chính được đưa qua
+Công trình đại diện cho một quy trình gọn từ đầu đến cuối: văn bản tài chính được đưa qua
 FinBERT, kết quả cảm xúc được liên kết với dữ liệu chuyển động và mô hình dự báo
 được đánh giá trên dữ liệu riêng của nghiên cứu. Kết quả công bố củng cố nhận định
 rằng cảm xúc miền tài chính có thể được sử dụng như một nguồn tín hiệu cho bài toán
-dự báo biến động giá cổ phiếu. Tuy nhiên, mô hình, thị trường và ngôn ngữ của công trình không
-phải dữ liệu HOSE. Ngoài ra, việc một mô hình FinBERT phân loại tốt không tự động cho
+cổ phiếu. Tuy nhiên, mô hình, thị trường và ngôn ngữ của công trình không
+tương ứng với dữ liệu HOSE. Ngoài ra, việc một mô hình FinBERT phân loại tốt không tự động cho
 thấy xác suất cảm xúc có giá trị gia tăng sau khi đã biết lịch sử giá. Điểm này cần
 được kiểm tra bằng loại bỏ đặc trưng trong đề tài.
 
@@ -179,7 +179,7 @@ do LLM tạo ra mang lại cho dự báo chuyển động giá \cite{Siala2026_2
 sánh dự báo có tín hiệu cảm xúc với dự báo đối chứng để đo phần thông tin gia tăng.
 Kết quả được công bố trong nghiên cứu mới cho thấy tác động của cảm xúc LLM cần được
 đo trên từng khung dữ liệu và không nên suy rộng thành lợi ích ổn định cho mọi thị
-trường. Hạn chế là đây là một bản thảo tiền công bố rất mới, dữ liệu và giao thức không trùng với
+trường. Hạn chế là đây là một bản thảo tiền công bố mới; dữ liệu và giao thức không trùng với
 đề tài, đồng thời LLM làm tăng yêu cầu về chi phí và khả năng tái lập. Tư tưởng kiểm
 tra phần đóng góp biên của cảm xúc là bài học trực tiếp cho thiết kế loại bỏ đặc trưng của
 đề tài.
@@ -252,14 +252,14 @@ bài viết, mô hình tạo vector:
 trong đó $i$ là mã cổ phiếu, $j$ là bài viết và $t$ là ngày được ánh xạ. Vector này
 giữ lại mức độ không chắc chắn của mô hình. Các vector được tổng hợp cùng số tin,
 độ phân tán, tỷ lệ lớp và cờ có tin theo từng mã và ngày. Nhờ đó, ngày có nhiều tin
-trung tính được phân biệt với ngày không có tin, còn ngày có một bài rất tích cực được
+trung tính được phân biệt với ngày không có tin, còn ngày có một bài tích cực cao được
 phân biệt với ngày có nhiều bài trái chiều.
 
 \section{Dự báo xu hướng giá bằng mô hình chuỗi thời gian}
 \label{sec:tq-timeseries}
 
 Nhánh chuỗi thời gian biểu diễn trạng thái thị trường qua OHLCV, lợi suất và các chỉ
-báo kỹ thuật. Mục tiêu của nhánh này là tạo một đối chứng cơ sở đủ mạnh để kiểm tra cảm xúc
+báo kỹ thuật \cite{Wilder1978_rsi,Appel2005_macd}. Mục tiêu của nhánh này là tạo một đối chứng cơ sở đủ mạnh để kiểm tra cảm xúc
 có thực sự cung cấp thông tin mới hay chỉ lặp lại những gì đã có trong giá. Dữ liệu
 thị trường có thứ tự thời gian và chịu ảnh hưởng của thay đổi chế độ, nên việc đánh
 giá phải bảo toàn quan hệ trước sau. Các nghiên cứu dự báo xu hướng thường bắt đầu bằng
@@ -276,7 +276,7 @@ cần được xem xét lại. Các đối chứng cơ sở này cũng giúp ph�
 quá mạnh hoặc quy tắc tạo nhãn tạo ra một lớp chiếm ưu thế.
 
 Nhóm mô hình cổ điển gồm hồi quy logistic, rừng ngẫu nhiên và XGBoost, chỉ nhận các
-đặc trưng giá và chỉ báo kỹ thuật. hồi quy logistic cung cấp mốc tuyến tính dễ kiểm
+đặc trưng giá và chỉ báo kỹ thuật. Hồi quy logistic cung cấp mốc tuyến tính dễ kiểm
 tra, rừng ngẫu nhiên mô hình hóa các ngưỡng và tương tác phi tuyến, còn XGBoost xây dựng
 nhiều cây tuần tự để giảm sai số. Các mô hình này không trực tiếp đọc thứ tự của toàn
 bộ cửa sổ, nhưng có thể tạo tín hiệu mạnh nếu việc tạo đặc trưng đã tóm tắt đủ
@@ -296,7 +296,7 @@ dùng làm bộ mã hóa chung cho các quy trình kết hợp tin tức và gi�
 
 Điểm mạnh của LSTM là cấu trúc tương đối gọn và phù hợp khi dữ liệu không đủ lớn cho
 một Transformer nhiều tham số. Điểm hạn chế là mô hình xử lý tuần tự, khó xem trực
-tiếp quan hệ giữa các thời điểm rất xa, và có thể nhạy với độ dài cửa sổ cũng như cách
+tiếp quan hệ giữa các thời điểm xa, và có thể nhạy với độ dài cửa sổ cũng như cách
 chuẩn hóa. Do đó, LSTM trong đề tài được dùng như mức sàn thực nghiệm chứ không được
 giả định là mô hình tối ưu.
 
@@ -334,14 +334,14 @@ ghép hai vector ở cuối mạng, hướng này tìm cách mô hình hóa tư�
 nhiều chuỗi hoặc nhiều phương thức trong cùng bộ Transformer. Về mặt ý tưởng, đây là
 một kiến trúc gần với trường hợp kết hợp chuỗi giá, chỉ báo và chuỗi cảm xúc. Kết
 quả được công bố cho thấy Transformer bậc cao có thể hỗ trợ bài toán dự báo biến động giá cổ phiếu trên dữ liệu đa phương thức. Hạn chế là số tham số, yêu cầu tính
-toán và độ phức tạp của việc kiểm soát quá khớp cao hơn mô hình phép nối. Vì vậy, mô hình
+toán và độ phức tạp của việc kiểm soát quá khớp cao hơn mô hình chỉ dùng phép nối. Vì vậy, mô hình
 này phù hợp với hướng phát triển sau khi mức sàn LSTM hai nhánh đã được đánh giá.
 
 Bộ biến đổi hợp nhất theo thời gian, thường gọi là TFT, là một tầng mở rộng kết hợp xử lý
 chuỗi, lựa chọn biến, các khối có cổng và chú ý. Cấu trúc này có thể dùng biến
 tĩnh, biến được biết trước và biến quan sát theo thời gian, đồng thời tạo ra các biểu
 diễn phục vụ dự báo. Nếu áp dụng cho đề tài, TFT phải được cấu hình cho phân loại ba
-lớp, có kích thước đầu ra bằng 3 và dùng hàm mất mát phân loại. tầm quan trọng của biến hoặc chú ý
+lớp, có kích thước đầu ra bằng 3 và dùng hàm mất mát phân loại. Tầm quan trọng của biến hoặc chú ý
 chỉ cho biết mô hình sử dụng biến như thế nào trong một điều kiện cụ thể, không đủ để
 suy ra rằng cảm xúc gây ra biến động giá \cite{Lim2021_tft}.
 
@@ -375,7 +375,7 @@ thời khó tách riêng tác động của tin khỏi tác động của quan h
 DoubleAdapt của Zhao, Kong và Shen (2023) tập trung vào trôi dạt khái niệm trong dữ liệu
 liên tục \cite{Zhao2023_230609862v3}. Phương pháp sử dụng một bộ thích nghi dữ liệu
 để ánh xạ dữ liệu mới về phân phối cục bộ gần ổn định hơn và một bộ thích nghi mô hình
-để khởi tạo tham số phù hợp với giai đoạn mới. Cách học học siêu tham số này hướng đến
+để khởi tạo tham số phù hợp với giai đoạn mới. Cách học siêu tham số này hướng đến
 việc cập nhật mô hình khi quan hệ giữa đặc trưng và xu hướng thay đổi. Kết quả công
 bố cho thấy DoubleAdapt có thể cải thiện dự báo trong bối cảnh phân phối thay đổi so
 với các cách cập nhật thông thường. Hạn chế là thiết kế phức tạp và cần một giao thức
@@ -383,7 +383,7 @@ liên tục rõ ràng. Trong phạm vi đề tài, trôi dạt khái niệm đư
 phân tích, chưa phải thành phần bắt buộc của mức sàn.
 
 MTMD của Wang và cộng sự (2022) sử dụng bộ nhớ thời gian đa quy mô và cơ chế giảm
-thiên lệch cho stock trend forecasting \cite{Wang2022_221208656v2}. Mô hình học các
+thiên lệch cho bài toán dự báo xu hướng cổ phiếu \cite{Wang2022_221208656v2}. Mô hình học các
 biểu diễn bộ nhớ ở nhiều thang thời gian, dùng chú ý để nhận diện điểm tương đồng
 và kết hợp tín hiệu cục bộ với tín hiệu toàn cục thông qua cấu trúc đồ thị. Mục tiêu
 là giữ tính nhất quán theo thời gian và giảm ảnh hưởng của nhiễu. Kết quả của công
@@ -391,12 +391,12 @@ trình cho thấy việc kết hợp bộ nhớ đa quy mô với quan hệ gi�
 các đối chứng cơ sở trước đó trên dữ liệu gốc. Hạn chế là số thành phần lớn, khó tái lập trong
 một đồ án có dữ liệu hạn chế và khó xác định phần cải thiện đến từ bộ nhớ hay đồ thị.
 
-Liu và cộng sự (2025) đề xuất một mạng đồ thị có nhận biết tương lai dựa trên chưng cất mô hình
+Liu và cộng sự (2025) đề xuất DishFT-GNN, một mạng đồ thị có nhận biết tương lai dựa trên chưng cất mô hình
 \cite{Liu2025_250210776v1}. Mô hình giáo viên học tương quan giữa sự dịch chuyển của
 phân phối lịch sử và phân phối tương lai, sau đó truyền thông tin cho mô hình học sinh
 để tạo biểu diễn không gian thời gian có tính dự báo hơn. Hướng này nhằm xử lý việc
 phân phối thị trường thay đổi, một vấn đề thường bị bỏ qua khi chỉ huấn luyện trên một
-phân phối cố định. Kết quả được công bố cho thấy chưng cất mô hình future-aware có thể hỗ
+phân phối cố định. Kết quả được công bố cho thấy chưng cất mô hình có nhận biết tương lai có thể hỗ
 trợ dự báo xu hướng. Hạn chế là cấu trúc giáo viên, học sinh và quan sát tương lai phải
 được thiết kế cẩn thận để không biến thông tin tương lai thành rò rỉ trong huấn luyện.
 
@@ -438,12 +438,12 @@ vị, tổng có trọng số hoặc các thống kê mô tả số lượng tin
 dễ kiểm tra, dễ thực hiện loại bỏ đặc trưng và phù hợp với dữ liệu không quá lớn. Việc lưu
 vector thay vì chỉ lưu nhãn cũng giữ lại mức độ không chắc chắn của bộ phân loại.
 
-Nhược điểm là nhiều bài viết có thể bị nén vào một số trung bình, làm mất thứ tự bài,
+Nhược điểm là nhiều bài viết có thể bị nén thành một giá trị trung bình, làm mất thứ tự bài,
 sự khác nhau về nguồn, độ tin cậy, độ dài và quan hệ giữa sự kiện với trạng thái giá.
 Nếu ngày không có tin được thay bằng vector zero mà không có cờ thiếu dữ liệu, mô hình
 có thể không phân biệt ``không có tin'' với ``có nhiều tin trung tính''. Ngược lại, nếu
 điền giá trị từ tương lai hoặc gom bài sau giờ đóng cửa vào cùng phiên, phép hợp nhất
-có thể tạo rò rỉ.
+có thể tạo ra rò rỉ dữ liệu.
 
 FinBERT-LSTM của Halder và dòng công trình của Gu là ví dụ điển hình của quy trình
 cảm xúc rồi chuỗi thời gian \cite{Halder2022_221107392v1,Gu2024_240716150v1}.
@@ -455,15 +455,15 @@ trên cùng dữ liệu. Việc phân loại cảm xúc tốt cũng không bảo
 \subsection{Hợp nhất bằng biểu diễn ngữ cảnh và sự kiện}
 
 Một hướng khác giữ lại biểu diễn của tiêu đề hoặc bài viết thay vì nén văn bản thành
-một điểm phân cực. Chen sử dụng biểu diễn ngữ cảnh từ BERT cho bài toán biến động giá cổ phiếu
-prediction và cho thấy biểu diễn này có thể chứa thông tin vượt ra ngoài nhãn cảm xúc
+một điểm phân cực. Chen sử dụng biểu diễn ngữ cảnh từ BERT cho bài toán dự báo biến động giá cổ phiếu
+và cho thấy biểu diễn này có thể chứa thông tin vượt ra ngoài nhãn cảm xúc
 \cite{Chen2021_210708721v1}. Khi đưa vào mô hình RNN, biểu diễn có thể giúp mô hình
 phân biệt các câu có cùng sắc thái nhưng nói về các loại sự kiện khác nhau. Đổi lại,
 vector có kích thước lớn, cần nhiều bộ nhớ và có thể mang theo thông tin không liên
 quan đến mục tiêu dự báo.
 
 Hướng giàu hơn là trích xuất sự kiện chi tiết gồm chủ thể, loại sự kiện, hướng tác
-động và thời gian. Chen và cộng sự nghiên cứu việc đưa tín hiệu fine-grained event
+động và thời gian. Chen và cộng sự nghiên cứu việc đưa tín hiệu sự kiện chi tiết
 vào dự báo chuyển động \cite{Chen2019_191005078v1}. Cách này có thể giảm mất mát thông
 tin khi một bài chứa nhiều sự kiện, nhưng đòi hỏi lược đồ, bộ gán nhãn và quy tắc ánh
 xạ sự kiện bổ sung. Một lỗi nhỏ trong việc xác định chủ thể, chẳng hạn nhầm công ty
@@ -477,12 +477,12 @@ giá trị của cảm xúc khỏi câu hỏi phức tạp hơn về biểu di�
 
 \subsection{Hợp nhất động và LLM}
 
-Các nghiên cứu dùng LLM cố gắng giữ lại nhiều ngữ cảnh hơn trong quá trình đọc tin.
+Các nghiên cứu sử dụng LLM nhằm giữ lại nhiều ngữ cảnh hơn khi đọc tin.
 Elahi và Taghvaei kết hợp dữ liệu tài chính với bài viết thông qua LLM, qua đó đặt
 bài toán hợp nhất giữa dữ liệu có cấu trúc và văn bản vào cùng một quy trình
 \cite{Elahi2024_241101368v1}. Lợi thế của hướng này là mô hình có thể đọc điều kiện,
 chủ thể và quan hệ giữa các sự kiện thay vì chỉ đếm từ tích cực hoặc tiêu cực. Hạn
-chế là kết quả phụ thuộc vào model điểm kiểm, câu lệnh, giới hạn ngữ cảnh và thiết kế
+chế là kết quả phụ thuộc vào điểm kiểm mô hình, câu lệnh, giới hạn ngữ cảnh và thiết kế
 đầu ra. Nếu không khóa phiên bản và câu lệnh, cùng một bộ dữ liệu có thể tạo đặc trưng
 khác nhau ở các lần chạy.
 
@@ -495,7 +495,7 @@ kho ngữ liệu tổng hợp từ nhiều website.
 
 Siala và cộng sự đặt trọng tâm vào việc đo tác động thực sự của cảm xúc do LLM tạo
 ra \cite{Siala2026_260200086v3}. Cách tiếp cận này có ý nghĩa đối với đề tài vì một
-LLM có thể tạo văn bản hoặc nhãn rất thuyết phục nhưng chưa chắc cải thiện dự báo ngoài
+LLM có thể tạo văn bản hoặc nhãn có vẻ thuyết phục nhưng chưa chắc cải thiện dự báo ngoài
 mẫu. Đề tài vì vậy không đặt trước giả định PhoBERT hoặc bất kỳ mô hình nền nào luôn làm
 kết quả tốt hơn. Nếu thí nghiệm cho thấy cảm xúc không cải thiện, kết quả vẫn có giá
 trị vì giúp xác định giới hạn của tín hiệu trong dữ liệu và giao thức đã chọn.
@@ -505,11 +505,11 @@ trị vì giúp xác định giới hạn của tín hiệu trong dữ liệu v�
 Có thể chia cơ chế hợp nhất thành ba nhóm:
 
 \begin{enumerate}[nosep]
-  \item Early hợp nhất: chuẩn hóa rồi nối hai nhóm đặc trưng trước bộ mã hóa.
+  \item Hợp nhất sớm (early fusion): chuẩn hóa rồi nối hai nhóm đặc trưng trước bộ mã hóa.
     Cách này đơn giản, ít tầng kết hợp và dễ triển khai, nhưng nhóm có nhiều chiều hoặc
     có thang đo lớn có thể lấn át nhóm còn lại. Nếu nối dữ liệu trước khi căn chỉnh
     thời gian, lỗi mốc thời gian cũng khó phát hiện.
-  \item Late hợp nhất: mỗi nhánh tạo biểu diễn hoặc dự đoán riêng, sau đó một
+  \item Hợp nhất muộn (late fusion): mỗi nhánh tạo biểu diễn hoặc dự đoán riêng, sau đó một
     lớp kết hợp các đầu ra. Cách này tách biệt quy trình xử lý văn bản và giá, thuận
     lợi cho loại bỏ đặc trưng, nhưng có thể bỏ lỡ tương tác chi tiết giữa một tin cụ thể với
     một trạng thái giá cụ thể.
@@ -535,10 +535,10 @@ toàn bộ tín hiệu mà cảm xúc được cho là cung cấp. Vì vậy, ch
 hợp nhất với một mô hình chỉ giá khác cấu hình chưa đủ để kết luận về giá trị của
 văn bản.
 
-Thiết kế của đề tài yêu cầu bốn điều kiện. Thứ nhất, mapping tin theo mốc thời gian phải
+Thiết kế của đề tài yêu cầu bốn điều kiện. Thứ nhất, ánh xạ tin theo mốc thời gian phải
 được kiểm tra, trong đó tin sau giờ đóng cửa, tin cuối tuần và tin ngày nghỉ được ánh
 xạ sang phiên đầu tiên mà nhà đầu tư có thể quan sát. Thứ hai, hai cấu hình loại bỏ đặc trưng
-dùng cùng cửa sổ, hạt giống, preprocessing, ngân sách huấn luyện và tập giữ lại. Thứ ba, chỉ số
+dùng cùng cửa sổ, hạt giống, tiền xử lý, ngân sách huấn luyện và tập giữ lại. Thứ ba, chỉ số
 được tính trên dự đoán ngoài mẫu theo thứ tự thời gian. Thứ tư, chênh lệch được báo
 cáo cùng độ bất định, chẳng hạn khoảng tin cậy lấy mẫu lặp theo khối ngày. Mô phỏng giao
 dịch có thể bổ sung sau, nhưng không thay thế kiểm tra phân loại ngoài mẫu
@@ -610,7 +610,7 @@ giữa hai cấu hình mới là căn cứ phù hợp hơn để đo giá trị 
 Trên cơ sở năm khoảng trống trên, đề tài tập trung xây dựng mô hình phân tích cảm xúc
 tin tức tài chính tiếng Việt bằng PhoBERT, tổng hợp xác suất cảm xúc theo từng mã cổ
 phiếu và ngày giao dịch, sau đó hợp nhất với dữ liệu thị trường trong mô hình học sâu
-dành cho chuỗi thời gian. Quy trình được đánh giá bằng cuốn chiếu theo thời gian xác thực, có mô
+dành cho chuỗi thời gian. Quy trình được đánh giá bằng cuốn chiếu xác thực theo thời gian, có mô
 hình đối chứng và thí nghiệm loại bỏ đặc trưng nhằm xác định tín hiệu cảm xúc có tạo
 ra giá trị bổ sung ổn định hay không.
 
@@ -628,8 +628,7 @@ ra giá trị bổ sung ổn định hay không.
     \cite{Yang2020_200608097v2,Nguyen2020_200300744v3} & Khác ngôn ngữ, miền,
     cách gán nhãn và thời điểm tin & Mô hình nền, tầng tiền xử lý \\
     Chỉ giá LSTM & Mô hình hóa cửa sổ OHLCV và chỉ báo kỹ thuật theo thời gian
-    \cite{Halder2022_221107392v1} & Không kiểm tra giá trị gia tăng của văn bản & Đối chứng cơ sở
-    sâu \\
+\cite{Halder2022_221107392v1} & Không kiểm tra giá trị gia tăng của văn bản & Đối chứng cơ sở học sâu \\
     Transformer dự báo biến động & Cơ chế chú ý cho phụ thuộc thời gian, đa phương thức hoặc
     liên mã \cite{Boyle2023_230503835v1,Omranpour2024_241210540v1} & Phức tạp,
     chưa có bằng chứng trực tiếp trên HOSE & TFT mở rộng \\
@@ -647,11 +646,11 @@ ra giá trị bổ sung ổn định hay không.
 \subsection{Định vị và giả thuyết kiểm chứng}
 
 Đề tài được định vị là một nghiên cứu thực nghiệm đa phương thức cho dữ liệu tiếng
-Việt, không phải cuộc thi tìm kiến trúc mới. Mức sàn gồm đối chứng lớp phổ biến, đối chứng ngẫu nhiên, chỉ giá
-classical, chỉ giá LSTM và LSTM hai nhánh với phép nối. TFT chỉ được chạy sau khi
-mức sàn đã có số liệu, output được cấu hình cho phân loại và tập giữ lại được khóa. Cách
+Việt, không phải cuộc thi tìm kiến trúc mới. Mức sàn gồm đối chứng lớp phổ biến, đối chứng ngẫu nhiên, các mô hình
+cổ điển chỉ giá, LSTM chỉ giá và LSTM hai nhánh với phép nối. TFT chỉ được chạy sau khi
+mức sàn đã có số liệu, đầu ra được cấu hình cho phân loại và tập giữ lại được khóa. Cách
 xếp tầng này giúp tách câu hỏi về chất lượng dữ liệu và đặc trưng khỏi câu hỏi về độ
-phức tạp của mô hình. Adversarial training trong các benchmark chuyển động quốc tế
+phức tạp của mô hình. Huấn luyện đối kháng trong các benchmark chuyển động quốc tế
 cũng cho thấy việc xây dựng đối chứng cơ sở và kiểm tra độ bền quan trọng không kém việc
 thêm tầng mô hình \cite{Feng2018_181009936v2}.
 
