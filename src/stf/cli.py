@@ -1646,9 +1646,16 @@ def cmd_forecast_ic(args: argparse.Namespace) -> int:
             f"[{row['low']:+.4f},{row['high']:+.4f}] {row['one_sided_p_le_zero']:7.3f}"
         )
     cs = report["cross_sectional"]
+    # A single qualifying session leaves the spread undefined; print that rather
+    # than crashing on a None format or inventing a zero.
+    spread = (
+        f"se {cs['standard_error']:.4f}, t {cs['t_statistic']:+.2f}"
+        if cs["standard_error"] is not None
+        else "se undefined (one session)"
+    )
     print(
         f"  cross-sectional daily IC vs {cs['target']}: {cs['mean_ic']:+.4f} "
-        f"(se {cs['standard_error']:.4f}, t {cs['t_statistic']:+.2f}, {cs['sessions']} sessions)"
+        f"({spread}, {cs['sessions']} sessions)"
     )
     print(f"[forecast-ic] -> {output}")
     return 0

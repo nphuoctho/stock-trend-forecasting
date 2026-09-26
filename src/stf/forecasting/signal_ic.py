@@ -179,6 +179,18 @@ def cross_sectional_ic(
     if not per_session:
         raise ValueError("No session had enough names to rank.")
     values = np.asarray([row["ic"] for row in per_session])
+    # A single session has no between-session spread, so its standard error is
+    # undefined rather than zero. Returning None keeps that visible instead of
+    # emitting a NaN t-statistic that reads like a computed result.
+    if values.size < 2:
+        return {
+            "signal": signal,
+            "target": target,
+            "sessions": int(values.size),
+            "mean_ic": float(values.mean()),
+            "standard_error": None,
+            "t_statistic": None,
+        }
     se = float(values.std(ddof=1) / np.sqrt(values.size))
     return {
         "signal": signal,

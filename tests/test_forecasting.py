@@ -19,7 +19,11 @@ from stf.forecasting.backtest import (
     daily_book,
     realized_returns,
 )
-from stf.forecasting.signal_ic import build_return_targets, information_coefficients
+from stf.forecasting.signal_ic import (
+    build_return_targets,
+    cross_sectional_ic,
+    information_coefficients,
+)
 from stf.forecasting.experiment import (
     LADDER,
     ForecastConfig,
@@ -1393,3 +1397,67 @@ def test_information_coefficient_recovers_a_planted_rank_relationship():
     # that target is not asserted: one draw of unrelated noise may exclude zero.
     assert abs(unrelated["ic"]) < 0.15
     assert unrelated["high"] - unrelated["low"] > 0.1
+
+
+def test_cross_sectional_ic_ranks_within_a_session_not_across_sessions():
+    """Per-session ranking must not be contaminated by session-level level shifts.
+
+    Pooling every ticker-day into one correlation lets a few volatile sessions
+    dominate and can hide a signal that is perfect inside each session. The data
+    here is deliberately adversarial: the signal ranks the cross-section exactly
+    on every session, while the session means of signal and return drift in
+    opposite directions, so a pooled correlation would come out negative.
+    """
+    dates = pd.bdate_range("2024-01-02", periods=40)
+    rows, targets = [], []
+    for i, date in enumerate(dates):
+        drift = i * 0.5
+        for rank, ticker in enumerate(("AAA", "BBB", "CCC", "DDD")):
+            rows.append(
+                {
+                    "ticker": ticker,
+                    "observation_date": date,
+                    "has_news": 1,
+                    "sent_pos_minus_neg": rank + drift,
+                }
+            )
+            targets.append(
+                {
+                    "ticker": ticker,
+                    "observation_date": date,
+                    "next_session_excess_return": rank * 0.01 - drift * 0.01,
+                }
+            )
+    panel = pd.DataFrame(rows)
+    target_frame = pd.DataFrame(targets)
+
+    out = cross_sectional_ic(panel, target_frame)
+    assert out["sessions"] == len(dates)
+    assert out["mean_ic"] == pytest.approx(1.0)
+    assert out["standard_error"] == pytest.approx(0.0)
+
+
+def test_cross_sectional_ic_skips_sessions_too_thin_to_rank():
+    """A two-name session carries no rank information worth averaging."""
+    panel = pd.DataFrame(
+        {
+            "ticker": ["AAA", "BBB", "AAA", "BBB", "CCC", "DDD"],
+            "observation_date": pd.to_datetime(
+                ["2024-01-02"] * 2 + ["2024-01-03"] * 4
+            ),
+            "has_news": 1,
+            "sent_pos_minus_neg": [0.1, -0.1, 0.3, 0.1, -0.1, -0.3],
+        }
+    )
+    targets = panel[["ticker", "observation_date"]].copy()
+    targets["next_session_excess_return"] = [0.01, -0.01, 0.03, 0.01, -0.01, -0.03]
+    out = cross_sectional_ic(panel, targets)
+    assert out["sessions"] == 1
+    # One session has no between-session spread; an undefined error must read as
+    # undefined, not as a NaN masquerading as a computed statistic.
+    assert out["standard_error"] is None
+    assert out["t_statistic"] is None
+
+    only_thin = panel[panel["observation_date"] == pd.Timestamp("2024-01-02")]
+    with pytest.raises(ValueError, match="enough names"):
+        cross_sectional_ic(only_thin, targets)
