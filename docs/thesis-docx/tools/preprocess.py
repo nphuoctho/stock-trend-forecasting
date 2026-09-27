@@ -1,8 +1,8 @@
-r"""Flatten thesis-latex into a single pandoc-friendly .tex for docx conversion.
+r"""Prepare the canonical thesis source for pandoc DOCX conversion.
 
-Reads the real source tree (no copy of chapter content), resolves ``\\input``,
-conditionals, custom commands, ``\\eqref``, math labels, tikz figures and
-layout-only commands. Output: ``build/flattened.tex``
+Reads the single complete LaTeX source, removes the two covers that the DOCX
+post-processor recreates, resolves conditionals and adapts unsupported LaTeX
+constructs. Output: ``build/flattened.tex``.
 """
 import re
 import sys
@@ -10,35 +10,25 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2] / "thesis-latex"
 BUILD = Path(__file__).resolve().parents[1] / "build"
+MASTER = ROOT / "BaoCaoDATN.tex"
+AUX = ROOT / "build" / "BaoCaoDATN.aux"
 
 # ---------------------------------------------------------------- aux labels
-aux = (ROOT / "BaoCaoDATN_full.aux").read_text(encoding="utf-8")
+aux = AUX.read_text(encoding="utf-8")
 LABELS = dict(re.findall(r"\\newlabel\{([^}]*)\}\{\{([^}]*)\}", aux))
 
-# ---------------------------------------------------------------- input order
-ORDER = [
-    "frontmatter/02-hoi-dong.tex",
-    "frontmatter/03-loi-cam-on.tex",
-    "frontmatter/04-danh-muc-viet-tat.tex",
-    "frontmatter/05-tom-tat.tex",
-    "frontmatter/05b-abstract.tex",
-    "chapters/01-mo-dau.tex",
-    "chapters/02-tong-quan.tex",
-    "chapters/03-phuong-phap.tex",
-    "chapters/04-ket-qua.tex",
-    "chapters/05-ket-luan.tex",
-    "chapters/06-huong-phat-trien.tex",
-]
+# ---------------------------------------------------------------- canonical body
+master = MASTER.read_text(encoding="utf-8")
+match = re.search(r"\\begin\{document\}(.*?)\\end\{document\}", master, re.S)
+if not match:
+    raise RuntimeError(f"Missing document environment in {MASTER}")
+src = match.group(1)
 
-def read(f):
-    return (ROOT / f).read_text(encoding="utf-8")
-
-parts = [read(f) for f in ORDER]
-# bibliography placeholder + appendix
-bib = r"\printbibliography" + "\n"
-parts.append(bib)
-parts.append("\\appendix\n" + read("chapters/07-phu-luc.tex"))
-src = "\n\n".join(parts)
+# Covers are reconstructed with Word-native layout by postprocess.py.
+src = re.sub(r"\\begin\{titlepage\}.*?\\end\{titlepage\}", "", src,
+             count=2, flags=re.S)
+# TOC/LOF/LOT are inserted as Word fields/lists by the Lua filter.
+src = re.sub(r"\\(?:tableofcontents|listoffigures|listoftables)\b", "", src)
 
 # ---------------------------------------------------------------- macros
 MACROS = {
@@ -173,6 +163,10 @@ REMOVE_CMDS = [
 ]
 for c in REMOVE_CMDS:
     src = re.sub(c, "", src)
+
+# \underline{\hspace{Ncm}} blanks -> dotted fill (template uses dots)
+src = re.sub(r"\\underline\{\\hspace\*?\{[^}]*\}\}",
+             "………………………………", src)
 
 # \vspace{n} -> newline-ish spacing; pandoc drops it anyway, keep blank line
 src = re.sub(r"\\vspace\*?\{[^}]*\}", "\n\n", src)

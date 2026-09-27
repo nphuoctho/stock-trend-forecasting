@@ -7,14 +7,14 @@ Input : build/thesis-raw.docx  (pandoc output; refs land at document end)
 Output: BaoCaoDATN_25410139_NguyenPhuocTho.docx
 
 Steps:
- 1. Insert 2 cover pages (with double page border) before committee page.
+ 1. Insert 2 cover pages using the distinct official BieuMau.docx borders.
  2. Section breaks: covers / front matter (no page numbers) / body
     (page numbering restarts at 1, centered PAGE footer).
  3. Number headings: "Chương N." / "N.M." / appendix "PHỤ LỤC A", "A.1".
  4. Bold "Hình x.y:" / "Bảng x.y:" caption prefixes; build LOF/LOT.
  5. Move bibliography before appendix, add TÀI LIỆU THAM KHẢO heading.
  6. framed-note -> bordered paragraph; tables -> thin borders;
-    Heading1 -> page-break-before.
+    all heading styles -> Times New Roman; Heading1 -> page-break-before.
 """
 import re
 import sys
@@ -28,7 +28,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 IN, OUT = sys.argv[1], sys.argv[2]
-AUX = sys.argv[3] if len(sys.argv) > 3 else "../thesis-latex/BaoCaoDATN_full.aux"
+AUX = sys.argv[3] if len(sys.argv) > 3 else "../thesis-latex/build/BaoCaoDATN.aux"
 LABELS = dict(re.findall(r"\\newlabel\{([^}]*)\}\{\{([^}]*)\}",
                          Path(AUX).read_text(encoding="utf-8")))
 
@@ -64,7 +64,8 @@ def new_p(text="", size=13, bold=False, italic=False, align="center",
         r = OxmlElement("w:r")
         rpr = el("w:rPr")
         rpr.append(el("w:rFonts", ascii="Times New Roman",
-                      hAnsi="Times New Roman", cs="Times New Roman"))
+                      hAnsi="Times New Roman", eastAsia="Times New Roman",
+                      cs="Times New Roman"))
         rpr.append(el("w:sz", val=str(size * 2)))
         if bold:
             rpr.append(el("w:b"))
@@ -78,18 +79,35 @@ def new_p(text="", size=13, bold=False, italic=False, align="center",
     return p
 
 def sect_pr():
+    """A4 body layout from Appendix 2 and the body sections of BieuMau.docx."""
     sp = el("w:sectPr")
     sp.append(el("w:pgSz", w="11906", h="16838"))
-    sp.append(el("w:pgMar", top="1701", right="1134", bottom="1984",
-                 left="1984", header="851", footer="851", gutter="0"))
+    sp.append(el("w:pgMar", top="1701", right="1134", bottom="1985",
+                 left="1985", header="708", footer="708", gutter="0"))
     return sp
 
-def insert_after_first(sect, node):
-    """insert footerReference/pgBorders honoring sectPr schema order:
-    headerReference*, footerReference*, footnotePr, endnotePr, type,
-    pgSz, pgMar, paperSrc, pgBorders, ..."""
-    # simplest: header/footer refs go first, pgBorders right after pgMar
-    pass  # handled inline below
+
+def cover_sect_pr(main_cover):
+    """Cover margins and page-border styles copied from BieuMau.docx."""
+    sp = el("w:sectPr")
+    sp.append(el("w:pgSz", w="11906", h="16838", orient="portrait"))
+    sp.append(el("w:pgMar", top="1135", right="1133", bottom="851",
+                 left="1440", header="708", footer="708", gutter="0"))
+    attrs = {"offsetFrom": "page"}
+    if main_cover:
+        attrs["display"] = "firstPage"
+    borders = el("w:pgBorders", **attrs)
+    for side in ("top", "left", "bottom", "right"):
+        if main_cover:
+            value = "thinThickSmallGap" if side in ("top", "left") \
+                else "thickThinSmallGap"
+            size = "24"
+        else:
+            value, size = "double", "4"
+        borders.append(el(f"w:{side}", val=value, color="auto", sz=size,
+                          space="24"))
+    sp.append(borders)
+    return sp
 
 def make_footer_part(name, field=None):
     xml = (b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -116,6 +134,24 @@ def add_footer_ref(sect, rid):
     fr.set(qn("r:id"), rid)
     sect.insert(0, fr)
 
+
+def make_blank_header_part(name):
+    xml = (b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+           b'<w:hdr xmlns:w="http://schemas.openxmlformats.org/'
+           b'wordprocessingml/2006/main"><w:p/></w:hdr>')
+    return Part(PackURI(f"/word/{name}.xml"),
+                "application/vnd.openxmlformats-officedocument."
+                "wordprocessingml.header+xml",
+                xml, doc.part.package)
+
+
+def add_header_ref(sect, rid):
+    """headerReference must precede footerReference and pgSz in sectPr."""
+    hr = OxmlElement("w:headerReference")
+    hr.set(qn("w:type"), "default")
+    hr.set(qn("r:id"), rid)
+    sect.insert(0, hr)
+
 def sect_break_par(sect):
     p = OxmlElement("w:p")
     ppr = el("w:pPr")
@@ -130,31 +166,47 @@ TITLE_VN = ("Xây dựng hệ thống dự báo xu hướng biến động giá 
 TITLE_EN = ("Building a stock price movement forecasting system based on "
             "financial news sentiment analysis using Transformer and "
             "time-series models")
+def blanks(count):
+    return [new_p("", after=120) for _ in range(count)]
+
+
 def cover(with_advisor):
-    ps = [new_p("", after=400)]
-    ps.append(new_p("ĐẠI HỌC QUỐC GIA TP. HỒ CHÍ MINH", 13, bold=True,
-                    after=120))
-    ps.append(new_p("TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN", 13, bold=True,
-                    after=120))
-    ps.append(new_p("KHOA KHOA HỌC MÁY TÍNH", 13, after=700))
+    first_size = 14 if with_advisor else 15
+    ps = [
+        new_p("ĐẠI HỌC QUỐC GIA TP. HỒ CHÍ MINH", first_size, bold=True,
+              after=120),
+        new_p("TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN", 16, bold=True,
+              after=120),
+        new_p("KHOA KHOA HỌC MÁY TÍNH", 16, bold=True, after=120),
+    ]
+    ps.extend(blanks(2))
     name = "NGUYỄN PHƯỚC THỌ" + (" – 25410139" if with_advisor else "")
-    ps.append(new_p(name, 14, after=1100))
-    ps.append(new_p("ĐỒ ÁN TỐT NGHIỆP", 16, bold=True, after=600))
-    ps.append(new_p(TITLE_VN, 15, bold=True, after=300))
-    ps.append(new_p(TITLE_EN, 13, italic=True, after=1100))
-    ps.append(new_p("CỬ NHÂN NGÀNH TRÍ TUỆ NHÂN TẠO", 14, after=700))
+    ps.append(new_p(name, 14, bold=True, after=120))
+    ps.extend(blanks(2))
+    ps.extend([
+        new_p("ĐỒ ÁN TỐT NGHIỆP", 16, bold=True, after=120),
+        new_p(TITLE_VN, 18, bold=True, after=120),
+        new_p(TITLE_EN, 16, bold=True, after=120),
+    ])
+    ps.extend(blanks(1))
+    ps.append(new_p("CỬ NHÂN NGÀNH TRÍ TUỆ NHÂN TẠO", 14, bold=True,
+                    after=120))
     if with_advisor:
-        ps.append(new_p("GIẢNG VIÊN HƯỚNG DẪN", 13, after=120))
-        ps.append(new_p("TS. Đặng Văn Thìn", 13, after=700))
+        ps.extend(blanks(1))
+        ps.append(new_p("GIẢNG VIÊN HƯỚNG DẪN", 14, bold=True, after=120))
+        ps.append(new_p("TS. Đặng Văn Thìn", 14, bold=True, after=120))
+        ps.extend(blanks(1))
     else:
-        ps.append(new_p("", after=900))
-    ps.append(new_p("TP. HỒ CHÍ MINH, 2026", 13, before=500))
+        ps.extend(blanks(4))
+    ps.append(new_p("TP. HỒ CHÍ MINH, 2026", 13, bold=True, after=120))
     return ps
 
 # footers
 rid_blank = doc.part.relate_to(make_footer_part("footerBlank"), RT.FOOTER)
 rid_page = doc.part.relate_to(make_footer_part("footerPage", field=True),
                               RT.FOOTER)
+rid_header_blank = doc.part.relate_to(
+    make_blank_header_part("headerBlank"), RT.HEADER)
 
 
 def idx_of_text(prefix, start=0):
@@ -165,17 +217,21 @@ def idx_of_text(prefix, start=0):
             return i
     return -1
 
-# section 1 (covers): double page border + blank footer
-sec1 = sect_pr()
-pgb = el("w:pgBorders", offsetFrom="page")
-for side in ("top", "left", "bottom", "right"):
-    pgb.append(el(f"w:{side}", val="double", sz="12", space="24",
-                  color="000000"))
-sec1.append(pgb)            # pgBorders right after pgMar
-add_footer_ref(sec1, rid_blank)  # footerRef hoisted to front by helper
+# Two one-page cover sections reproduce the distinct borders in BieuMau.docx.
+sec_main_cover = cover_sect_pr(main_cover=True)
+add_footer_ref(sec_main_cover, rid_blank)
+add_header_ref(sec_main_cover, rid_header_blank)
+main_cover = cover(False)
+main_cover[-1].find(qn("w:pPr")).append(sec_main_cover)
+
+sec_secondary_cover = cover_sect_pr(main_cover=False)
+add_footer_ref(sec_secondary_cover, rid_blank)
+add_header_ref(sec_secondary_cover, rid_header_blank)
+secondary_cover = cover(True)
+secondary_cover[-1].find(qn("w:pPr")).append(sec_secondary_cover)
 
 first_p = body.find(qn("w:p"))
-for p in cover(False) + cover(True):
+for p in main_cover + secondary_cover:
     first_p.addprevious(p)
 
 children = list(body)
@@ -201,23 +257,33 @@ for c in children:
             ppr = el("w:pPr"); c.insert(0, ppr)
         ppr.append(el("w:jc", val="right"))
 
-# section 1 = covers only: break before MỤC LỤC (border + no footer)
-# section 1 = covers only: break before committee page (border + no footer)
-i_committee = idx_of_text("THÔNG TIN HỘI ĐỒNG")
-children[i_committee].addprevious(sect_break_par(sec1))
+# Front matter: Appendix 2 body margins, no page number.
+sec_front = sect_pr()
+add_footer_ref(sec_front, rid_blank)
+add_header_ref(sec_front, rid_header_blank)
+i_summary = idx_of_text("TÓM TẮT ĐỒ ÁN")
+children[i_summary].addprevious(sect_break_par(sec_front))
 children = list(body)
 
-# section 2 (front matter): blank footer, no border
-sec2 = sect_pr()
-add_footer_ref(sec2, rid_blank)
-i_abstract = idx_of_text("TÓM TẮT ĐỒ ÁN")
-children[i_abstract].addprevious(sect_break_par(sec2))
-children = list(body)
-
-# main section: page numbering restart at 1 + PAGE footer
+# Main section: same body layout; page numbering restarts at the Vietnamese summary.
 main_sect = body.find(qn("w:sectPr"))
+main_pg_sz = main_sect.find(qn("w:pgSz"))
+if main_pg_sz is None:
+    main_pg_sz = el("w:pgSz")
+    main_sect.append(main_pg_sz)
+main_pg_sz.set(qn("w:w"), "11906")
+main_pg_sz.set(qn("w:h"), "16838")
+main_pg_mar = main_sect.find(qn("w:pgMar"))
+if main_pg_mar is None:
+    main_pg_mar = el("w:pgMar")
+    main_sect.append(main_pg_mar)
+for attr, value in {
+    "top": "1701", "right": "1134", "bottom": "1985", "left": "1985",
+    "header": "708", "footer": "708", "gutter": "0",
+}.items():
+    main_pg_mar.set(qn(f"w:{attr}"), value)
 add_footer_ref(main_sect, rid_page)
-# pgNumType after pgMar/pgBorders order-wise; appending is accepted
+add_header_ref(main_sect, rid_header_blank)
 main_sect.append(el("w:pgNumType", start="1"))
 
 # ------------------------------------------------------------- 2. numbering
@@ -398,10 +464,11 @@ for c in children:
     elif in_refs:
         in_refs = False
 
-# drop literal ::: {#refs} marker paragraphs
+# drop literal reference-container marker paragraphs emitted by preprocessing
 for c in list(body.iter(qn("w:p"))):
-    if para_text(c).strip() in (":::", "#refs"):
-        body.remove(c)
+    marker = para_text(c).strip()
+    if marker in (":::", "#refs") or marker.startswith("::: #refs"):
+        c.getparent().remove(c)
 
 if appendix_el is not None and refs_paras:
     h = OxmlElement("w:p")
@@ -428,21 +495,53 @@ for c in body.iter(qn("w:p")):
 
 for tbl in body.iter(qn("w:tbl")):
     tblpr = tbl.find(qn("w:tblPr"))
-    if tblpr is None or tblpr.find(qn("w:tblBorders")) is not None:
-        continue
-    borders = el("w:tblBorders")
-    for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
-        borders.append(el(f"w:{side}", val="single", sz="4", space="0",
-                          color="000000"))
-    tblpr.append(borders)
+    if tblpr is not None and tblpr.find(qn("w:tblBorders")) is None:
+        borders = el("w:tblBorders")
+        for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
+            borders.append(el(f"w:{side}", val="single", sz="4", space="0",
+                              color="000000"))
+        tblpr.append(borders)
+
+    for index, row in enumerate(tbl.findall(qn("w:tr"))):
+        trpr = row.find(qn("w:trPr"))
+        if trpr is None:
+            trpr = el("w:trPr")
+            row.insert(0, trpr)
+        if index == 0 and trpr.find(qn("w:tblHeader")) is None:
+            trpr.append(el("w:tblHeader", val="true"))
+        if trpr.find(qn("w:cantSplit")) is None:
+            trpr.append(el("w:cantSplit"))
+
+def set_run_font(parent, name):
+    rpr = parent.find(qn("w:rPr"))
+    if rpr is None:
+        rpr = el("w:rPr")
+        parent.insert(0, rpr)
+    rfonts = rpr.find(qn("w:rFonts"))
+    if rfonts is None:
+        rfonts = el("w:rFonts")
+        rpr.insert(0, rfonts)
+    for attr in ("ascii", "hAnsi", "eastAsia", "cs"):
+        rfonts.set(qn(f"w:{attr}"), name)
+
 
 for st_el in doc.styles.element.iter(qn("w:style")):
-    if st_el.get(qn("w:styleId")) == "Heading1":
+    style_id = st_el.get(qn("w:styleId"), "")
+    if not re.fullmatch(r"(?:Heading[1-9](?:Char)?|TOCHeading)", style_id):
+        continue
+    set_run_font(st_el, "Times New Roman")
+    if style_id == "Heading1":
         ppr = st_el.find(qn("w:pPr"))
         if ppr is None:
             ppr = el("w:pPr"); st_el.append(ppr)
         if ppr.find(qn("w:pageBreakBefore")) is None:
             ppr.append(el("w:pageBreakBefore"))
+
+for p in body.iter(qn("w:p")):
+    if not re.fullmatch(r"(?:Heading[1-9]|TOCHeading)", style_of(p) or ""):
+        continue
+    for run in p.iter(qn("w:r")):
+        set_run_font(run, "Times New Roman")
 
 doc.save(OUT)
 print("saved", OUT)

@@ -1,71 +1,49 @@
-# Mẫu LaTeX Đồ án tốt nghiệp
+# Báo cáo đồ án tốt nghiệp bằng LaTeX
 
-Template LaTeX cho đồ án, tuân thủ Phụ lục 2 (hình thức trình bày) của trường:
-Times New Roman 13pt, giãn dòng 1.5, lề T3/D3.5/L3.5/P2 cm, đánh số chương/mục,
-tài liệu tham khảo IEEE.
+Nguồn báo cáo tuân thủ Phụ lục 2 về hình thức trình bày: Times New Roman 13 pt,
+giãn dòng 1,5; lề trên 3 cm, dưới 3,5 cm, trái 3,5 cm, phải 2 cm; tài liệu tham
+khảo theo chuẩn IEEE.
 
 ## Cấu trúc
 
+```text
+BaoCaoDATN.tex       nguồn LaTeX hoàn chỉnh và duy nhất
+references.bib       cơ sở dữ liệu tài liệu tham khảo
+latexmkrc            cấu hình đưa toàn bộ kết quả biên dịch vào build/
+build/                PDF, log và các tệp trung gian
 ```
-BaoCaoDATN_full.tex             bản đầy đủ, có sơ đồ
-BaoCaoDATN_progress.tex         bản báo cáo tiến độ
-preamble.tex                    cấu hình font/lề/spacing theo quy định trường
-frontmatter/                    bìa chính, bìa phụ, hội đồng, lời cảm ơn, danh mục, tóm tắt
-chapters/                       các chương của báo cáo
-references.bib                  tài liệu tham khảo (IEEE, biber)
-build/                          file trung gian (chỉ dùng khi build bằng latexmk; xelatex thủ công ghi cạnh .tex)
-BaoCaoDATN_*.pdf                PDF đầu ra, nằm cạnh các file .tex
-```
+
+`BaoCaoDATN.tex` chứa toàn bộ cấu hình trình bày, phần đầu báo cáo, sáu chương,
+tài liệu tham khảo và phụ lục. Không duy trì bản `full`, bản `progress` hoặc các
+tệp chương phân mảnh.
 
 ## Biên dịch
 
-Cần XeLaTeX (font Unicode + tiếng Việt) và biber. Trên máy này không có `latexmk`;
-biên dịch thủ công theo trình tự `xelatex` -> `biber` -> `xelatex` -> `xelatex`
-trên `BaoCaoDATN_full.tex`, chạy từ thư mục `docs/thesis-latex/`:
+Cần XeLaTeX và Biber. Chạy từ `docs/thesis-latex/`:
 
 ```bash
-xelatex BaoCaoDATN_full.tex
-biber BaoCaoDATN_full
-xelatex BaoCaoDATN_full.tex
-xelatex BaoCaoDATN_full.tex
+latexmk -xelatex BaoCaoDATN.tex
 ```
 
-Bản báo cáo tiến độ build tương tự:
+PDF được tạo tại `build/BaoCaoDATN.pdf`. Toàn bộ `.aux`, `.bcf`, `.bbl`, `.toc`,
+`.lof`, `.lot`, `.out`, `.run.xml`, `.blg`, `.log` và các tệp do LaTeX sinh ra
+cũng nằm trong `build/`.
+
+Nếu không có `latexmk`, dùng:
 
 ```bash
-xelatex BaoCaoDATN_progress.tex
-biber BaoCaoDATN_progress
-xelatex BaoCaoDATN_progress.tex
-xelatex BaoCaoDATN_progress.tex
+mkdir -p build
+xelatex -output-directory=build BaoCaoDATN.tex
+biber build/BaoCaoDATN
+xelatex -output-directory=build BaoCaoDATN.tex
+xelatex -output-directory=build BaoCaoDATN.tex
 ```
 
-Các file trung gian (`.aux`, `.bcf`, `.bbl`, `.toc`, `.lof`, `.lot`, `.out`,
-`.run.xml`, `.blg`) nằm ngay cạnh file `.tex` trong `docs/thesis-latex/`; PDF đầu
-ra cũng nằm cạnh file nguồn.
-
-Nếu ở một máy khác có `latexmk`, `latexmkrc` vẫn được giữ để các file trung gian
-nằm trong `build/` còn PDF cuối cùng nằm cạnh file `.tex`:
-
-```bash
-latexmk -xelatex BaoCaoDATN_full.tex
-```
-
-Với `latexmk`, dọn toàn bộ output bằng:
-
-```bash
-latexmk -C BaoCaoDATN_full.tex
-```
-
-Overleaf: upload cả thư mục, chọn compiler XeLaTeX.
-
+Overleaf: tải lên `BaoCaoDATN.tex` và `references.bib`, sau đó chọn XeLaTeX.
 
 ## Lưu ý
 
-- Font: nếu máy không có "Times New Roman", preamble tự fallback sang
-  "Liberation Serif" (metric-compatible). Trên Overleaf có sẵn TNR.
-- Sơ đồ kiến trúc chương 3 đã được vẽ trực tiếp bằng TikZ trong
-  `chapters/03-phuong-phap.tex` (điều kiện `\ifShowDiagram`); file
-  `figures/architecture.png` chỉ là bản xuất tham khảo, không được chèn vào báo cáo.
-- Các bảng kết quả chương 4 (`chapters/04-ket-qua.tex`) đã được điền số liệu thực
-  nghiệm; mọi con số cần truy về artifact trong `outputs/` trước khi sửa.
-
+- Nếu máy không có Times New Roman, cấu hình tự chuyển sang Liberation Serif.
+- Hai sơ đồ trong báo cáo được vẽ trực tiếp bằng TikZ.
+- Các số liệu thực nghiệm trong Chương 4 phải được đối chiếu với artifact tương
+  ứng trong `outputs/` trước khi sửa.

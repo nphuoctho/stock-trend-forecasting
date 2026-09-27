@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Rebuild the thesis docx from the LaTeX sources.
 # Usage: docs/thesis-docx/build.sh
-# Requires: xelatex + pdftoppm (for TikZ figures), uv (python-docx), and
-# pandoc via pypandoc-binary cache (first run: `uvx --from pypandoc-binary
+# Requires: xelatex + pdftoppm (for TikZ figures), uv (python-docx),
+# LibreOffice (to populate document fields), and pandoc via the
+# pypandoc-binary cache (first run: `uvx --from pypandoc-binary
 # python -c "import pypandoc"` to populate the cache).
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -31,7 +32,7 @@ python3 tools/preprocess.py
 # 3. label map for the lua filter
 python3 - <<'PY'
 import re
-aux = open('../thesis-latex/BaoCaoDATN_full.aux').read()
+aux = open('../thesis-latex/build/BaoCaoDATN.aux').read()
 labels = dict(re.findall(r"\\newlabel\{([^}]*)\}\{\{([^}]*)\}", aux))
 with open('build/labelmap.lua', 'w') as f:
     f.write("return {\n")
@@ -63,4 +64,7 @@ cd ..
 # 6. post-process -> final docx
 uv run --with python-docx tools/postprocess.py build/thesis-raw.docx \
    "BaoCaoDATN_25410139_NguyenPhuocTho.docx" \
-   ../thesis-latex/BaoCaoDATN_full.aux
+   ../thesis-latex/build/BaoCaoDATN.aux
+
+# 7. populate TOC/page-reference fields using LibreOffice's layout engine
+python3 tools/update-fields.py "BaoCaoDATN_25410139_NguyenPhuocTho.docx"
