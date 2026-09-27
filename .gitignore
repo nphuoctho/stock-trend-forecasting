@@ -24,3 +24,6 @@ wheels/
 # tracked paths is already the record of what changed; committing a second copy
 # would add ~28 MB of stale numbers that contradict the current ones.
 /outputs/_archive_pre_ci_fix/
+
+# Daily job logs accumulate indefinitely; the two committed samples are enough.
+/logs/daily-*.log

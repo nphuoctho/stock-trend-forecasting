@@ -328,8 +328,9 @@ uv run python -m stf.cli forecast-ic \
   --output outputs/signal_ic_pit.json
 ```
 
-**Nó không chứng minh điều gì.** Hệ số Spearman gần 0 chỉ bác bỏ liên hệ **đơn điệu** của
-**đúng điểm số vô hướng này**. Nó không phải cận trên của khả năng dự báo và không phải
+**Nó không chứng minh điều gì.** Hệ số Spearman gần 0 chỉ cho thấy **chưa phát hiện được
+bằng chứng** về liên hệ **đơn điệu** của **đúng điểm số vô hướng này**, chứ không bác bỏ
+liên hệ đó. Nó không phải cận trên của khả năng dự báo và không phải
 thước đo lượng thông tin: quan hệ $y = x^2$ với $x$ đối xứng dự báo được hoàn hảo nhưng
 tương quan hạng bằng 0. Nó cũng không nói gì về một cách tổng hợp khác, một hiệu ứng có
 điều kiện hay tương tác, một chân trời dài hơn, hay một cách đo cảm xúc tốt hơn. Đọc kết

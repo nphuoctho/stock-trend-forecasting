@@ -10,7 +10,7 @@
 > bên dưới chỉ là bản ghi lịch sử của đường cơ sở và ablation.
 >
 > **Nguồn số liệu hiện tại:** [`../outputs/sentiment-cv-merged/cv_results.json`](../outputs/sentiment-cv-merged/cv_results.json),
-> `outputs/merged-refit.zip`, `outputs/point-in-time.zip`, `outputs/size-matched-s7.zip`,
+> `models/sentiment/{merged-refit,point-in-time,size-matched-s7}/manifest.json`,
 > `outputs/forecast_merged_sentiment_tft/{forecast_results,information_gain,information_gain_tft}.json`,
 > `outputs/forecast_pit_sentiment/{forecast_results,information_gain,information_gain_tft}.json`,
 > `outputs/forecast_sizematched_s7_sentiment/{forecast_results,information_gain}.json`,
@@ -458,8 +458,11 @@ nằm ở bảng ba điểm kiểm ở đầu tài liệu: khoảng tin cậy th
 - archive Kaggle chứa năm thư mục `fold-*/best/` cho tập 1.306 nhãn
   (`outputs/merged__title_context__head_tail__inverse_frequency__e5.zip`);
 - ba điểm kiểm triển khai `models/sentiment/{merged-refit,point-in-time,size-matched-s7}/`
-  (archive `outputs/merged-refit.zip`, `outputs/point-in-time.zip`,
-  `outputs/size-matched-s7.zip`) kèm `manifest.json` của mỗi điểm kiểm;
+  kèm `manifest.json` của mỗi điểm kiểm. Đây là bản có thẩm quyền: mã băm bản kê của
+  chúng (`39d04a04…`, `e53c5cfe…`, `07dbb4c3…`) chính là mã băm được ghi trong
+  `score_manifest` của mọi artifact dự báo. Các tệp ZIP tải về từ Kaggle trước đây đã
+  bị xoá vì hai trong ba bản kê bên trong khác với bản trên đĩa, tức là bản xuất cũ
+  hơn; giữ lại chỉ tạo rủi ro nạp nhầm điểm kiểm;
 - các parquet cảm xúc đã chấm `data/processed/news_sentiment_{merged,pit,sizematched_s7}.parquet`
   và manifest đi kèm;
 - các thư mục lượt `outputs/forecast_*_{sentiment,control}*` cùng

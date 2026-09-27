@@ -7,14 +7,16 @@ it is not contaminated by the choice of architecture.
 
 What it does **not** establish
 ------------------------------
-A Spearman coefficient near zero rules out a *monotone* association between *this
-particular scalar score* and the return. It is not an upper bound on predictability
-and not a measure of information. A perfectly predictable non-monotone relation --
-``y = x**2`` for symmetric ``x`` is the standard counterexample -- has zero rank
-correlation. Nor does it speak to a different aggregation, a conditional or
-interaction effect, a longer horizon, or a better sentiment measurement. Read a null
-here as "no monotone association detected for this score at this horizon", and treat
-it as exploratory: the contrasts below were not pre-registered.
+A Spearman coefficient near zero does not rule out a monotone association between
+*this particular scalar score* and the return; a sample statistic close to zero is
+absence of evidence, not evidence of absence, exactly as it is for the ablation.
+It is also not an upper bound on predictability and not a measure of information.
+A perfectly predictable non-monotone relation -- ``y = x**2`` for symmetric ``x``
+is the standard counterexample -- has zero rank correlation. Nor does it speak to a
+different aggregation, a conditional or interaction effect, a longer horizon, or a
+better sentiment measurement. Read a null here as "no monotone association detected
+for this score at this horizon", and treat it as exploratory: the contrasts below
+were not pre-registered.
 
 Two contrasts are reported:
 
