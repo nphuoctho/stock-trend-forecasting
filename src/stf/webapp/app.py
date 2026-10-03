@@ -104,11 +104,18 @@ def list_runs() -> dict:
         results = _read_json(path / "forecast_results.json")
         provenance = results.get("provenance") or {}
         news = _normalize_news_sentiment(provenance.get("news_sentiment") or {})
+        config = results.get("config") or {}
         runs.append(
             {
                 "name": name,
                 "panel_rows": results.get("panel_rows"),
                 "mode": news.get("mode"),
+                # Runs differ in what they predict, not just in their news source.
+                # Without these two fields an excess-return or multi-session run is
+                # indistinguishable from the headline next-session run in the list.
+                "target_mode": config.get("target_mode", "raw"),
+                "horizon": config.get("horizon", 1),
+                "point_in_time": news.get("point_in_time"),
                 "date_start": provenance.get("date_start"),
                 "date_end": provenance.get("date_end"),
                 "has_information_gain": (path / "information_gain.json").is_file(),

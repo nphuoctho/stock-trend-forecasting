@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 # Daily forecast job: refresh prices + news, score new articles, predict, resolve.
 #
-# Schedule after the HOSE close (15:00 ICT), e.g. cron:
-#   30 15 * * 1-5  /path/to/stock-trend-forecasting/scripts/daily-forecast.sh
+# SCHEDULE IT IN THE MORNING, NOT AFTER THE CLOSE.
 #
+# The price provider publishes a session's close only on the following day, so at
+# 15:30 on day D the freshest close available is still D-1 and the job would be
+# "predicting" a session that has already traded. Running before the 09:00 ICT
+# opening auction uses the overnight publication of D-1 and targets D, which has
+# not moved yet -- the only arrangement that produces a prospective forecast:
+#   0 8 * * 1-5  /path/to/stock-trend-forecasting/scripts/daily-forecast.sh
+#
+# `forecast-predict` warns when an issuance cannot count as prospective, and
+# `forecast-resolve` reports the prospective/replayed split of every run.
 # Required env:
 #   SENTIMENT_MODEL   checkpoint dir (default: models/sentiment/merged-refit/best)
 #   SCORED_NEWS       score-news parquet (default: data/processed/news_sentiment_merged.parquet)

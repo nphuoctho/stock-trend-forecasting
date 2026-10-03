@@ -93,10 +93,10 @@ def test_resolve_scores_older_observation(panel, tmp_path):
 
 
 def test_resolve_marks_only_stamped_predictions_as_prospective(panel, tmp_path):
-    """The live track record counts only rows provably issued before the session.
+    """The live track record counts only rows issued before the target session opens.
 
-    A prediction written today for yesterday's observation is a replay, not a
-    forecast; mixing it into the accuracy figure would fabricate a live record.
+    A prediction written after the target has traded is a replay; mixing it into
+    the accuracy figure would fabricate a live record.
     """
     cfg = ForecastConfig(val_size=10, seeds=(42,))
     refit_arm(panel, "logreg_price", cfg=cfg, output_dir=tmp_path / "arm")
@@ -106,21 +106,55 @@ def test_resolve_marks_only_stamped_predictions_as_prospective(panel, tmp_path):
     past_panel = panel[panel["observation_date"] <= cutoff]
     predictions = predict_latest(past_panel, arm)
 
-    # Issued now, for an observation whose target already traded: a replay.
+    # Issued now, long after the target session traded: a replay.
     predictions["issued_at"] = pd.Timestamp.now(tz="UTC").isoformat()
     resolved = resolve_predictions(predictions, panel, arm.thresholds)
     assert not resolved["prospective"].any()
 
-    # Issued on the observation date itself: genuinely prospective.
+    # Issued on the observation date itself: prospective, and same-session.
     obs = pd.to_datetime(predictions["observation_date"]).max()
-    predictions["issued_at"] = (obs - pd.Timedelta(hours=1)).isoformat()
+    predictions["issued_at"] = (obs - pd.Timedelta(hours=1)).tz_localize(
+        "Asia/Ho_Chi_Minh"
+    ).isoformat()
     resolved = resolve_predictions(predictions, panel, arm.thresholds)
     assert resolved["prospective"].all()
+    assert resolved["issued_same_session"].all()
 
     # Files written before issuance stamping existed never count as live.
     del predictions["issued_at"]
     resolved = resolve_predictions(predictions, panel, arm.thresholds)
     assert not resolved["prospective"].any()
+
+
+def test_resolve_accepts_a_forecast_issued_before_the_target_opens(panel, tmp_path):
+    """The reachable protocol: publish overnight, issue before the 09:00 auction.
+
+    The price feed only publishes a session's close on the following day, so the
+    freshest observation is always yesterday's. Requiring the stamp to land on the
+    observation date would make a prospective forecast impossible to produce. What
+    matters for the audit is that the target session had not opened yet.
+    """
+    cfg = ForecastConfig(val_size=10, seeds=(42,))
+    refit_arm(panel, "logreg_price", cfg=cfg, output_dir=tmp_path / "arm")
+    arm = load_arm(tmp_path / "arm")
+
+    cutoff = panel["observation_date"].sort_values().unique()[-2]
+    predictions = predict_latest(panel[panel["observation_date"] <= cutoff], arm)
+    resolved = resolve_predictions(predictions, panel, arm.thresholds)
+    target = pd.to_datetime(resolved["target_date"]).max()
+
+    for hour, expected in ((8, True), (9, False), (15, False)):
+        stamped = predictions.copy()
+        stamped["issued_at"] = (
+            (target + pd.Timedelta(hours=hour))
+            .tz_localize("Asia/Ho_Chi_Minh")
+            .isoformat()
+        )
+        out = resolve_predictions(stamped, panel, arm.thresholds)
+        assert out["prospective"].all() == expected, hour
+        # Issued the morning after the observation session: never same-session,
+        # yet still a legitimate forecast when it beats the opening auction.
+        assert not out["issued_same_session"].any()
 
 
 
