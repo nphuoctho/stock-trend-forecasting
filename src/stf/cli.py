@@ -725,7 +725,6 @@ def cmd_openapi(args: argparse.Namespace) -> int:
     return 0
 
 
-
 def _forecast_smoke_prices(n: int) -> pd.DataFrame:
     dates = pd.bdate_range("2024-01-02", periods=n)
     close = pd.Series(
