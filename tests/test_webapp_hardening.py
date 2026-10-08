@@ -6,11 +6,13 @@ uv run pytest tests/test_webapp_hardening.py -q
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from pathlib import Path
 
 import pandas as pd
 import pytest
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 
@@ -398,7 +400,27 @@ def test_cors_and_security_headers_reach_429_so_the_portal_can_read_it(outputs):
     assert limited.headers["x-content-type-options"] == "nosniff"
 
 
-# --- SSE limits (test-only /api/events route; the real one ships separately) ----
+# --- SSE limits (a stand-in /api/events route replaces the real one) --------------
+# These tests are about the middleware, so they swap the real stream (which tails
+# the event log until the client leaves) for one whose length the test controls.
+# The real route is exercised in tests/test_events_stream.py.
+
+
+class NoEventsService:
+    """Takes the place of ``EventsService`` so the app has no /api/events route."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        self.router = APIRouter()
+
+    @contextlib.asynccontextmanager
+    async def lifespan(self, app):
+        yield
+
+
+def app_without_events_route(env: dict[str, str] | None = None):
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(webapp_module, "EventsService", NoEventsService)
+        return webapp_module.create_app({"STF_RATE_LIMIT": "100000", **(env or {})})
 
 
 def add_events_route(application) -> None:
@@ -414,7 +436,7 @@ def add_events_route(application) -> None:
 
 
 def events_app(env: dict[str, str] | None = None):
-    application = webapp_module.create_app({"STF_RATE_LIMIT": "100000", **(env or {})})
+    application = app_without_events_route(env)
     add_events_route(application)
     return application
 
@@ -524,12 +546,8 @@ def test_slot_is_freed_when_the_client_disconnects(outputs):
 
 
 def test_slot_is_freed_when_the_stream_handler_raises(outputs):
-    application = webapp_module.create_app(
-        {
-            "STF_RATE_LIMIT": "100000",
-            "STF_EVENTS_MAX_PER_IP": "1",
-            "STF_EVENTS_CONNECT_PER_MINUTE": "10",
-        }
+    application = app_without_events_route(
+        {"STF_EVENTS_MAX_PER_IP": "1", "STF_EVENTS_CONNECT_PER_MINUTE": "10"}
     )
 
     @application.get("/api/events")
@@ -718,10 +736,11 @@ def test_committed_openapi_is_current(tmp_path):
 
 def test_every_endpoint_documents_a_response_schema_and_its_errors():
     document = json.loads(webapp_module.render_openapi())
+    # /api/events is a text/event-stream; its contract is tested in test_events_stream.
     api_paths = {
         path: item
         for path, item in document["paths"].items()
-        if path.startswith("/api/")
+        if path.startswith("/api/") and path != "/api/events"
     }
     assert len(api_paths) == 10
 

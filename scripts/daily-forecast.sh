@@ -18,6 +18,8 @@
 #
 # Every run appends to logs/daily-YYYYMMDD.log and writes its outcome to
 # outputs/live/last_run.json, which the dashboard reads via /api/live/status.
+# Newly persisted signals, scored news and the job outcome are also appended to
+# outputs/live/events.jsonl, which the API streams from /api/events.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -30,22 +32,34 @@ mkdir -p logs outputs/live
 exec > >(tee -a "logs/daily-${TODAY}.log") 2>&1
 
 STEP="init"
+# Appends every committed-but-unlogged event (signals, scored news, job status) to
+# outputs/live/events.jsonl. The event log is derived from the artifacts, so this
+# is idempotent and safe to run at any time; a failure here never fails the job.
+reconcile_events() {
+  uv run python -m stf.cli events-reconcile \
+    || echo "[daily] warning: events-reconcile failed (rc=$?)" >&2
+}
+
+# Writes last_run.json and logs the matching job.status event.
 write_status() {
   local rc="$1"
   STEP="$STEP" RC="$rc" uv run python - <<'PY'
-import json, os
-from datetime import datetime, timezone
-status = {
-    "finished_at": datetime.now(timezone.utc).isoformat(),
-    "ok": os.environ["RC"] == "0",
-    "exit_code": int(os.environ["RC"]),
-    "failed_step": None if os.environ["RC"] == "0" else os.environ["STEP"],
-}
-with open("outputs/live/last_run.json", "w", encoding="utf-8") as fh:
-    json.dump(status, fh, ensure_ascii=False, indent=2)
+import os
+
+from stf import events
+
+rc = int(os.environ["RC"])
+events.record_last_run(
+    exit_code=rc, failed_step=None if rc == 0 else os.environ["STEP"]
+)
 PY
 }
-trap 'rc=$?; write_status "$rc"; exit $rc' EXIT
+# trap EXIT is only the fast path: SIGKILL, power loss or killing the process
+# group skips it, so the next run (and the API) reconcile from the artifacts too.
+trap 'rc=$?; write_status "$rc"; reconcile_events; exit $rc' EXIT
+
+# Recover events a previous run persisted but never got to log.
+reconcile_events
 
 echo "[daily] $(date -Is) fetching prices"
 STEP="prices"

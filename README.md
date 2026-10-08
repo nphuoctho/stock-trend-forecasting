@@ -397,12 +397,14 @@ with an `/api` proxy.
 
 ### Exposing the API publicly
 
-The API is read-only and has no authentication. It is meant to run on a local
-machine behind a Cloudflare Tunnel (`cloudflared` connects from loopback) and to
-be called from a separately hosted portal, so the process itself enforces CORS,
-per-IP rate limiting and a few hardening measures. Everything is configured
-through environment variables read at startup; a malformed value stops the
-server with an error instead of silently loosening a limit.
+The API serves read-only artifacts (its one write is the `outputs/live/events.jsonl`
+index, see [Live events](#live-events-get-apievents)) and has no authentication.
+It is meant to run on a local machine behind a Cloudflare Tunnel (`cloudflared`
+connects from loopback) and to be called from a separately hosted portal, so the
+process itself enforces CORS, per-IP rate limiting and a few hardening measures.
+Everything is configured through environment variables read at startup; a
+malformed value stops the server with an error instead of silently loosening a
+limit.
 
 | Variable | Default | Meaning | Recommended in production |
 | --- | --- | --- | --- |
@@ -410,8 +412,10 @@ server with an error instead of silently loosening a limit.
 | `STF_CORS_ORIGIN_REGEX` | unset | Regex an `Origin` must match **in full** (`re.fullmatch`, so a suffix or prefix cannot slip through). For Vercel previews. Write literal dots as `[.]`, not `\.`: systemd's `EnvironmentFile` strips backslashes. | `https://stf-portal-[a-z0-9-]+[.]vercel[.]app`, or unset |
 | `STF_RATE_LIMIT` | `120` | Requests per window per client IP; `0` disables. Over the limit: `429` with `Retry-After`. | `120` |
 | `STF_RATE_LIMIT_WINDOW` | `60` | Window length in seconds. | `60` |
-| `STF_EVENTS_CONNECT_PER_MINUTE` | `6` | Extra per-IP limit on new `/api/events` stream handshakes (`429` + `Retry-After` = seconds until a token frees). Applies once the `/api/events` stream endpoint ships; the API does not serve that route yet. | `6` |
-| `STF_EVENTS_MAX_PER_IP` | `3` | Extra per-IP cap on concurrent `/api/events` streams (`429` + `Retry-After: 30`). The slot is freed when the stream ends, the client disconnects or the server shuts down. Applies once the `/api/events` stream endpoint ships. | `3` |
+| `STF_EVENTS_CONNECT_PER_MINUTE` | `6` | Extra per-IP limit on new `/api/events` stream handshakes (`429` + `Retry-After` = seconds until a token frees). A rejected handshake is answered before the event log is read, so it never receives replayed events. | `6` |
+| `STF_EVENTS_MAX_PER_IP` | `3` | Extra per-IP cap on concurrent `/api/events` streams (`429` + `Retry-After: 30`). The slot is freed when the stream ends, the client disconnects or the server shuts down. | `3` |
+| `STF_EVENTS_MAX_STREAMS` | `50` | Global cap on concurrent `/api/events` streams across all clients; beyond it `503` + `Retry-After: 5`. Positive integer. | `50` |
+| `STF_EVENTS_RECONCILE_SECONDS` | `300` | Period, in seconds, of the API's own `events-reconcile` pass (it also runs once at startup). Positive number. | `300` |
 | `STF_TRUST_CF_HEADERS` | unset | Default: the client is the connection peer after uvicorn's `X-Forwarded-For` handling, which is honoured only from loopback. `1`: a valid `CF-Connecting-IP` takes precedence. Only set behind the Tunnel: anyone who can reach the port directly could spoof the header. | `1` with the Tunnel, and bind `--host 127.0.0.1` |
 | `STF_ALLOWED_HOSTS` | unset (any `Host`) | Comma-separated `Host` allow-list (`api.example.com`, `*.example.com`); others get `400`. | the public API hostname |
 
@@ -581,6 +585,50 @@ The dashboard exposes the results at `/api/live/latest` (per-arm signals for the
 newest session), `/api/live/history` (prospective vs replayed resolved rows,
 pending count, per-date accuracy over prospective rows only), and
 `/api/live/status` (last job outcome plus each arm's data-through date).
+
+### Live events (`GET /api/events`)
+
+The API pushes new signals and news over Server-Sent Events. "Real time" means the
+moment the daily job *persists* a result, not a new crawler: there is no extra
+producer process. `outputs/live/events.jsonl` (append-only JSONL, gitignored) is an
+index derived from the files under `outputs/live/`, which stay the source of truth:
+
+| `event:` | Emitted when | `data` payload |
+| --- | --- | --- |
+| `signal.issued` | `forecast-predict` persists a dated prediction file (one per arm per observation date) | `arm`, `observation_date` (the forecast targets the next session), `n_predictions`, `issued_at` |
+| `news.ingested` | `score-news --incremental` scored at least one new article | `count`, `total_scored`, `by_ticker` |
+| `job.status` | `daily-forecast.sh` finishes (written with `last_run.json`) | `ok`, `exit_code`, `failed_step`, `finished_at` |
+| `reset` | the client's `Last-Event-ID` cannot be served (never logged) | `reason`, `head_id` |
+
+Every frame carries `id: <log id>` and `event: <type>`, and `data:` is the whole
+JSON event. A client that reconnects with `Last-Event-ID` (header, or
+`?last_event_id=` where headers cannot be set) receives exactly the events it
+missed, then the live tail; a client without one starts at the head. On `reset` the
+client must refetch `/api/live/*` and continue from the `id` of the reset frame.
+`: ping` comments every 15 s keep Cloudflare from closing an idle stream; the
+stream ends promptly on SIGINT/SIGTERM. Opening streams is limited per client
+(`STF_EVENTS_CONNECT_PER_MINUTE`, `STF_EVENTS_MAX_PER_IP`: `429`, answered before
+the log is read) and globally (`STF_EVENTS_MAX_STREAMS`: `503`); all four
+`STF_EVENTS_*` variables are in the table under [Exposing the API
+publicly](#exposing-the-api-publicly).
+
+```bash
+curl -N -H 'Last-Event-ID: 0' http://127.0.0.1:8000/api/events
+```
+
+An event is appended only for a newly persisted result, and each has a
+deterministic key (`signal.issued`: arm + observation date + sha256 of the file;
+`news.ingested`: digest of the batch's article URLs; `job.status`: `finished_at`),
+so appending a known key is a no-op. Because a crash (SIGKILL, power loss) can land
+between persisting a file and appending its event, `uv run python -m stf.cli
+events-reconcile` re-derives every committed-but-unlogged event from the artifacts.
+It runs at the start and in the exit trap of `daily-forecast.sh`, at API startup, and
+every `STF_EVENTS_RECONCILE_SECONDS` (default 300) inside the API. It is idempotent
+and invents nothing. `score-news --incremental` keeps a write-ahead ledger
+(`outputs/live/news_batches.jsonl`) because scored news carries no timestamps to
+re-derive a batch from. Do not delete `events.jsonl` while clients are connected:
+ids restart at 1 when it is rebuilt.
+
 
 
 ## Expanding the sentiment label set

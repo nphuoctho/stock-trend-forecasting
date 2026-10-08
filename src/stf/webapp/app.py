@@ -1,8 +1,9 @@
 """FastAPI surface exposing forecast experiment artifacts.
 
-The API is read-only: every endpoint derives from files under ``outputs/`` and
-never mutates them. Run directories are discovered by the presence of
-``forecast_results.json``.
+The API never rewrites the artifacts it serves: every endpoint derives from files
+under ``outputs/``. The one thing it writes is ``outputs/live/events.jsonl``, the
+event index that ``stf.events.reconcile`` re-derives from those files. Run
+directories are discovered by the presence of ``forecast_results.json``.
 
 It is meant to be public (behind a Cloudflare Tunnel), so :func:`create_app`
 layers the hardening from :mod:`stf.webapp.security` on top of the routes and
@@ -29,6 +30,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from stf import config
 from stf.webapp import schemas
+from stf.webapp.events_api import EventsService, EventsSettings
 from stf.webapp.security import (
     CORS_ALLOWED_METHODS,
     CORS_EXPOSED_HEADERS,
@@ -565,16 +567,21 @@ def create_app(env: Mapping[str, str] | None = None) -> FastAPI:
     500s so the browser portal can read them, and preflights are never rate
     counted.
     """
-    settings = SecuritySettings.from_env(os.environ if env is None else env)
+    environ = os.environ if env is None else env
+    settings = SecuritySettings.from_env(environ)
+    events_service = EventsService(_live_dir, EventsSettings.from_env(environ))
     application = FastAPI(
         title=API_TITLE,
         version=API_VERSION,
         description=(
-            "Read-only forecast artifacts: experiment runs and live daily predictions."
+            "Forecast artifacts (experiment runs and live daily predictions) and "
+            "a Server-Sent Events stream announcing newly persisted signals and news."
         ),
         docs_url="/api/docs",
+        lifespan=events_service.lifespan,
     )
     application.include_router(router)
+    application.include_router(events_service.router)
     mount_frontend(application)
 
     application.add_middleware(
