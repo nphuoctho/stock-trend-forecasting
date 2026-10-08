@@ -407,7 +407,7 @@ server with an error instead of silently loosening a limit.
 | Variable | Default | Meaning | Recommended in production |
 | --- | --- | --- | --- |
 | `STF_CORS_ORIGINS` | unset | Comma-separated exact origins allowed cross-origin (`https://portal.example.com`). `*` is rejected. | the portal's production origin |
-| `STF_CORS_ORIGIN_REGEX` | unset | Regex an `Origin` must match **in full** (`re.fullmatch`, so a suffix or prefix cannot slip through). For Vercel previews. | `https://stf-portal-[a-z0-9-]+\.vercel\.app`, or unset |
+| `STF_CORS_ORIGIN_REGEX` | unset | Regex an `Origin` must match **in full** (`re.fullmatch`, so a suffix or prefix cannot slip through). For Vercel previews. Write literal dots as `[.]`, not `\.`: systemd's `EnvironmentFile` strips backslashes. | `https://stf-portal-[a-z0-9-]+[.]vercel[.]app`, or unset |
 | `STF_RATE_LIMIT` | `120` | Requests per window per client IP; `0` disables. Over the limit: `429` with `Retry-After`. | `120` |
 | `STF_RATE_LIMIT_WINDOW` | `60` | Window length in seconds. | `60` |
 | `STF_EVENTS_CONNECT_PER_MINUTE` | `6` | Extra per-IP limit on new `/api/events` stream handshakes (`429` + `Retry-After` = seconds until a token frees). Applies once the `/api/events` stream endpoint ships; the API does not serve that route yet. | `6` |
@@ -462,7 +462,8 @@ cat > ~/.config/stf/api.env <<'EOF'
 # Exact portal origin allowed cross-origin.
 STF_CORS_ORIGINS=https://<PORTAL_HOST>
 # Vercel previews; must match the whole Origin (replace <scope>).
-STF_CORS_ORIGIN_REGEX=^https://stf-portal-[a-z0-9-]+-<scope>\.vercel\.app$
+# Dots are written [.] because systemd's EnvironmentFile strips backslashes.
+STF_CORS_ORIGIN_REGEX=^https://stf-portal-[a-z0-9-]+-<scope>[.]vercel[.]app$
 # Requests per window per client IP (0 disables) and window length in seconds.
 STF_RATE_LIMIT=120
 STF_RATE_LIMIT_WINDOW=60
