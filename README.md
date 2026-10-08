@@ -448,6 +448,58 @@ Regenerate it after changing an endpoint or model (a test fails while it is stal
 uv run python -m stf.cli openapi --output openapi.json   # omit --output for stdout
 ```
 
+### Running the public API
+
+Run the API permanently as a systemd user unit behind a Cloudflare Tunnel. Settings
+come from `~/.config/stf/api.env` (read by the unit; the file is optional). The
+variables are described in the [table above](#exposing-the-api-publicly). Replace
+`<API_HOST>` (for example `stf-api.nptlabs.io.vn`) and `<PORTAL_HOST>` with your
+hostnames:
+
+```bash
+mkdir -p ~/.config/stf
+cat > ~/.config/stf/api.env <<'EOF'
+# Exact portal origin allowed cross-origin.
+STF_CORS_ORIGINS=https://<PORTAL_HOST>
+# Vercel previews; must match the whole Origin (replace <scope>).
+STF_CORS_ORIGIN_REGEX=^https://stf-portal-[a-z0-9-]+-<scope>\.vercel\.app$
+# Requests per window per client IP (0 disables) and window length in seconds.
+STF_RATE_LIMIT=120
+STF_RATE_LIMIT_WINDOW=60
+# Per-IP limits for /api/events streams: new handshakes per minute, concurrent streams.
+STF_EVENTS_CONNECT_PER_MINUTE=6
+STF_EVENTS_MAX_PER_IP=3
+# Take the client IP from CF-Connecting-IP (only safe behind the Tunnel, bound to 127.0.0.1).
+STF_TRUST_CF_HEADERS=1
+# Host header allow-list.
+STF_ALLOWED_HOSTS=<API_HOST>,127.0.0.1,localhost
+EOF
+```
+
+Install, same as `stf-daily-forecast.*`:
+
+```bash
+cp scripts/systemd/stf-api.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now stf-api.service
+curl -s http://127.0.0.1:8000/api/live/status    # confirm it answers
+journalctl --user -u stf-api.service             # logs
+```
+
+Restart after pulling new code: `systemctl --user restart stf-api.service`.
+
+Tunnel: map `<API_HOST>` to `http://localhost:8000`.
+
+- Dashboard-managed (token) tunnel: Zero Trust -> Networks -> Tunnels -> the
+  tunnel -> Public Hostname -> add `<API_HOST>` with service `http://localhost:8000`.
+- Locally configured tunnel: add an ingress entry `hostname: <API_HOST>`,
+  `service: http://localhost:8000` above the `http_status:404` catch-all, run
+  `cloudflared tunnel route dns <tunnel> <API_HOST>`, then restart `cloudflared`.
+
+Once the tunnel is up, do the one-time rate-limit check described above: two
+distinct clients must get separate budgets. A single shared budget means
+`X-Forwarded-For` is not forwarded; keep `STF_TRUST_CF_HEADERS=1`.
+
 ## Phase 6: daily prediction (live serving)
 
 The walk-forward experiment discards every trained model; `forecast-refit` freezes one
