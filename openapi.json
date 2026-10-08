@@ -1,0 +1,2287 @@
+{
+  "components": {
+    "schemas": {
+      "AblationMetric": {
+        "additionalProperties": true,
+        "properties": {
+          "date_block_bootstrap": {
+            "$ref": "#/components/schemas/BootstrapCI"
+          },
+          "per_window": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Per Window",
+            "type": "array"
+          },
+          "window_bootstrap": {
+            "$ref": "#/components/schemas/BootstrapCI"
+          }
+        },
+        "required": [
+          "per_window",
+          "window_bootstrap",
+          "date_block_bootstrap"
+        ],
+        "title": "AblationMetric",
+        "type": "object"
+      },
+      "BootstrapCI": {
+        "additionalProperties": true,
+        "properties": {
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean"
+          },
+          "n_blocks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Blocks"
+          },
+          "n_window_strata": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Window Strata"
+          },
+          "one_sided_p_le_zero": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "One Sided P Le Zero"
+          }
+        },
+        "required": [
+          "mean",
+          "low",
+          "high"
+        ],
+        "title": "BootstrapCI",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "FlatBand": {
+        "additionalProperties": true,
+        "properties": {
+          "high": {
+            "title": "High",
+            "type": "number"
+          },
+          "low": {
+            "title": "Low",
+            "type": "number"
+          }
+        },
+        "required": [
+          "low",
+          "high"
+        ],
+        "title": "FlatBand",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "InformationGain": {
+        "additionalProperties": true,
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "effects": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/InformationGainEffect"
+            },
+            "title": "Effects",
+            "type": "object"
+          },
+          "price_arm": {
+            "title": "Price Arm",
+            "type": "string"
+          }
+        },
+        "required": [
+          "arm",
+          "price_arm",
+          "effects"
+        ],
+        "title": "InformationGain",
+        "type": "object"
+      },
+      "InformationGainEffect": {
+        "additionalProperties": true,
+        "properties": {
+          "architecture_and_news_presence_volume_effect": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Architecture And News Presence Volume Effect"
+          },
+          "information_gain": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Information Gain"
+          },
+          "information_gain_date_bootstrap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BootstrapCI"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "information_gain_per_window": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Information Gain Per Window"
+          },
+          "information_gain_window_bootstrap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BootstrapCI"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "naive_delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Naive Delta"
+          },
+          "price_only": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Only"
+          },
+          "two_branch_neutral_prior": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Two Branch Neutral Prior"
+          },
+          "two_branch_real_sentiment": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Two Branch Real Sentiment"
+          }
+        },
+        "title": "InformationGainEffect",
+        "type": "object"
+      },
+      "LastRun": {
+        "additionalProperties": true,
+        "properties": {
+          "exit_code": {
+            "title": "Exit Code",
+            "type": "integer"
+          },
+          "failed_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Step"
+          },
+          "finished_at": {
+            "title": "Finished At",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "finished_at",
+          "ok",
+          "exit_code",
+          "failed_step"
+        ],
+        "title": "LastRun",
+        "type": "object"
+      },
+      "LiveArmHistory": {
+        "additionalProperties": true,
+        "properties": {
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "by_date": {
+            "items": {
+              "$ref": "#/components/schemas/LiveDateAccuracy"
+            },
+            "title": "By Date",
+            "type": "array"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "prospective_resolved": {
+            "title": "Prospective Resolved",
+            "type": "integer"
+          },
+          "replayed_resolved": {
+            "title": "Replayed Resolved",
+            "type": "integer"
+          },
+          "resolved": {
+            "title": "Resolved",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "arm",
+          "total",
+          "resolved",
+          "prospective_resolved",
+          "replayed_resolved",
+          "pending",
+          "accuracy",
+          "by_date"
+        ],
+        "title": "LiveArmHistory",
+        "type": "object"
+      },
+      "LiveArmLatest": {
+        "additionalProperties": true,
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "observation_date": {
+            "title": "Observation Date",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/LivePrediction"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "arm",
+          "observation_date",
+          "rows"
+        ],
+        "title": "LiveArmLatest",
+        "type": "object"
+      },
+      "LiveArmStatus": {
+        "additionalProperties": true,
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "issued_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued At"
+          },
+          "observation_date": {
+            "title": "Observation Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "arm",
+          "observation_date",
+          "issued_at"
+        ],
+        "title": "LiveArmStatus",
+        "type": "object"
+      },
+      "LiveDateAccuracy": {
+        "additionalProperties": true,
+        "properties": {
+          "accuracy": {
+            "title": "Accuracy",
+            "type": "number"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "target_date": {
+            "title": "Target Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_date",
+          "n",
+          "accuracy"
+        ],
+        "title": "LiveDateAccuracy",
+        "type": "object"
+      },
+      "LiveHistoryResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "arms": {
+            "items": {
+              "$ref": "#/components/schemas/LiveArmHistory"
+            },
+            "title": "Arms",
+            "type": "array"
+          }
+        },
+        "required": [
+          "arms"
+        ],
+        "title": "LiveHistoryResponse",
+        "type": "object"
+      },
+      "LiveLatestResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "arms": {
+            "items": {
+              "$ref": "#/components/schemas/LiveArmLatest"
+            },
+            "title": "Arms",
+            "type": "array"
+          }
+        },
+        "required": [
+          "arms"
+        ],
+        "title": "LiveLatestResponse",
+        "type": "object"
+      },
+      "LivePrediction": {
+        "additionalProperties": true,
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "has_news": {
+            "title": "Has News",
+            "type": "integer"
+          },
+          "observation_date": {
+            "title": "Observation Date",
+            "type": "string"
+          },
+          "prob_down": {
+            "title": "Prob Down",
+            "type": "number"
+          },
+          "prob_flat": {
+            "title": "Prob Flat",
+            "type": "number"
+          },
+          "prob_up": {
+            "title": "Prob Up",
+            "type": "number"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "y_pred": {
+            "title": "Y Pred",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "observation_date",
+          "has_news",
+          "prob_down",
+          "prob_flat",
+          "prob_up",
+          "y_pred",
+          "arm"
+        ],
+        "title": "LivePrediction",
+        "type": "object"
+      },
+      "LiveStatusResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "arms": {
+            "items": {
+              "$ref": "#/components/schemas/LiveArmStatus"
+            },
+            "title": "Arms",
+            "type": "array"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastRun"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "last_run",
+          "arms"
+        ],
+        "title": "LiveStatusResponse",
+        "type": "object"
+      },
+      "LiveTodayNews": {
+        "additionalProperties": true,
+        "properties": {
+          "prob_negative": {
+            "title": "Prob Negative",
+            "type": "number"
+          },
+          "prob_neutral": {
+            "title": "Prob Neutral",
+            "type": "number"
+          },
+          "prob_positive": {
+            "title": "Prob Positive",
+            "type": "number"
+          },
+          "published_at": {
+            "title": "Published At",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "url",
+          "published_at",
+          "prob_negative",
+          "prob_neutral",
+          "prob_positive"
+        ],
+        "title": "LiveTodayNews",
+        "type": "object"
+      },
+      "LiveTodayResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "issued_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued At"
+          },
+          "observation_date": {
+            "title": "Observation Date",
+            "type": "string"
+          },
+          "tickers": {
+            "items": {
+              "$ref": "#/components/schemas/LiveTodayTicker"
+            },
+            "title": "Tickers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "arm",
+          "observation_date",
+          "issued_at",
+          "tickers"
+        ],
+        "title": "LiveTodayResponse",
+        "type": "object"
+      },
+      "LiveTodayTicker": {
+        "additionalProperties": true,
+        "properties": {
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "flat_band": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlatBand"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "has_news": {
+            "title": "Has News",
+            "type": "boolean"
+          },
+          "last_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Close"
+          },
+          "news": {
+            "items": {
+              "$ref": "#/components/schemas/LiveTodayNews"
+            },
+            "title": "News",
+            "type": "array"
+          },
+          "prob_down": {
+            "title": "Prob Down",
+            "type": "number"
+          },
+          "prob_flat": {
+            "title": "Prob Flat",
+            "type": "number"
+          },
+          "prob_up": {
+            "title": "Prob Up",
+            "type": "number"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "y_pred": {
+            "enum": [
+              "UP",
+              "FLAT",
+              "DOWN"
+            ],
+            "title": "Y Pred",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "y_pred",
+          "confidence",
+          "prob_down",
+          "prob_flat",
+          "prob_up",
+          "has_news",
+          "last_close",
+          "flat_band",
+          "stale",
+          "news"
+        ],
+        "title": "LiveTodayTicker",
+        "type": "object"
+      },
+      "MeanStd": {
+        "additionalProperties": true,
+        "properties": {
+          "mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "std": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Std"
+          }
+        },
+        "required": [
+          "mean",
+          "std",
+          "n"
+        ],
+        "title": "MeanStd",
+        "type": "object"
+      },
+      "MetricsResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/MetricsRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows"
+        ],
+        "title": "MetricsResponse",
+        "type": "object"
+      },
+      "MetricsRow": {
+        "additionalProperties": true,
+        "description": "One arm's metric row; the metric columns vary by pipeline version.",
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          }
+        },
+        "required": [
+          "arm"
+        ],
+        "title": "MetricsRow",
+        "type": "object"
+      },
+      "NewsCoverage": {
+        "additionalProperties": true,
+        "properties": {
+          "fraction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fraction"
+          },
+          "panel_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panel Rows"
+          },
+          "rows_with_news": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows With News"
+          }
+        },
+        "title": "NewsCoverage",
+        "type": "object"
+      },
+      "NewsSentimentProvenance": {
+        "additionalProperties": true,
+        "properties": {
+          "feature_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feature Hash"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "real",
+                  "neutral_prior"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
+          },
+          "source_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Hash"
+          },
+          "source_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Path"
+          }
+        },
+        "title": "NewsSentimentProvenance",
+        "type": "object"
+      },
+      "NewsStrata": {
+        "additionalProperties": true,
+        "properties": {
+          "has_news": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StratumStat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "no_news": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StratumStat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "NewsStrata",
+        "type": "object"
+      },
+      "Prediction": {
+        "additionalProperties": true,
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "has_news": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Has News"
+          },
+          "observation_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observation Date"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Date"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "window": {
+            "title": "Window",
+            "type": "integer"
+          },
+          "y_pred": {
+            "title": "Y Pred",
+            "type": "string"
+          },
+          "y_true": {
+            "title": "Y True",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "window",
+          "arm",
+          "y_true",
+          "y_pred"
+        ],
+        "title": "Prediction",
+        "type": "object"
+      },
+      "PredictionsResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/Prediction"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "rows"
+        ],
+        "title": "PredictionsResponse",
+        "type": "object"
+      },
+      "Provenance": {
+        "additionalProperties": true,
+        "properties": {
+          "alignment_report": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignment Report"
+          },
+          "alignment_report_in_window": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignment Report In Window"
+          },
+          "date_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date End"
+          },
+          "date_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Start"
+          },
+          "news_coverage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NewsCoverage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "news_sentiment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NewsSentimentProvenance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "panel_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panel End"
+          },
+          "panel_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panel Hash"
+          },
+          "panel_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panel Start"
+          },
+          "prices_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prices Hash"
+          },
+          "session_cutoff": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Cutoff"
+          },
+          "tickers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tickers"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          }
+        },
+        "title": "Provenance",
+        "type": "object"
+      },
+      "RunInfo": {
+        "additionalProperties": true,
+        "properties": {
+          "date_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date End"
+          },
+          "date_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Start"
+          },
+          "has_information_gain": {
+            "title": "Has Information Gain",
+            "type": "boolean"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "real",
+                  "neutral_prior"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "panel_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panel Rows"
+          }
+        },
+        "required": [
+          "name",
+          "panel_rows",
+          "mode",
+          "date_start",
+          "date_end",
+          "has_information_gain"
+        ],
+        "title": "RunInfo",
+        "type": "object"
+      },
+      "RunSummary": {
+        "additionalProperties": true,
+        "properties": {
+          "ablation": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/AblationMetric"
+                  },
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ablation"
+          },
+          "chance_level": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chance Level"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "environment": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "panel_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panel Rows"
+          },
+          "panel_tickers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panel Tickers"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Provenance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stratified_by_news": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/NewsStrata"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stratified By News"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/MeanStd"
+                  },
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          }
+        },
+        "required": [
+          "name",
+          "config",
+          "chance_level",
+          "panel_rows",
+          "panel_tickers",
+          "summary",
+          "ablation",
+          "stratified_by_news",
+          "environment",
+          "provenance"
+        ],
+        "title": "RunSummary",
+        "type": "object"
+      },
+      "RunsResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/RunInfo"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "runs"
+        ],
+        "title": "RunsResponse",
+        "type": "object"
+      },
+      "StratifiedResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/StratifiedRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows"
+        ],
+        "title": "StratifiedResponse",
+        "type": "object"
+      },
+      "StratifiedRow": {
+        "additionalProperties": true,
+        "properties": {
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "balanced_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Balanced Accuracy"
+          },
+          "macro_f1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Macro F1"
+          },
+          "n": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "stratum": {
+            "title": "Stratum",
+            "type": "string"
+          },
+          "window": {
+            "title": "Window",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "window",
+          "arm",
+          "stratum"
+        ],
+        "title": "StratifiedRow",
+        "type": "object"
+      },
+      "StratumStat": {
+        "additionalProperties": true,
+        "properties": {
+          "accuracy_mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy Mean"
+          },
+          "balanced_accuracy_mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Balanced Accuracy Mean"
+          },
+          "macro_f1_mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Macro F1 Mean"
+          },
+          "n_mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Mean"
+          }
+        },
+        "title": "StratumStat",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Read-only forecast artifacts: experiment runs and live daily predictions.",
+    "title": "stock-trend-forecasting",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/live/history": {
+      "get": {
+        "description": "Resolved predictions with realized labels and per-date accuracy, per arm.",
+        "operationId": "live_history_api_live_history_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveHistoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No resolved predictions yet."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded; see the Retry-After header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Live History"
+      }
+    },
+    "/api/live/latest": {
+      "get": {
+        "description": "Latest per-ticker predictions produced by ``forecast-predict``, per arm.",
+        "operationId": "live_latest_api_live_latest_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveLatestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No live predictions have been issued yet."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded; see the Retry-After header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Live Latest"
+      }
+    },
+    "/api/live/status": {
+      "get": {
+        "description": "Freshness of the daily job and of each arm's latest issued prediction.",
+        "operationId": "live_status_api_live_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded; see the Retry-After header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Live Status"
+      }
+    },
+    "/api/live/today": {
+      "get": {
+        "description": "User-facing view: next-session call per ticker with related news.\n\nJoins the primary arm's latest issued predictions with the last close, the\nissued class boundaries (terciles of all labeled historical returns -- NOT a\npredicted price interval; magnitude forecasting is not implemented), and the\narticles that fed the sentiment features. The articles are context the model\nread, not proven causes: no attribution method is applied.",
+        "operationId": "live_today_api_live_today_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveTodayResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No live predictions have been issued yet."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded; see the Retry-After header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Live Today"
+      }
+    },
+    "/api/runs": {
+      "get": {
+        "description": "List forecast run directories with headline provenance.",
+        "operationId": "list_runs_api_runs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded; see the Retry-After header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List forecast runs"
+      }
+    },
+    "/api/runs/{name}/information-gain": {
+      "get": {
+        "description": "Paired decomposition of the sentiment contribution for one run.",
+        "operationId": "run_information_gain_api_runs__name__information_gain_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InformationGain"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown run, or the run has no information_gain.json."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded; see the Retry-After header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Run Information Gain"
+      }
+    },
+    "/api/runs/{name}/metrics": {
+      "get": {
+        "description": "Per-arm metric table with bootstrap intervals.",
+        "operationId": "run_metrics_api_runs__name__metrics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown run, or the run has no forecast_metrics.csv."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded; see the Retry-After header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Run Metrics"
+      }
+    },
+    "/api/runs/{name}/predictions": {
+      "get": {
+        "description": "Paginated per-row predictions, filterable by arm/ticker/window.",
+        "operationId": "run_predictions_api_runs__name__predictions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "arm",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Arm"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticker",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "in": "query",
+            "name": "window",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Window"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 5000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 1000000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown run, or the run has no forecast_predictions.csv."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded; see the Retry-After header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Run Predictions"
+      }
+    },
+    "/api/runs/{name}/stratified": {
+      "get": {
+        "description": "Per-window metrics split by news presence.",
+        "operationId": "run_stratified_api_runs__name__stratified_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StratifiedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown run, or the run has no forecast_stratified.csv."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded; see the Retry-After header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Run Stratified"
+      }
+    },
+    "/api/runs/{name}/summary": {
+      "get": {
+        "description": "Config, per-arm summary metrics, ablation and stratified aggregates.",
+        "operationId": "run_summary_api_runs__name__summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown run."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate limit exceeded; see the Retry-After header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Run Summary"
+      }
+    }
+  }
+}

@@ -1,28 +1,77 @@
-"""FastAPI surface exposing forecast experiment artifacts to the dashboard.
+"""FastAPI surface exposing forecast experiment artifacts.
 
 The API is read-only: every endpoint derives from files under ``outputs/`` and
 never mutates them. Run directories are discovered by the presence of
 ``forecast_results.json``.
+
+It is meant to be public (behind a Cloudflare Tunnel), so :func:`create_app`
+layers the hardening from :mod:`stf.webapp.security` on top of the routes and
+every endpoint declares a Pydantic response model (:mod:`stf.webapp.schemas`),
+which is what ``/openapi.json`` and the committed ``openapi.json`` describe.
 """
 
 from __future__ import annotations
 
 import json
+import os
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, FastAPI, HTTPException, Query
+from fastapi import Path as PathParam
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from stf import config
+from stf.webapp import schemas
+from stf.webapp.security import (
+    CORS_ALLOWED_METHODS,
+    CORS_EXPOSED_HEADERS,
+    ErrorGuardMiddleware,
+    EventsLimitMiddleware,
+    RateLimitMiddleware,
+    SecurityHeadersMiddleware,
+    SecuritySettings,
+    TokenBucketLimiter,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WEB_DIST = REPO_ROOT / "web" / "dist"
 
-app = FastAPI(title="stock-trend-forecasting", docs_url="/api/docs")
+API_TITLE = "stock-trend-forecasting"
+API_VERSION = "1.0.0"
+
+# Upper bounds on caller-controlled query/path parameters.
+MAX_NAME_LENGTH = 128
+MAX_FILTER_LENGTH = 64
+MAX_PAGE_SIZE = 5000
+MAX_OFFSET = 1_000_000
+MAX_WINDOW = 1000
+
+router = APIRouter(
+    responses={
+        429: {
+            "model": schemas.ErrorResponse,
+            "description": "Rate limit exceeded; see the Retry-After header (seconds).",
+            "headers": {"Retry-After": {"schema": {"type": "integer"}}},
+        }
+    }
+)
+
+# Every handler builds exactly the JSON it returns, so the response models are
+# applied with exclude_unset: a key an artifact does not carry is not invented.
+_MODELED = {"response_model_exclude_unset": True}
+
+
+def _not_found(description: str) -> dict:
+    return {404: {"model": schemas.ErrorResponse, "description": description}}
+
+
+RunName = Annotated[str, PathParam(max_length=MAX_NAME_LENGTH)]
 
 
 def _outputs_root() -> Path:
@@ -96,8 +145,13 @@ def _normalize_information_gain(payload: dict) -> dict:
 
 
 
-@app.get("/api/runs")
-def list_runs() -> dict:
+@router.get(
+    "/api/runs",
+    response_model=schemas.RunsResponse,
+    summary="List forecast runs",
+    **_MODELED,
+)
+def list_runs() -> dict[str, Any]:
     """List forecast run directories with headline provenance."""
     runs = []
     for name, path in _run_dirs().items():
@@ -117,8 +171,13 @@ def list_runs() -> dict:
     return {"runs": runs}
 
 
-@app.get("/api/runs/{name}/summary")
-def run_summary(name: str) -> dict:
+@router.get(
+    "/api/runs/{name}/summary",
+    response_model=schemas.RunSummary,
+    responses=_not_found("Unknown run."),
+    **_MODELED,
+)
+def run_summary(name: RunName) -> dict[str, Any]:
     """Config, per-arm summary metrics, ablation and stratified aggregates."""
     results = _read_json(_run_dir(name) / "forecast_results.json")
     provenance = results.get("provenance") or {}
@@ -141,21 +200,31 @@ def run_summary(name: str) -> dict:
     }
 
 
-@app.get("/api/runs/{name}/metrics")
-def run_metrics(name: str) -> dict:
+@router.get(
+    "/api/runs/{name}/metrics",
+    response_model=schemas.MetricsResponse,
+    responses=_not_found("Unknown run, or the run has no forecast_metrics.csv."),
+    **_MODELED,
+)
+def run_metrics(name: RunName) -> dict[str, Any]:
     """Per-arm metric table with bootstrap intervals."""
     return {"rows": _read_csv_records(_run_dir(name) / "forecast_metrics.csv")}
 
 
-@app.get("/api/runs/{name}/predictions")
+@router.get(
+    "/api/runs/{name}/predictions",
+    response_model=schemas.PredictionsResponse,
+    responses=_not_found("Unknown run, or the run has no forecast_predictions.csv."),
+    **_MODELED,
+)
 def run_predictions(
-    name: str,
-    arm: str | None = Query(default=None),
-    ticker: str | None = Query(default=None),
-    window: int | None = Query(default=None),
-    limit: int = Query(default=500, ge=1, le=5000),
-    offset: int = Query(default=0, ge=0),
-) -> dict:
+    name: RunName,
+    arm: str | None = Query(default=None, max_length=MAX_FILTER_LENGTH),
+    ticker: str | None = Query(default=None, max_length=MAX_FILTER_LENGTH),
+    window: int | None = Query(default=None, ge=0, le=MAX_WINDOW),
+    limit: int = Query(default=500, ge=1, le=MAX_PAGE_SIZE),
+    offset: int = Query(default=0, ge=0, le=MAX_OFFSET),
+) -> dict[str, Any]:
     """Paginated per-row predictions, filterable by arm/ticker/window."""
     rows = _read_csv_records(_run_dir(name) / "forecast_predictions.csv")
     if arm is not None:
@@ -167,14 +236,24 @@ def run_predictions(
     return {"total": len(rows), "rows": rows[offset : offset + limit]}
 
 
-@app.get("/api/runs/{name}/stratified")
-def run_stratified(name: str) -> dict:
+@router.get(
+    "/api/runs/{name}/stratified",
+    response_model=schemas.StratifiedResponse,
+    responses=_not_found("Unknown run, or the run has no forecast_stratified.csv."),
+    **_MODELED,
+)
+def run_stratified(name: RunName) -> dict[str, Any]:
     """Per-window metrics split by news presence."""
     return {"rows": _read_csv_records(_run_dir(name) / "forecast_stratified.csv")}
 
 
-@app.get("/api/runs/{name}/information-gain")
-def run_information_gain(name: str) -> dict:
+@router.get(
+    "/api/runs/{name}/information-gain",
+    response_model=schemas.InformationGain,
+    responses=_not_found("Unknown run, or the run has no information_gain.json."),
+    **_MODELED,
+)
+def run_information_gain(name: RunName) -> dict[str, Any]:
     """Paired decomposition of the sentiment contribution for one run."""
     path = _run_dir(name) / "information_gain.json"
     if not path.is_file():
@@ -197,8 +276,13 @@ def _live_arm_dirs() -> dict[str, Path]:
     }
 
 
-@app.get("/api/live/latest")
-def live_latest() -> dict:
+@router.get(
+    "/api/live/latest",
+    response_model=schemas.LiveLatestResponse,
+    responses=_not_found("No live predictions have been issued yet."),
+    **_MODELED,
+)
+def live_latest() -> dict[str, Any]:
     """Latest per-ticker predictions produced by ``forecast-predict``, per arm."""
     arms = []
     for name, path in _live_arm_dirs().items():
@@ -217,8 +301,13 @@ def live_latest() -> dict:
     return {"arms": arms}
 
 
-@app.get("/api/live/history")
-def live_history() -> dict:
+@router.get(
+    "/api/live/history",
+    response_model=schemas.LiveHistoryResponse,
+    responses=_not_found("No resolved predictions yet."),
+    **_MODELED,
+)
+def live_history() -> dict[str, Any]:
     """Resolved predictions with realized labels and per-date accuracy, per arm."""
     arms = []
     for name, path in _live_arm_dirs().items():
@@ -267,8 +356,12 @@ def live_history() -> dict:
     return {"arms": arms}
 
 
-@app.get("/api/live/status")
-def live_status() -> dict:
+@router.get(
+    "/api/live/status",
+    response_model=schemas.LiveStatusResponse,
+    **_MODELED,
+)
+def live_status() -> dict[str, Any]:
     """Freshness of the daily job and of each arm's latest issued prediction."""
     status_path = _live_dir() / "last_run.json"
     last_run = _read_json(status_path) if status_path.is_file() else None
@@ -299,8 +392,13 @@ PRIMARY_LIVE_ARM = "lstm_price_sentiment"
 # prediction covers the same span.
 NEWS_LOOKBACK_SESSIONS = 5
 
-@app.get("/api/live/today")
-def live_today() -> dict:
+@router.get(
+    "/api/live/today",
+    response_model=schemas.LiveTodayResponse,
+    responses=_not_found("No live predictions have been issued yet."),
+    **_MODELED,
+)
+def live_today() -> dict[str, Any]:
     """User-facing view: next-session call per ticker with related news.
 
     Joins the primary arm's latest issued predictions with the last close, the
@@ -431,11 +529,73 @@ def live_today() -> dict:
         "tickers": tickers,
     }
 
-def mount_frontend() -> None:
+
+def mount_frontend(target: FastAPI) -> None:
     """Serve the built dashboard when ``web/dist`` exists."""
     if not WEB_DIST.is_dir():
         return
-    app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="web")
+    target.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="web")
 
 
-mount_frontend()
+def create_app(env: Mapping[str, str] | None = None) -> FastAPI:
+    """Build the API with hardening configured from ``env`` (default: process env).
+
+    Middleware order, outermost first: security headers, trusted hosts, CORS,
+    error guard, rate limit, events limits. Headers therefore reach every
+    response (preflights, 400s and 500s included), CORS headers reach 429s and
+    500s so the browser portal can read them, and preflights are never rate
+    counted.
+    """
+    settings = SecuritySettings.from_env(os.environ if env is None else env)
+    application = FastAPI(
+        title=API_TITLE,
+        version=API_VERSION,
+        description=(
+            "Read-only forecast artifacts: experiment runs and live daily predictions."
+        ),
+        docs_url="/api/docs",
+    )
+    application.include_router(router)
+    mount_frontend(application)
+
+    application.add_middleware(
+        EventsLimitMiddleware,
+        handshake=TokenBucketLimiter(settings.events_connect_per_minute, 60.0),
+        max_streams_per_ip=settings.events_max_per_ip,
+        trust_cf_headers=settings.trust_cf_headers,
+    )
+    if settings.rate_limit > 0:
+        application.add_middleware(
+            RateLimitMiddleware,
+            limiter=TokenBucketLimiter(settings.rate_limit, settings.rate_window_seconds),
+            trust_cf_headers=settings.trust_cf_headers,
+        )
+    application.add_middleware(ErrorGuardMiddleware)
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_origin_regex=settings.cors_origin_regex,
+        allow_credentials=False,
+        allow_methods=CORS_ALLOWED_METHODS,
+        allow_headers=[],
+        expose_headers=CORS_EXPOSED_HEADERS,
+    )
+    if settings.allowed_hosts:
+        application.add_middleware(
+            TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts
+        )
+    application.add_middleware(SecurityHeadersMiddleware)
+    return application
+
+
+def render_openapi() -> str:
+    """The OpenAPI document as committed to ``openapi.json``.
+
+    Independent of the environment (middleware is not part of the schema) and
+    key-sorted so the text is stable across runs.
+    """
+    document = create_app({}).openapi()
+    return json.dumps(document, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+
+
+app = create_app()
