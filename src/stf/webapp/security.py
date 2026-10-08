@@ -21,7 +21,6 @@ from __future__ import annotations
 import ipaddress
 import logging
 import math
-import os
 import re
 import time
 from collections import OrderedDict
@@ -109,7 +108,9 @@ class SecuritySettings:
             try:
                 re.compile(regex)
             except re.error as error:
-                raise ValueError(f"STF_CORS_ORIGIN_REGEX is invalid: {error}") from error
+                raise ValueError(
+                    f"STF_CORS_ORIGIN_REGEX is invalid: {error}"
+                ) from error
 
         window = _int_env(
             env, "STF_RATE_LIMIT_WINDOW", int(DEFAULT_RATE_WINDOW_SECONDS), minimum=1
@@ -193,7 +194,9 @@ class ErrorGuardMiddleware:
             logger.exception("unhandled error on %s %s", scope["method"], scope["path"])
             if started:
                 raise
-            response = JSONResponse({"detail": "internal server error"}, status_code=500)
+            response = JSONResponse(
+                {"detail": "internal server error"}, status_code=500
+            )
             await response(scope, receive, send)
 
 
@@ -258,25 +261,46 @@ class TokenBucketLimiter:
             del self._buckets[key]
 
 
-def client_ip(scope: Scope, *, trust_cf: bool | None = None) -> str:
-    """Client identity: the socket peer, or ``CF-Connecting-IP`` when trusted.
+def _bucket_key(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> str:
+    """The unit one subscriber controls: an IPv4 address or an IPv6 /64.
 
-    The header is only honoured when ``STF_TRUST_CF_HEADERS=1`` (read from the
-    process environment unless ``trust_cf`` is passed), because without a
-    Cloudflare Tunnel in front anyone could send it. An unparsable header value
-    falls back to the socket peer.
+    A single IPv6 subscriber owns at least a /64, so limiting per full address
+    would hand out a fresh budget for every address it cares to source from.
+    IPv4-mapped IPv6 addresses count as the IPv4 address they carry.
     """
-    if trust_cf is None:
-        trust_cf = _flag(os.environ.get("STF_TRUST_CF_HEADERS"))
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped is not None:
+            return str(ip.ipv4_mapped)
+        return str(ipaddress.IPv6Address(int(ip) >> 64 << 64))
+    return str(ip)
+
+
+def client_ip(scope: Scope, *, trust_cf: bool) -> str:
+    """Rate-limit key of the client: its IPv4 address or IPv6 /64.
+
+    The peer in ``scope["client"]`` is what uvicorn reports, and with proxy
+    headers enabled uvicorn has already replaced it by the rightmost untrusted
+    ``X-Forwarded-For`` entry when the TCP peer is loopback (the tunnel). With
+    ``trust_cf`` (``STF_TRUST_CF_HEADERS=1``) a valid ``CF-Connecting-IP``
+    takes precedence over that; an unparsable value falls back to the peer. A
+    peer that is not an IP address (a unix socket path) is used as is.
+    """
     if trust_cf:
         for key, value in scope.get("headers") or []:
             if key == b"cf-connecting-ip":
                 try:
-                    return str(ipaddress.ip_address(value.decode("latin-1").strip()))
+                    return _bucket_key(
+                        ipaddress.ip_address(value.decode("latin-1").strip())
+                    )
                 except ValueError:
                     break
     client = scope.get("client")
-    return client[0] if client else "unknown"
+    if not client:
+        return "unknown"
+    try:
+        return _bucket_key(ipaddress.ip_address(client[0]))
+    except ValueError:
+        return client[0]
 
 
 def _too_many_requests(detail: str, retry_after: int) -> JSONResponse:
@@ -296,7 +320,11 @@ class RateLimitMiddleware:
     """
 
     def __init__(
-        self, app: ASGIApp, *, limiter: TokenBucketLimiter, trust_cf_headers: bool = False
+        self,
+        app: ASGIApp,
+        *,
+        limiter: TokenBucketLimiter,
+        trust_cf_headers: bool = False,
     ) -> None:
         self.app = app
         self.limiter = limiter
@@ -346,7 +374,9 @@ class EventsLimitMiddleware:
         ip = client_ip(scope, trust_cf=self.trust_cf_headers)
         wait = self.handshake.acquire(ip)
         if wait > 0:
-            response = _too_many_requests("too many stream connections", math.ceil(wait))
+            response = _too_many_requests(
+                "too many stream connections", math.ceil(wait)
+            )
             await response(scope, receive, send)
             return
         if self._open.get(ip, 0) >= self.max_streams_per_ip:

@@ -38,6 +38,9 @@ class RunInfo(Loose):
     name: str
     panel_rows: int | None
     mode: NewsMode | None
+    target_mode: str
+    horizon: int
+    point_in_time: bool | None
     date_start: str | None
     date_end: str | None
     has_information_gain: bool

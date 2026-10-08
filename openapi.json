@@ -1261,6 +1261,10 @@
             "title": "Has Information Gain",
             "type": "boolean"
           },
+          "horizon": {
+            "title": "Horizon",
+            "type": "integer"
+          },
           "mode": {
             "anyOf": [
               {
@@ -1290,12 +1294,30 @@
               }
             ],
             "title": "Panel Rows"
+          },
+          "point_in_time": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point In Time"
+          },
+          "target_mode": {
+            "title": "Target Mode",
+            "type": "string"
           }
         },
         "required": [
           "name",
           "panel_rows",
           "mode",
+          "target_mode",
+          "horizon",
+          "point_in_time",
           "date_start",
           "date_end",
           "has_information_gain"

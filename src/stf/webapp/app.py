@@ -13,6 +13,7 @@ which is what ``/openapi.json`` and the committed ``openapi.json`` describe.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from collections.abc import Mapping
 from pathlib import Path
@@ -38,6 +39,8 @@ from stf.webapp.security import (
     SecuritySettings,
     TokenBucketLimiter,
 )
+
+logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WEB_DIST = REPO_ROOT / "web" / "dist"
@@ -77,6 +80,7 @@ RunName = Annotated[str, PathParam(max_length=MAX_NAME_LENGTH)]
 def _outputs_root() -> Path:
     return Path(config.ROOT) / "outputs"
 
+
 def _run_dirs() -> dict[str, Path]:
     root = _outputs_root()
     if not root.is_dir():
@@ -99,16 +103,24 @@ def _read_json(path: Path) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise HTTPException(
-            status_code=500, detail=f"cannot read artifact {path.name}"
-        ) from error
+        # The file name stays in the log; the client gets the same opaque body
+        # as any other unhandled error.
+        logger.error("cannot read artifact %s: %s", path.name, error)
+        raise HTTPException(status_code=500, detail="internal server error") from error
+
+
+def _read_csv_frame(path: Path) -> pd.DataFrame:
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail=f"missing artifact {path.name}")
+    return pd.read_csv(path)
+
+
+def _records(frame: pd.DataFrame) -> list[dict]:
+    return json.loads(frame.to_json(orient="records"))
 
 
 def _read_csv_records(path: Path) -> list[dict]:
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail=f"missing artifact {path.name}")
-    frame = pd.read_csv(path)
-    return json.loads(frame.to_json(orient="records"))
+    return _records(_read_csv_frame(path))
 
 
 def _normalize_news_sentiment(news: dict) -> dict:
@@ -142,7 +154,6 @@ def _normalize_information_gain(payload: dict) -> dict:
                     effect.pop("architecture_effect"),
                 )
     return payload
-
 
 
 @router.get(
@@ -233,14 +244,14 @@ def run_predictions(
     offset: int = Query(default=0, ge=0, le=MAX_OFFSET),
 ) -> dict[str, Any]:
     """Paginated per-row predictions, filterable by arm/ticker/window."""
-    rows = _read_csv_records(_run_dir(name) / "forecast_predictions.csv")
-    if arm is not None:
-        rows = [row for row in rows if row.get("arm") == arm]
-    if ticker is not None:
-        rows = [row for row in rows if row.get("ticker") == ticker]
-    if window is not None:
-        rows = [row for row in rows if row.get("window") == window]
-    return {"total": len(rows), "rows": rows[offset : offset + limit]}
+    frame = _read_csv_frame(_run_dir(name) / "forecast_predictions.csv")
+    for column, value in (("arm", arm), ("ticker", ticker), ("window", window)):
+        if value is not None:
+            frame = frame[frame[column] == value] if column in frame else frame.iloc[:0]
+    return {
+        "total": len(frame),
+        "rows": _records(frame.iloc[offset : offset + limit]),
+    }
 
 
 @router.get(
@@ -399,6 +410,7 @@ PRIMARY_LIVE_ARM = "lstm_price_sentiment"
 # prediction covers the same span.
 NEWS_LOOKBACK_SESSIONS = 5
 
+
 @router.get(
     "/api/live/today",
     response_model=schemas.LiveTodayResponse,
@@ -423,7 +435,9 @@ def live_today() -> dict[str, Any]:
     # Prefer the boundaries stamped into the issued rows; the manifest is only a
     # fallback for predictions written before stamping existed, so a later refit
     # cannot change what an old prediction displays.
-    manifest_path = Path(config.ROOT) / "models" / "forecast" / PRIMARY_LIVE_ARM / "manifest.json"
+    manifest_path = (
+        Path(config.ROOT) / "models" / "forecast" / PRIMARY_LIVE_ARM / "manifest.json"
+    )
     manifest = _read_json(manifest_path) if manifest_path.is_file() else {}
     manifest_thresholds = manifest.get("thresholds")
 
@@ -511,9 +525,7 @@ def live_today() -> dict[str, Any]:
             {
                 "ticker": ticker,
                 "y_pred": row["y_pred"],
-                "confidence": float(
-                    row[["prob_down", "prob_flat", "prob_up"]].max()
-                ),
+                "confidence": float(row[["prob_down", "prob_flat", "prob_up"]].max()),
                 "prob_down": float(row["prob_down"]),
                 "prob_flat": float(row["prob_flat"]),
                 "prob_up": float(row["prob_up"]),
@@ -574,7 +586,9 @@ def create_app(env: Mapping[str, str] | None = None) -> FastAPI:
     if settings.rate_limit > 0:
         application.add_middleware(
             RateLimitMiddleware,
-            limiter=TokenBucketLimiter(settings.rate_limit, settings.rate_window_seconds),
+            limiter=TokenBucketLimiter(
+                settings.rate_limit, settings.rate_window_seconds
+            ),
             trust_cf_headers=settings.trust_cf_headers,
         )
     application.add_middleware(ErrorGuardMiddleware)

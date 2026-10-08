@@ -410,9 +410,9 @@ server with an error instead of silently loosening a limit.
 | `STF_CORS_ORIGIN_REGEX` | unset | Regex an `Origin` must match **in full** (`re.fullmatch`, so a suffix or prefix cannot slip through). For Vercel previews. | `https://stf-portal-[a-z0-9-]+\.vercel\.app`, or unset |
 | `STF_RATE_LIMIT` | `120` | Requests per window per client IP; `0` disables. Over the limit: `429` with `Retry-After`. | `120` |
 | `STF_RATE_LIMIT_WINDOW` | `60` | Window length in seconds. | `60` |
-| `STF_EVENTS_CONNECT_PER_MINUTE` | `6` | Extra per-IP limit on new `/api/events` stream handshakes (`429` + `Retry-After` = seconds until a token frees). | `6` |
-| `STF_EVENTS_MAX_PER_IP` | `3` | Extra per-IP cap on concurrent `/api/events` streams (`429` + `Retry-After: 30`). The slot is freed when the stream ends, the client disconnects or the server shuts down. | `3` |
-| `STF_TRUST_CF_HEADERS` | unset | `1` = identify clients by `CF-Connecting-IP`; otherwise the socket peer. Only set behind the Tunnel: anyone who can reach the port directly could spoof the header. | `1` with the Tunnel, and bind `--host 127.0.0.1` |
+| `STF_EVENTS_CONNECT_PER_MINUTE` | `6` | Extra per-IP limit on new `/api/events` stream handshakes (`429` + `Retry-After` = seconds until a token frees). Applies once the `/api/events` stream endpoint ships; the API does not serve that route yet. | `6` |
+| `STF_EVENTS_MAX_PER_IP` | `3` | Extra per-IP cap on concurrent `/api/events` streams (`429` + `Retry-After: 30`). The slot is freed when the stream ends, the client disconnects or the server shuts down. Applies once the `/api/events` stream endpoint ships. | `3` |
+| `STF_TRUST_CF_HEADERS` | unset | Default: the client is the connection peer after uvicorn's `X-Forwarded-For` handling, which is honoured only from loopback. `1`: a valid `CF-Connecting-IP` takes precedence. Only set behind the Tunnel: anyone who can reach the port directly could spoof the header. | `1` with the Tunnel, and bind `--host 127.0.0.1` |
 | `STF_ALLOWED_HOSTS` | unset (any `Host`) | Comma-separated `Host` allow-list (`api.example.com`, `*.example.com`); others get `400`. | the public API hostname |
 
 With neither CORS variable set no cross-origin access is granted (the same-origin
@@ -421,7 +421,15 @@ and only `GET`, `HEAD` and `OPTIONS` pass preflight. The general limiter counts
 each HTTP request once, when it arrives, so a long-lived `/api/events` stream is
 one request however many events it sends; preflights are not counted. Rate-limit
 state is in memory (idle clients are evicted, at most 10,000 are tracked), so it
-resets on restart and is per process.
+resets on restart and is per process. Clients are keyed by IPv4 address or by
+IPv6 `/64`, so one IPv6 subscriber cannot multiply its budget by changing
+source address.
+
+After setting up the tunnel, verify that two distinct clients get separate
+budgets (for example `STF_RATE_LIMIT=3`, then five requests from one client
+followed by one from another). If both share a single bucket, the
+`X-Forwarded-For` header is not reaching the process and every visitor counts as
+`127.0.0.1`; set `STF_TRUST_CF_HEADERS=1`.
 
 Every response carries `X-Content-Type-Options: nosniff`, `Referrer-Policy:
 no-referrer` and `X-Frame-Options: DENY`; JSON responses default to
