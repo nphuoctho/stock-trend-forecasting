@@ -1,0 +1,17 @@
+[Unit]
+Description=Stock trend forecasting public API (FastAPI + SSE)
+Documentation=file://%h/Documents/MySpace/Researcher/stock-trend-forecasting/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Documents/MySpace/Researcher/stock-trend-forecasting
+EnvironmentFile=-%h/.config/stf/api.env
+ExecStart=/usr/bin/uv run python -m stf.cli webapp --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target
