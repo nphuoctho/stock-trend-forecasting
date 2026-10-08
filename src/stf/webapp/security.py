@@ -18,9 +18,11 @@ Invalid values fail loudly at startup rather than silently widening access.
 
 from __future__ import annotations
 
+import functools
 import ipaddress
 import logging
 import math
+import os
 import re
 import time
 from collections import OrderedDict
@@ -261,46 +263,53 @@ class TokenBucketLimiter:
             del self._buckets[key]
 
 
-def _bucket_key(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> str:
-    """The unit one subscriber controls: an IPv4 address or an IPv6 /64.
+@functools.cache
+def _env_trust_cf() -> bool:
+    """``STF_TRUST_CF_HEADERS`` from the process environment, read once."""
+    return _flag(os.environ.get("STF_TRUST_CF_HEADERS"))
+
+
+def client_ip(scope: Scope, *, trust_cf: bool | None = None) -> str:
+    """Resolved client address: the connection peer, or ``CF-Connecting-IP``.
+
+    The peer in ``scope["client"]`` is what uvicorn reports, and with proxy
+    headers enabled uvicorn has already replaced it by the rightmost untrusted
+    ``X-Forwarded-For`` entry when the TCP peer is loopback (the tunnel). With
+    ``STF_TRUST_CF_HEADERS=1`` (read once from the process environment unless
+    ``trust_cf`` is passed) a valid ``CF-Connecting-IP`` takes precedence over
+    that; an unparsable value falls back to the peer. The result is a full
+    address; use :func:`limiter_key` to choose a rate-limit bucket.
+    """
+    if trust_cf is None:
+        trust_cf = _env_trust_cf()
+    if trust_cf:
+        for key, value in scope.get("headers") or []:
+            if key == b"cf-connecting-ip":
+                try:
+                    return str(ipaddress.ip_address(value.decode("latin-1").strip()))
+                except ValueError:
+                    break
+    client = scope.get("client")
+    return client[0] if client else "unknown"
+
+
+def limiter_key(address: str) -> str:
+    """Rate-limit bucket for a client address: an IPv4 address or an IPv6 /64.
 
     A single IPv6 subscriber owns at least a /64, so limiting per full address
     would hand out a fresh budget for every address it cares to source from.
-    IPv4-mapped IPv6 addresses count as the IPv4 address they carry.
+    IPv4-mapped IPv6 addresses count as the IPv4 address they carry; anything
+    that is not an IP address (a unix socket path, ``"unknown"``) is unchanged.
     """
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return address
     if isinstance(ip, ipaddress.IPv6Address):
         if ip.ipv4_mapped is not None:
             return str(ip.ipv4_mapped)
         return str(ipaddress.IPv6Address(int(ip) >> 64 << 64))
     return str(ip)
-
-
-def client_ip(scope: Scope, *, trust_cf: bool) -> str:
-    """Rate-limit key of the client: its IPv4 address or IPv6 /64.
-
-    The peer in ``scope["client"]`` is what uvicorn reports, and with proxy
-    headers enabled uvicorn has already replaced it by the rightmost untrusted
-    ``X-Forwarded-For`` entry when the TCP peer is loopback (the tunnel). With
-    ``trust_cf`` (``STF_TRUST_CF_HEADERS=1``) a valid ``CF-Connecting-IP``
-    takes precedence over that; an unparsable value falls back to the peer. A
-    peer that is not an IP address (a unix socket path) is used as is.
-    """
-    if trust_cf:
-        for key, value in scope.get("headers") or []:
-            if key == b"cf-connecting-ip":
-                try:
-                    return _bucket_key(
-                        ipaddress.ip_address(value.decode("latin-1").strip())
-                    )
-                except ValueError:
-                    break
-    client = scope.get("client")
-    if not client:
-        return "unknown"
-    try:
-        return _bucket_key(ipaddress.ip_address(client[0]))
-    except ValueError:
-        return client[0]
 
 
 def _too_many_requests(detail: str, retry_after: int) -> JSONResponse:
@@ -334,7 +343,9 @@ class RateLimitMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        wait = self.limiter.acquire(client_ip(scope, trust_cf=self.trust_cf_headers))
+        wait = self.limiter.acquire(
+            limiter_key(client_ip(scope, trust_cf=self.trust_cf_headers))
+        )
         if wait > 0:
             response = _too_many_requests("rate limit exceeded", math.ceil(wait))
             await response(scope, receive, send)
@@ -371,7 +382,7 @@ class EventsLimitMiddleware:
         if scope["type"] != "http" or scope["path"] != self.path:
             await self.app(scope, receive, send)
             return
-        ip = client_ip(scope, trust_cf=self.trust_cf_headers)
+        ip = limiter_key(client_ip(scope, trust_cf=self.trust_cf_headers))
         wait = self.handshake.acquire(ip)
         if wait > 0:
             response = _too_many_requests(

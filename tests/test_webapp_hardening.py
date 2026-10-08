@@ -16,10 +16,12 @@ from fastapi.testclient import TestClient
 
 from stf.cli import main
 from stf.webapp import app as webapp_module
+from stf.webapp import security
 from stf.webapp.security import (
     RateLimitMiddleware,
     TokenBucketLimiter,
     client_ip,
+    limiter_key,
 )
 
 PORTAL = "https://portal.example.com"
@@ -218,51 +220,69 @@ def test_cf_connecting_ip_is_ignored_unless_trusted(outputs):
     )
 
 
-def test_client_ip_helper_follows_the_trust_switch():
-    scope = {
-        "client": ("10.0.0.5", 1234),
-        "headers": [(b"cf-connecting-ip", b"198.51.100.9")],
-    }
-    assert client_ip(scope, trust_cf=False) == "10.0.0.5"
-    assert client_ip(scope, trust_cf=True) == "198.51.100.9"
-    assert client_ip({"client": None, "headers": []}, trust_cf=True) == "unknown"
-
-
 def _scope(peer: str | None, cf: str | None = None) -> dict:
     headers = [(b"cf-connecting-ip", cf.encode())] if cf else []
     return {"client": (peer, 1234) if peer else None, "headers": headers}
 
 
-@pytest.mark.parametrize("trust_cf", [False, True])
-def test_ipv6_addresses_of_one_slash_64_share_a_bucket(trust_cf):
-    def key(address: str) -> str:
-        # The peer path when untrusted, the Cloudflare header path when trusted.
-        scope = _scope("::1", address) if trust_cf else _scope(address)
-        return client_ip(scope, trust_cf=trust_cf)
+def test_client_ip_helper_follows_the_trust_switch():
+    scope = _scope("10.0.0.5", "198.51.100.9")
+    assert client_ip(scope, trust_cf=False) == "10.0.0.5"
+    assert client_ip(scope, trust_cf=True) == "198.51.100.9"
+    assert client_ip(_scope(None), trust_cf=True) == "unknown"
 
+
+def test_client_ip_defaults_to_the_environment_read_once(monkeypatch):
+    scope = _scope("10.0.0.5", "198.51.100.9")
+    monkeypatch.setenv("STF_TRUST_CF_HEADERS", "1")
+    security._env_trust_cf.cache_clear()
+    try:
+        assert client_ip(scope) == "198.51.100.9"
+        monkeypatch.setenv("STF_TRUST_CF_HEADERS", "0")
+        assert client_ip(scope) == "198.51.100.9"  # resolved once, not per call
+        security._env_trust_cf.cache_clear()
+        assert client_ip(scope) == "10.0.0.5"
+    finally:
+        security._env_trust_cf.cache_clear()
+
+
+def test_client_ip_keeps_the_full_address():
+    address = "2001:db8:1:2:aaaa:bbbb:cccc:dddd"
+    assert client_ip(_scope(address), trust_cf=False) == address
+    assert client_ip(_scope("::1", address), trust_cf=True) == address
+    assert client_ip(_scope("/run/stf.sock"), trust_cf=False) == "/run/stf.sock"
+
+
+def test_ipv6_addresses_of_one_slash_64_share_a_limiter_key():
     same_subnet = [
-        key("2001:db8:1:2::1"),
-        key("2001:db8:1:2:aaaa:bbbb:cccc:dddd"),
-        key("2001:0db8:0001:0002:ffff:ffff:ffff:ffff"),
+        limiter_key("2001:db8:1:2::1"),
+        limiter_key("2001:db8:1:2:aaaa:bbbb:cccc:dddd"),
+        limiter_key("2001:0db8:0001:0002:ffff:ffff:ffff:ffff"),
     ]
     assert len(set(same_subnet)) == 1
-    assert key("2001:db8:1:3::1") != same_subnet[0]
-    assert key("2001:db8:2:2::1") != same_subnet[0]
+    assert limiter_key("2001:db8:1:3::1") != same_subnet[0]
+    assert limiter_key("2001:db8:2:2::1") != same_subnet[0]
 
 
-@pytest.mark.parametrize("trust_cf", [False, True])
-def test_ipv4_and_ipv4_mapped_addresses_are_keyed_by_the_full_address(trust_cf):
-    def key(address: str) -> str:
-        scope = _scope("::1", address) if trust_cf else _scope(address)
-        return client_ip(scope, trust_cf=trust_cf)
-
-    assert key("203.0.113.7") == "203.0.113.7"
-    assert key("203.0.113.8") != key("203.0.113.7")
-    assert key("::ffff:203.0.113.7") == "203.0.113.7"
+def test_limiter_key_is_the_address_for_ipv4_and_unchanged_for_non_ips():
+    assert limiter_key("203.0.113.7") == "203.0.113.7"
+    assert limiter_key("203.0.113.8") != limiter_key("203.0.113.7")
+    assert limiter_key("::ffff:203.0.113.7") == "203.0.113.7"
+    assert limiter_key("/run/stf.sock") == "/run/stf.sock"
+    assert limiter_key("unknown") == "unknown"
 
 
-def test_a_peer_that_is_not_an_ip_address_is_used_unchanged():
-    assert client_ip(_scope("/run/stf.sock"), trust_cf=False) == "/run/stf.sock"
+def test_trusted_cloudflare_header_clients_in_one_subnet_share_a_budget(outputs):
+    client = make_client({"STF_RATE_LIMIT": "2", "STF_TRUST_CF_HEADERS": "1"})
+    codes = [
+        client.get(
+            "/api/runs", headers={"CF-Connecting-IP": f"2001:db8:1:2::{i}"}
+        ).status_code
+        for i in range(1, 5)
+    ]
+    assert codes == [200, 200, 429, 429]
+    other = {"CF-Connecting-IP": "2001:db8:1:3::1"}
+    assert client.get("/api/runs", headers=other).status_code == 200
 
 
 def test_the_limiter_treats_one_ipv6_subnet_as_one_client(outputs):
