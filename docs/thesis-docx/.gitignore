@@ -1,0 +1,3 @@
+# Generated DOCX pipeline artifacts: flattened source, extracted figures, the
+# unpacked docx tree and the rendered document. Rebuild them from tools/.
+build/

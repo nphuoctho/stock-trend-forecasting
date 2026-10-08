@@ -31,6 +31,21 @@ function ModeBadge({ mode }: { mode: RunInfo['mode'] }) {
   return <Badge variant="muted">không tin tức</Badge>
 }
 
+// A run's label definition changes what its numbers mean. Two runs are only
+// comparable when both of these match, so the dashboard states them rather than
+// letting the directory name carry the distinction.
+function targetLabel(run: Pick<RunInfo, 'target_mode' | 'horizon'>) {
+  const target = run.target_mode === 'excess' ? 'lợi suất vượt trội' : 'lợi suất thô'
+  return run.horizon > 1 ? `${target} · h=${run.horizon}` : target
+}
+
+function TargetBadge({ run }: { run: RunInfo }) {
+  const nonDefault = run.target_mode === 'excess' || run.horizon > 1
+  return (
+    <Badge variant={nonDefault ? 'neutral' : 'muted'}>{targetLabel(run)}</Badge>
+  )
+}
+
 export default function App() {
   const [selected, setSelected] = useState<string | null>(null)
 
@@ -96,12 +111,13 @@ export default function App() {
               <SelectContent>
                 {runs?.map((r) => (
                   <SelectItem key={r.name} value={r.name}>
-                    {r.name}
+                    {r.name} — {targetLabel(r)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {currentRun && <ModeBadge mode={currentRun.mode} />}
+            {currentRun && <TargetBadge run={currentRun} />}
           </div>
         </div>
       </header>

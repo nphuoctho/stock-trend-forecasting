@@ -2,6 +2,12 @@ export interface RunInfo {
   name: string
   panel_rows: number | null
   mode: 'real' | 'neutral_prior' | null
+  // What the run predicts. A run with target_mode 'excess' or horizon > 1 answers
+  // a different question than the headline next-session run and must not be read
+  // side by side with it without saying so.
+  target_mode: 'raw' | 'excess'
+  horizon: number
+  point_in_time: boolean | null
   date_start: string | null
   date_end: string | null
   has_information_gain: boolean
