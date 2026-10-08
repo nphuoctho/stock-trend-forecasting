@@ -695,14 +695,34 @@ def cmd_score_news(args: argparse.Namespace) -> int:
 
 
 def cmd_webapp(args: argparse.Namespace) -> int:
-    """Serve the read-only dashboard over forecast artifacts."""
+    """Serve the read-only API (and the built dashboard, if present)."""
     import uvicorn
 
     uvicorn.run(
-        "stf.webapp.app:app", host=args.host, port=args.port, log_level="info"
+        "stf.webapp.app:app",
+        host=args.host,
+        port=args.port,
+        log_level="info",
+        # X-Forwarded-* is honoured only from a loopback peer (the local
+        # Cloudflare Tunnel). Pinned here so an ambient FORWARDED_ALLOW_IPS=*
+        # cannot let any remote client spoof its address.
+        proxy_headers=True,
+        forwarded_allow_ips="127.0.0.1,::1",
     )
     return 0
 
+
+def cmd_openapi(args: argparse.Namespace) -> int:
+    """Write the OpenAPI document the portal generates its types from."""
+    from stf.webapp.app import render_openapi
+
+    text = render_openapi()
+    if args.output is None:
+        sys.stdout.write(text)
+    else:
+        args.output.write_text(text, encoding="utf-8")
+        print(f"[openapi] wrote {args.output}", file=sys.stderr)
+    return 0
 
 
 def _forecast_smoke_prices(n: int) -> pd.DataFrame:
@@ -2101,6 +2121,18 @@ def main(argv: list[str] | None = None) -> int:
     p_web.add_argument("--host", default="127.0.0.1")
     p_web.add_argument("--port", type=int, default=8000)
     p_web.set_defaults(func=cmd_webapp)
+
+    p_openapi = sub.add_parser(
+        "openapi",
+        help="write the deterministic OpenAPI document of the webapp API",
+    )
+    p_openapi.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="file to write (default: stdout)",
+    )
+    p_openapi.set_defaults(func=cmd_openapi)
 
     p_cand = sub.add_parser(
         "label-candidates",
