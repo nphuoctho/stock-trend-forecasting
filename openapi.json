@@ -309,6 +309,77 @@
         "title": "InformationGainEffect",
         "type": "object"
       },
+      "JobStatusData": {
+        "description": "Outcome of one run of the daily job, as written to ``last_run.json``.",
+        "properties": {
+          "exit_code": {
+            "title": "Exit Code",
+            "type": "integer"
+          },
+          "failed_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Step"
+          },
+          "finished_at": {
+            "title": "Finished At",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "exit_code",
+          "finished_at"
+        ],
+        "title": "JobStatusData",
+        "type": "object"
+      },
+      "JobStatusEvent": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/JobStatusData"
+          },
+          "id": {
+            "description": "Monotonic event id; also the SSE `id:` field.",
+            "title": "Id",
+            "type": "integer"
+          },
+          "key": {
+            "description": "Deterministic idempotency key.",
+            "title": "Key",
+            "type": "string"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          },
+          "type": {
+            "const": "job.status",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ts",
+          "key",
+          "type",
+          "data"
+        ],
+        "title": "JobStatusEvent",
+        "type": "object"
+      },
       "LastRun": {
         "additionalProperties": true,
         "properties": {
@@ -877,6 +948,72 @@
         "title": "NewsCoverage",
         "type": "object"
       },
+      "NewsIngestedData": {
+        "description": "A batch of newly scored articles was persisted.",
+        "properties": {
+          "by_ticker": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Articles scored per ticker.",
+            "title": "By Ticker",
+            "type": "object"
+          },
+          "count": {
+            "description": "Articles scored in this batch.",
+            "title": "Count",
+            "type": "integer"
+          },
+          "total_scored": {
+            "description": "Rows in the scored-news file afterwards.",
+            "title": "Total Scored",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count",
+          "total_scored",
+          "by_ticker"
+        ],
+        "title": "NewsIngestedData",
+        "type": "object"
+      },
+      "NewsIngestedEvent": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NewsIngestedData"
+          },
+          "id": {
+            "description": "Monotonic event id; also the SSE `id:` field.",
+            "title": "Id",
+            "type": "integer"
+          },
+          "key": {
+            "description": "Deterministic idempotency key.",
+            "title": "Key",
+            "type": "string"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          },
+          "type": {
+            "const": "news.ingested",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ts",
+          "key",
+          "type",
+          "data"
+        ],
+        "title": "NewsIngestedEvent",
+        "type": "object"
+      },
       "NewsSentimentProvenance": {
         "additionalProperties": true,
         "properties": {
@@ -1232,6 +1369,55 @@
         "title": "Provenance",
         "type": "object"
       },
+      "ResetData": {
+        "description": "The client's ``Last-Event-ID`` cannot be served; it must refetch state.",
+        "properties": {
+          "head_id": {
+            "description": "Id of the newest event; the stream resumes here.",
+            "title": "Head Id",
+            "type": "integer"
+          },
+          "reason": {
+            "enum": [
+              "stale_last_event_id",
+              "invalid_last_event_id",
+              "log_replaced"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "head_id"
+        ],
+        "title": "ResetData",
+        "type": "object"
+      },
+      "ResetEvent": {
+        "description": "Control event, never logged: sent in place of a replay that cannot be served.",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ResetData"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "type": {
+            "const": "reset",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "data"
+        ],
+        "title": "ResetEvent",
+        "type": "object"
+      },
       "RunInfo": {
         "additionalProperties": true,
         "properties": {
@@ -1483,6 +1669,81 @@
         "title": "RunsResponse",
         "type": "object"
       },
+      "SignalIssuedData": {
+        "description": "One arm's predictions for the next session were persisted.",
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "issued_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Issuance stamp written into the prediction file.",
+            "title": "Issued At"
+          },
+          "n_predictions": {
+            "description": "Rows (tickers) in the persisted file.",
+            "title": "N Predictions",
+            "type": "integer"
+          },
+          "observation_date": {
+            "description": "Session the features were observed on; the forecast targets the next trading session after it.",
+            "format": "date",
+            "title": "Observation Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "arm",
+          "observation_date",
+          "n_predictions"
+        ],
+        "title": "SignalIssuedData",
+        "type": "object"
+      },
+      "SignalIssuedEvent": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SignalIssuedData"
+          },
+          "id": {
+            "description": "Monotonic event id; also the SSE `id:` field.",
+            "title": "Id",
+            "type": "integer"
+          },
+          "key": {
+            "description": "Deterministic idempotency key.",
+            "title": "Key",
+            "type": "string"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          },
+          "type": {
+            "const": "signal.issued",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ts",
+          "key",
+          "type",
+          "data"
+        ],
+        "title": "SignalIssuedEvent",
+        "type": "object"
+      },
       "StratifiedResponse": {
         "additionalProperties": true,
         "properties": {
@@ -1673,12 +1934,158 @@
     }
   },
   "info": {
-    "description": "Read-only forecast artifacts: experiment runs and live daily predictions.",
+    "description": "Forecast artifacts (experiment runs and live daily predictions) and a Server-Sent Events stream announcing newly persisted signals and news.",
     "title": "stock-trend-forecasting",
     "version": "1.0.0"
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/events": {
+      "get": {
+        "description": "`text/event-stream`. Each frame carries `id: <log id>`, `event: <type>` and one `data:` line holding the JSON event. A reconnect with `Last-Event-ID` replays the events it missed; an id the log cannot serve yields a `reset` event, after which the client must refetch its state. `: ping` comments keep the connection alive and carry no data.",
+        "operationId": "stream_events_api_events_get",
+        "parameters": [
+          {
+            "description": "Same as the Last-Event-ID header, for clients that cannot set headers. The header wins when both are sent.",
+            "in": "query",
+            "name": "last_event_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Same as the Last-Event-ID header, for clients that cannot set headers. The header wins when both are sent.",
+              "title": "Last Event Id"
+            }
+          },
+          {
+            "description": "Id of the last event the client received; everything after it is replayed before the stream tails the log.",
+            "in": "header",
+            "name": "Last-Event-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Id of the last event the client received; everything after it is replayed before the stream tails the log.",
+              "title": "Last-Event-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "properties": {
+                    "data": {
+                      "contentMediaType": "application/json",
+                      "contentSchema": {
+                        "discriminator": {
+                          "mapping": {
+                            "job.status": "#/components/schemas/JobStatusEvent",
+                            "news.ingested": "#/components/schemas/NewsIngestedEvent",
+                            "reset": "#/components/schemas/ResetEvent",
+                            "signal.issued": "#/components/schemas/SignalIssuedEvent"
+                          },
+                          "propertyName": "type"
+                        },
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/SignalIssuedEvent"
+                          },
+                          {
+                            "$ref": "#/components/schemas/NewsIngestedEvent"
+                          },
+                          {
+                            "$ref": "#/components/schemas/JobStatusEvent"
+                          },
+                          {
+                            "$ref": "#/components/schemas/ResetEvent"
+                          }
+                        ],
+                        "title": "Streamitem Stream Events Api Events Get"
+                      },
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "This client opened streams too fast or holds too many; see the Retry-After header (seconds).",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The server is at its global stream cap or shutting down.",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Live signals, news and job status (Server-Sent Events)"
+      }
+    },
     "/api/live/history": {
       "get": {
         "description": "Resolved predictions with realized labels and per-date accuracy, per arm.",

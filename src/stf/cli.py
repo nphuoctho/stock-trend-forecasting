@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -541,6 +542,59 @@ def _validated_scored_news_manifest(news_path: Path, news: pd.DataFrame) -> dict
     }
 
 
+def _stage_parquet(frame: pd.DataFrame, path: Path) -> Path:
+    """Write and fsync ``frame`` beside ``path``; commit it with ``os.replace``."""
+    staged = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        frame.to_parquet(staged, index=False)
+        fd = os.open(staged, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except BaseException:
+        staged.unlink(missing_ok=True)
+        raise
+    return staged
+
+
+def _write_parquet_atomic(frame: pd.DataFrame, path: Path) -> None:
+    staged = _stage_parquet(frame, path)
+    try:
+        os.replace(staged, path)
+    except BaseException:
+        staged.unlink(missing_ok=True)
+        raise
+
+
+def _log_events(what: str, action):
+    """Run an event-log step without letting it fail the command.
+
+    ``outputs/live/events.jsonl`` is an index derived from the persisted
+    artifacts; if appending fails the artifacts are still valid and
+    ``events-reconcile`` (run by the daily job and the API) re-derives the event.
+    """
+    try:
+        return action()
+    except Exception as error:
+        print(
+            f"[events] {what} failed ({error!r}); events-reconcile will recover it.",
+            file=sys.stderr,
+        )
+        return None
+
+
+def cmd_events_reconcile(args: argparse.Namespace) -> int:
+    """Append every committed-but-unlogged event (idempotent)."""
+    from stf import events
+
+    appended = events.reconcile()
+    print(f"[events] reconcile appended {len(appended)} event(s)")
+    for event in appended:
+        print(f"  #{event['id']} {event['type']} {event['key']}")
+    return 0
+
+
 def cmd_score_news(args: argparse.Namespace) -> int:
     """Score crawler rows and persist audited probability provenance."""
     from stf.data.news import load_ticker_articles
@@ -574,6 +628,13 @@ def cmd_score_news(args: argparse.Namespace) -> int:
         articles, args.input_variant, context_chars=args.context_chars
     )
     scored_all = scored
+
+    from stf import events
+
+    if args.incremental:
+        # Settle any batch a previous run committed but did not get to log, so the
+        # ledger holds no live intent when this run's batch is prepared.
+        _log_events("reconcile", events.reconcile)
 
     output_path = Path(args.output)
     existing = None
@@ -635,9 +696,38 @@ def cmd_score_news(args: argparse.Namespace) -> int:
         if existing is not None
         else new_rows
     )
-    output_path = Path(args.output)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    out.to_parquet(output_path, index=False)
+
+    # Stage the parquet, make the batch durable in the ledger, then commit with an
+    # atomic rename: a crash anywhere in between leaves either the old file or a
+    # file whose hash the ledger already records (see stf.events.reconcile).
+    out_path = Path(args.output)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    staged = _stage_parquet(out, out_path)
+    batch = None
+    if args.incremental and len(new_rows):
+        batch = (
+            events.news_batch_key(zip(new_rows["ticker"], new_rows["url"])),
+            events.NewsIngestedData(
+                count=int(len(new_rows)),
+                total_scored=int(len(out)),
+                by_ticker={
+                    str(ticker): int(n)
+                    for ticker, n in new_rows["ticker"].value_counts().sort_index().items()
+                },
+            ),
+        )
+        _log_events(
+            "news batch ledger",
+            lambda: events.prepare_news_batch(
+                events.live_dir(),
+                key=batch[0],
+                data=batch[1],
+                output=out_path,
+                output_sha256=events.file_sha256(staged),
+            ),
+        )
+    os.replace(staged, out_path)
+    output_path = out_path
     manifest_path = output_path.with_suffix(".manifest.json")
     refit_manifest_path = _checkpoint_manifest_path(model_dir)
     manifest = {
@@ -691,6 +781,16 @@ def cmd_score_news(args: argparse.Namespace) -> int:
         f"[score-news] scored {len(out)} rows -> {output_path} "
         f"(manifest {manifest_path})"
     )
+    if batch is not None:
+        # Last: the parquet and its manifest are both in place, so a consumer that
+        # reacts to the event reads consistent scored news. A crash before this
+        # line is recovered from the ledger by events.reconcile.
+        _log_events(
+            "news.ingested",
+            lambda: events.append_event(
+                events.live_dir(), "news.ingested", batch[0], batch[1]
+            ),
+        )
     return 0
 
 
@@ -1230,8 +1330,16 @@ def cmd_forecast_predict(args: argparse.Namespace) -> int:
             )
             return 3
     else:
-        predictions.to_parquet(dated_path, index=False)
-    predictions.to_parquet(out_dir / "latest.parquet", index=False)
+        _write_parquet_atomic(predictions, dated_path)
+    _write_parquet_atomic(predictions, out_dir / "latest.parquet")
+
+    # The dated file is the commit point: the event is derived from its bytes, so
+    # it is logged only now, after both files that /api/live/* serves are in
+    # place. Exit 3 returned above never reaches this line, and re-running over an
+    # identical file is a no-op because the key includes the file's content hash.
+    from stf import events
+
+    _log_events("signal.issued", lambda: events.emit_signal_issued(dated_path))
 
     print(f"[forecast-predict] arm={arm.name} date={obs_date} tickers={len(predictions)}")
     # The live track record only counts a row whose issuance stamp falls on the
@@ -2113,6 +2221,12 @@ def main(argv: list[str] | None = None) -> int:
         help="append only articles not already scored in --output",
     )
     p_score.set_defaults(func=cmd_score_news)
+
+    p_events = sub.add_parser(
+        "events-reconcile",
+        help="append committed-but-unlogged events to outputs/live/events.jsonl",
+    )
+    p_events.set_defaults(func=cmd_events_reconcile)
 
     p_web = sub.add_parser(
         "webapp",
